@@ -65,6 +65,19 @@ not assumed obsolete by age alone. Results identify their cached revision and
 retain author, observation date, source and signed event ID. Remote grant changes
 and corrections still require explicit import of a newer authorised snapshot.
 
+Records may optionally carry signed extraction provenance:
+
+```ts
+provenance: {
+  derivation: 'extracted', method: 'typescript-ast', confidence: 90,
+}
+```
+
+The derivation is `extracted`, `inferred` or `ambiguous`; methods are bounded
+stable identifiers and confidence is an integer from 0 to 100. These fields
+describe how evidence was produced. They do not prove that it is true or grant
+authority to act on it.
+
 ## Authorised relationship graphs
 
 Records may carry up to 16 typed, directed `relations` to records in the same
@@ -99,8 +112,8 @@ explicit relations, while preserving each edge's asserted direction. Both are
 disposable views of one currently authorised, corrected snapshot: they do no
 network IO, never follow sources and never traverse another collection.
 
-The Node tools package provides a bounded package-manifest scanner. Further
-repository scanners and semantic extractors belong in optional adapters. They
+The Node tools package provides bounded package, ecosystem, TypeScript/JavaScript
+and broad-language source scanners. Further semantic extractors belong in optional adapters. They
 may propose records and relationships for any project or ecosystem, but the
 core does not silently promote generated output to trusted evidence.
 

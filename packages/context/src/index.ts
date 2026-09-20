@@ -14,6 +14,16 @@ export type { ContextGraphOptions, ContextGraph, ContextGraphPathOptions, Contex
 
 export type ContextScope = 'personal' | 'kin' | 'kith'
 export type ContextRole = 'read' | 'write'
+export const CONTEXT_DERIVATIONS = ['extracted', 'inferred', 'ambiguous'] as const
+export type ContextDerivation = typeof CONTEXT_DERIVATIONS[number]
+export interface ContextProvenance {
+  /** How this record was derived; metadata is not proof of truth or authority. */
+  derivation: ContextDerivation
+  /** Stable extractor identifier, such as `typescript-ast`. */
+  method: string
+  /** Deterministic strength of extraction evidence, from 0 to 100. */
+  confidence: number
+}
 export interface ContextIdentity {
   readonly pubkey: string
   signEvent(unsigned: { kind: number; created_at: number; tags: string[][]; content: string }): Promise<Event>
@@ -46,6 +56,7 @@ export interface ContextRecord {
   observedAt: number
   /** A correction retains the old signed record as evidence. */
   supersedes?: string
+  provenance?: ContextProvenance
   /** Signed, directed links to records in this collection. */
   relations?: ContextRelation[]
 }
@@ -135,6 +146,13 @@ function validators(verifyDelegation: VerifyDelegation = () => ({ ok: false })) 
     assert(role(p.body, e.pubkey, e.created_at) === 'write', 'Record author has no write grant.')
     assert(HEX.test(r.id) && ['fact', 'decision', 'task', 'blocker', 'question', 'evidence'].includes(r.kind) && text(r.text, 4000) && text(r.source, 1000) && seconds(r.observedAt), 'Invalid context record.')
     assert(r.supersedes === undefined || HEX.test(r.supersedes), 'Invalid correction reference.')
+    if (r.provenance !== undefined) {
+      const provenance = object(r.provenance) as unknown as ContextProvenance
+      assert(Object.keys(provenance).sort().join(',') === 'confidence,derivation,method' && CONTEXT_DERIVATIONS.includes(provenance.derivation) &&
+        typeof provenance.method === 'string' && /^[a-z0-9](?:[a-z0-9._-]{0,62}[a-z0-9])?$/.test(provenance.method) &&
+        Number.isSafeInteger(provenance.confidence) && provenance.confidence >= 0 && provenance.confidence <= 100,
+      'Invalid context provenance.')
+    }
     assert(r.relations === undefined || Array.isArray(r.relations) && r.relations.length <= 16 && r.relations.every(link =>
       link && HEX.test(link.to) && link.to !== r.id && CONTEXT_RELATION_KINDS.includes(link.kind)) &&
       new Set(r.relations.map(link => `${link.kind}:${link.to}`)).size === r.relations.length, 'Invalid context relations.')
@@ -288,6 +306,7 @@ export class ContextVault {
     const records = rows.filter(r => !replaced.has(r.body.id) && `${r.body.text}\n${r.body.source}`.toLocaleLowerCase().includes(query.toLocaleLowerCase())).map(({ event: e, body: r }) => ({
       id: r.id, kind: r.kind, text: r.text, source: r.source, observedAt: r.observedAt,
       ...(r.supersedes ? { supersedes: r.supersedes } : {}), author: e.pubkey, event: e.id,
+      ...(r.provenance ? { provenance: structuredClone(r.provenance) } : {}),
       ...(r.relations?.length ? { relations: structuredClone(r.relations) } : {}),
     }))
     return { id: p.collection, owner: p.owner, title: p.title, scope: p.scope, ...(p.room ? { room: p.room } : {}), epoch: p.epoch,
@@ -339,7 +358,7 @@ export class ContextVault {
     for (const input of inputs) {
       const r = await this.#sign('record', { v: 1, collection, policy: before.policy, kind: input.kind,
         text: input.text, source: input.source, observedAt: input.observedAt, supersedes: input.supersedes,
-        relations: input.relations, id: input.id })
+        provenance: input.provenance, relations: input.relations, id: input.id })
       this.#checks.record(r, p.owner, collection)
       signed.push(r)
     }

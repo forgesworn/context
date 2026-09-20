@@ -8,6 +8,11 @@ analysis that emits reviewable file, declaration, import and call evidence into
 the same signed graph format. It runs locally without executing a repository or
 contacting a model.
 
+The bounded source tools cover TypeScript/JavaScript through the compiler API,
+plus conservative lexical navigation for Python, Rust, Go, Java, Kotlin, Swift,
+C/C++, C#, Ruby and PHP. Every derived record can carry signed method,
+derivation and integer confidence metadata.
+
 An explicit ecosystem manifest can also join package dependencies and Markdown
 design rationale across multiple repositories. The resulting append-safe graph
 uses the existing bounded query and path traversal; extraction remains local and

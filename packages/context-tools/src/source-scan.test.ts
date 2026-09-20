@@ -28,6 +28,9 @@ describe('bounded TypeScript and JavaScript source graph scan', () => {
     expect(first).toEqual(second)
     expect(first).toMatchObject({ filesScanned: 4, filesSkipped: 0, importsFound: 2 })
     expect(first.records.every(record => /^[0-9a-f]{64}$/.test(record.id) && !JSON.stringify(record).includes(root))).toBe(true)
+    expect(first.records.every(record => JSON.stringify(record.provenance) === JSON.stringify({
+      derivation: 'extracted', method: 'typescript-ast', confidence: 90,
+    }))).toBe(true)
     const fileA = bySource(first.records, 'repo://src/a.ts')!
     const fileB = bySource(first.records, 'repo://src/b.ts')!
     const index = bySource(first.records, 'repo://src/index.ts')!

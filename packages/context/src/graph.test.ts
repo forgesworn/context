@@ -56,6 +56,17 @@ describe('bounded authorised context graph', () => {
     expect(path.edges).toHaveLength(2)
   })
 
+  it('preserves signed provenance in bounded graph nodes', async () => {
+    const f = await fixture()
+    let view = f.view()
+    view = await f.vault.append(view.id, view.head, { kind: 'evidence', text: 'AST extracted component',
+      source: 'repo://component.ts', observedAt: now,
+      provenance: { derivation: 'extracted', method: 'typescript-ast', confidence: 90 } })
+    const graph = f.vault.graph(view.id, { query: 'component' })
+    expect(graph.nodes[0].provenance).toEqual({ derivation: 'extracted', method: 'typescript-ast', confidence: 90 })
+    expect(new TextEncoder().encode(JSON.stringify(graph))).toHaveLength(graph.bytesUsed)
+  })
+
   it('validates signed links and hides absent or corrected endpoints', async () => {
     const f = await fixture()
     const first = await f.add('First component')
