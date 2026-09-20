@@ -1,6 +1,7 @@
 # ForgeSworn Context
 
-Portable signed, encrypted project evidence and bounded retrieval.
+Portable signed, encrypted project evidence, bounded retrieval and authorised
+relationship graphs.
 
 - `packages/context`: browser-safe core, published as `@forgesworn/context`.
 - `packages/context-tools`: Node persistence, CLI and MCP, published as
@@ -8,6 +9,10 @@ Portable signed, encrypted project evidence and bounded retrieval.
 
 Both are MIT licensed. Provider routing, worker execution and application UI
 belong to consumers, not this library. No model provider is required by core.
+
+The formats and APIs are project-agnostic. A collection can describe one
+repository or an explicitly assembled ecosystem; graph operations never make
+another collection visible or turn an extracted relationship into authority.
 
 Use Node 22.13 or later (Node 24 tested):
 

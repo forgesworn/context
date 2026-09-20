@@ -7,7 +7,7 @@ never enter its root import. No KithMoot or NanoClaw runtime dependency.
 Install the patch release, which depends on the matching core package:
 
 ```sh
-npm install @forgesworn/context-tools@0.2.0
+npm install @forgesworn/context-tools@0.3.0
 ```
 
 The source is maintained in the ForgeSworn Context workspace. Build with
@@ -28,9 +28,11 @@ Supply an existing identity; no key is minted. Startup does not contact
 storage. The legacy `room` name denotes a hex audience binding; it does not
 join any room. Use a separate state file for every identity and binding.
 
-The tools are `context_list`, `context_read`, `context_retrieve`, `context_create`,
-`context_append`, `context_preview`, `context_import`, `context_upload`,
-`context_access`, `context_grants` and `context_set_grants`. They preserve the
+The tools are `context_list`, `context_read`, `context_retrieve`,
+`context_graph`, `context_graph_path`, `context_create`, `context_append`,
+`context_append_batch`,
+`context_preview`, `context_import`, `context_upload`, `context_access`,
+`context_grants` and `context_set_grants`. They preserve the
 existing tool names and request shapes. Preview before importing. Writes stay
 local until explicitly uploaded and access events delivered. Tools send no
 messages and records are never execution authority.
@@ -43,6 +45,34 @@ transport framing is outside that payload. `maxRecords`, `includeRelated` and
 `observedSince` are optional. Oversized records are omitted, never silently cut.
 Every call rechecks the cached grant and audience. No source URL is fetched,
 no other collection is traversed, and no plaintext index persists.
+
+`context_graph` returns a compact subgraph selected by a lexical query and
+expanded over explicit signed relations within configurable byte, node and
+depth limits. `context_graph_path` finds a shortest bounded path between two
+records. These read-only tools preserve provenance and edge direction, never
+cross collection boundaries and do not claim that a signed relationship is
+true.
+
+## Local ecosystem scanning
+
+`encrypted-context scan <directory>` recursively reads bounded `package.json`
+manifests without an identity, network access, source-file contents or package
+execution. It emits deterministic evidence records and internal dependency
+edges suitable for `context_append_batch`. Signed-record paths are root-relative
+`repo://` sources; the canonical absolute root is returned only as local
+operator diagnostics.
+
+```sh
+encrypted-context scan /projects/my-ecosystem \
+  --max-packages 64 --max-depth 4 --observed-at 1800000000
+```
+
+The scan ignores symlinks, hidden directories, `.git`, `node_modules`, build,
+dist and coverage output. This is package-manifest extraction, not full semantic
+code analysis. Malformed or excess manifests are counted as skipped, ambiguous
+duplicate package names are not linked, and inferred edges remain evidence to
+review. Nothing is signed or stored until the returned `records` are explicitly
+submitted with the collection's current head.
 
 Applications can import `ContextFileStore` from `./store`, tool registration
 and dispatch from `./mcp`, or `main` from `./cli`. The CLI's `configureVault`

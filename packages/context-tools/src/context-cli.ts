@@ -5,6 +5,7 @@ import { createNostrIdentity } from '@forgesworn/context/nostr'
 import type { ContextVaultOptions } from '@forgesworn/context'
 import { ContextFileStore } from './context-store.js'
 import { serveContextMcp, callContextTool } from './context-mcp.js'
+import { scanPackageEcosystem } from './repository-scan.js'
 
 export interface ContextCliOptions {
   name?: string
@@ -16,9 +17,19 @@ export async function main(options: ContextCliOptions = {}): Promise<void> {
     identity: { type: 'string' }, state: { type: 'string' }, room: { type: 'string' },
     'expect-pubkey': { type: 'string' }, personal: { type: 'boolean' },
     server: { type: 'string', multiple: true }, help: { type: 'boolean' },
+    'max-packages': { type: 'string' }, 'max-depth': { type: 'string' }, 'observed-at': { type: 'string' },
   } })
   if (values.help) {
-    process.stdout.write((options.name ?? 'encrypted-context') + ' mcp|call <tool> --identity <existing agent hex-key file> --expect-pubkey <agent hex pubkey> --state <encrypted cache> --room <room hex id> [--server <HTTPS origin> ...]\nUse --personal instead of --room only for a separate private assistant. CLI call reads a JSON object from stdin. No key is generated and no network is contacted on startup.\n')
+    process.stdout.write((options.name ?? 'encrypted-context') + ' mcp|call <tool> --identity <existing agent hex-key file> --expect-pubkey <agent hex pubkey> --state <encrypted cache> --room <room hex id> [--server <HTTPS origin> ...]\n' +
+      (options.name ?? 'encrypted-context') + ' scan <directory> [--max-packages 64] [--max-depth 4] [--observed-at <epoch-seconds>]\nUse --personal instead of --room only for a separate private assistant. CLI call reads a JSON object from stdin. Scan reads bounded package manifests and needs no identity. No key is generated and no network is contacted on startup.\n')
+    return
+  }
+  if (positionals[0] === 'scan') {
+    if (positionals.length !== 2) throw new Error('Choose one directory to scan.')
+    const integer = (value: string | undefined): number | undefined => value === undefined ? undefined : Number(value)
+    const result = await scanPackageEcosystem(positionals[1], { maxPackages: integer(values['max-packages']),
+      maxDepth: integer(values['max-depth']), observedAt: integer(values['observed-at']) })
+    process.stdout.write(JSON.stringify(result, null, 2) + '\n')
     return
   }
   if (!values.identity || !values.state || !values['expect-pubkey'] || (!!values.room === !!values.personal)) throw new Error('Supply --identity, --expect-pubkey, --state and exactly one of --room or --personal. See --help.')

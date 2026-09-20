@@ -1,3 +1,5 @@
 export { ContextFileStore } from './context-store.js'
 export { callContextTool, registerContextTools, serveContextMcp } from './context-mcp.js'
 export type { ContextTool } from './context-mcp.js'
+export { scanPackageEcosystem } from './repository-scan.js'
+export type { RepositoryScan, RepositoryScanOptions } from './repository-scan.js'
