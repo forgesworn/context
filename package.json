@@ -1,0 +1,28 @@
+{
+  "name": "forgesworn-context-workspace",
+  "private": true,
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=22.13"
+  },
+  "workspaces": [
+    "packages/context",
+    "packages/context-tools"
+  ],
+  "scripts": {
+    "build": "npm run build --workspace @forgesworn/context && npm run build --workspace @forgesworn/context-tools",
+    "build:context": "npm run build",
+    "test": "npm run test --workspace @forgesworn/context",
+    "test:packages": "node test/context-package-smoke.mjs"
+  },
+  "devDependencies": {
+    "esbuild": "0.28.2",
+    "typescript": "5.9.3",
+    "vitest": "4.1.11"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/forgesworn/context.git"
+  }
+}

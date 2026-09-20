@@ -49,12 +49,12 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/forgesworn/kithmoot.git",
+    "url": "git+https://github.com/forgesworn/context.git",
     "directory": "packages/context-tools"
   },
-  "homepage": "https://github.com/forgesworn/kithmoot/tree/main/packages/context-tools#readme",
+  "homepage": "https://github.com/forgesworn/context/tree/main/packages/context-tools#readme",
   "bugs": {
-    "url": "https://github.com/forgesworn/kithmoot/issues"
+    "url": "https://github.com/forgesworn/context/issues"
   },
   "publishConfig": {
     "access": "public"

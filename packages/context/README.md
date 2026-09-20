@@ -4,8 +4,8 @@ Signed, encrypted collections of sourced facts, decisions, tasks, blockers,
 questions and evidence. MIT, ESM, browser and Node 22.13+. No KithMoot,
 NanoClaw, model provider, MCP SDK or hosted service dependency.
 
-This package is maintained in the KithMoot repository alongside its first
-consumer. It has its own manifest, exports, build and distributable tarball.
+This package is maintained in the ForgeSworn Context repository alongside
+its CLI/MCP adapter. It has its own manifest, exports, build and distributable tarball.
 Install the package:
 
 ```sh

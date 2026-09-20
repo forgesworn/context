@@ -10,7 +10,7 @@ Install the patch release, which depends on the matching core package:
 npm install @forgesworn/context-tools@0.2.0
 ```
 
-The source is maintained in the KithMoot workspace. Build with
+The source is maintained in the ForgeSworn Context workspace. Build with
 `npm run build:context`, then `npm pack --workspace @forgesworn/context-tools`.
 For future versions, publish the matching core package first. Local tarballs
 can also be installed together.
