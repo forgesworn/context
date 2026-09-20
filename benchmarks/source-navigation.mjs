@@ -16,6 +16,7 @@ const questions = [
   { id: 'blossom-upload', query: 'uploadEnvelope encrypted Blossom attachment', required: ['context/src/blossom.ts'] },
   { id: 'package-scan', query: 'scanPackageEcosystem workspace package manifests', required: ['context-tools/src/repository-scan.ts'] },
   { id: 'source-scan', query: 'scanSourceGraph TypeScript JavaScript syntax evidence', required: ['context-tools/src/source-scan.ts'] },
+  { id: 'ecosystem-scan', query: 'scanEcosystem', required: ['context-tools/src/ecosystem-scan.ts'] },
   { id: 'mcp-server', query: 'serveContextMcp registered context tools', required: ['context-tools/src/context-mcp.ts'] },
 ]
 

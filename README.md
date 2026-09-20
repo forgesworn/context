@@ -8,6 +8,11 @@ analysis that emits reviewable file, declaration, import and call evidence into
 the same signed graph format. It runs locally without executing a repository or
 contacting a model.
 
+An explicit ecosystem manifest can also join package dependencies and Markdown
+design rationale across multiple repositories. The resulting append-safe graph
+uses the existing bounded query and path traversal; extraction remains local and
+deterministic, so routine scans consume no model tokens.
+
 - `packages/context`: browser-safe core, published as `@forgesworn/context`.
 - `packages/context-tools`: Node persistence, CLI and MCP, published as
   `@forgesworn/context-tools`.

@@ -55,6 +55,41 @@ true.
 
 ## Local ecosystem and source scanning
 
+For a multi-repository project, create a manifest beneath the common ecosystem
+directory. Repository paths are relative to that manifest and IDs become stable
+portable `repo://` source namespaces:
+
+```json
+{
+  "v": 1,
+  "repositories": [
+    { "id": "context", "path": "context" },
+    { "id": "kithmoot", "path": "kithmoot" }
+  ]
+}
+```
+
+```sh
+encrypted-context scan-ecosystem /projects/forgesworn/ecosystem.json \
+  --max-repositories 32 --max-files 128 --max-records 128 \
+  --observed-at 1800000000
+```
+
+The command emits a single append-safe graph containing repository nodes,
+package manifests, Markdown documents and ATX-heading sections, in that priority
+order. Package dependencies link across repositories only when the package name
+is globally unambiguous. Relative Markdown links connect retained documents;
+sections connect to their document and repository. Duplicate headings receive
+deterministic occurrence suffixes. Fenced code is not treated as rationale.
+
+The manifest is an explicit allow-list, not permission to discover arbitrary
+sibling folders. Scans reject escaping paths and symlinks, ignore hidden and
+generated trees, enforce file/byte/record limits and never execute repositories,
+contact a model or sign/store records. When the 128-record collection limit is
+reached, `recordsOmitted` reports the loss and no dangling relationship is
+emitted. Submit the returned records explicitly with `context_append_batch`,
+then use `context_graph` or `context_graph_path` for bounded traversal.
+
 `encrypted-context scan <directory>` recursively reads bounded `package.json`
 manifests without an identity, network access, source-file contents or package
 execution. It emits deterministic evidence records and internal dependency
@@ -92,8 +127,8 @@ Dynamic imports, computed calls, object dispatch, package exports and type-level
 resolution are deliberately not inferred. These records are reviewable static
 evidence, not proof of runtime behaviour or semantic intent.
 
-Applications can import `scanSourceGraph` and `scanPackageEcosystem` from the
-package root, `ContextFileStore` from `./store`, tool registration and dispatch
+Applications can import `scanEcosystem`, `scanSourceGraph` and
+`scanPackageEcosystem` from the package root, `ContextFileStore` from `./store`, tool registration and dispatch
 from `./mcp`, or `main` from `./cli`. The CLI's `configureVault`
 callback accepts trusted application configuration such as a proof verifier.
 The default accepts direct identity grants and refuses unrecognised agent

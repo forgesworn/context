@@ -1,5 +1,19 @@
 # Extraction evidence
 
+## Multi-repository ecosystems and Markdown
+
+`scanEcosystem` reads a versioned explicit manifest and emits deterministic
+repository, package, Markdown-document and Markdown-section evidence. Stable
+repository IDs keep signed `repo://` sources portable across machines. Cross-repo
+package edges require a globally unique package name; Markdown edges require an
+explicit relative `.md` link that remains inside the selected repository.
+
+This is syntactic extraction, not semantic agreement: headings and prose are
+reviewable evidence and relations remain assertions. Fenced code, remote links,
+ambiguous packages, unretained targets and escaping links do not become graph
+edges. Existing signed graph queries can traverse the retained records without
+fetching their sources or contacting an LLM.
+
 Prepared from forgesworn/kithmoot commit `2f5166fa067c61200e1d6ffe856ead246f3a6d0f`.
 The source checkout was clean. A separate no-hardlink clone was filtered to
 `packages/context`, `packages/context-tools`, root LICENSE and the standalone
