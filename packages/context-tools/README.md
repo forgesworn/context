@@ -1,7 +1,7 @@
 # @forgesworn/context-tools
 
 Node file persistence, CLI and MCP tools for `@forgesworn/context`. MIT, ESM,
-Node 22.13+. Separate from the browser-safe core: filesystem and MCP dependencies
+Node 24+. Separate from the browser-safe core: filesystem and MCP dependencies
 never enter its root import. No KithMoot or NanoClaw runtime dependency.
 
 Install the patch release, which depends on the matching core package:

@@ -14,7 +14,7 @@ The formats and APIs are project-agnostic. A collection can describe one
 repository or an explicitly assembled ecosystem; graph operations never make
 another collection visible or turn an extracted relationship into authority.
 
-Use Node 22.13 or later (Node 24 tested):
+Use Node 24 LTS. The repository pins the currently validated release in `.nvmrc`:
 
 ```sh
 npm ci --ignore-scripts
