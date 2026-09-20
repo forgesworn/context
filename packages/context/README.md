@@ -1,7 +1,7 @@
 # @forgesworn/context
 
 Signed, encrypted collections of sourced facts, decisions, tasks, blockers,
-questions and evidence. MIT, ESM, browser and Node 22.13+. No KithMoot,
+questions and evidence. MIT, ESM, browser and Node 24+. No KithMoot,
 NanoClaw, model provider, MCP SDK or hosted service dependency.
 
 This package is maintained in the ForgeSworn Context repository alongside

@@ -24,6 +24,7 @@ Both extracted source directories are byte-identical to the source checkout.
 The original KithMoot checkout remains clean. Oathrun/KithMoot consumer cutover,
 and a new npm release remain pending.
 
-The standalone CI workflow passed on Node 22.13 and 24 at `55091b4`:
+The standalone CI workflow originally passed on Node 22.13 and 24 at `55091b4`.
+The supported runtime is now Node 24 LTS, pinned in `.nvmrc`:
 https://github.com/forgesworn/context/actions/runs/35490548443.
 The local combined `npm run check` also passed after publication.
