@@ -21,7 +21,14 @@ npm ci --ignore-scripts
 npm run build
 npm test
 npm run test:packages
+npm run benchmark:tokens:check
 ```
+
+The [measured token-reduction benchmark](benchmarks/README.md) compares exact
+bounded retrieval payloads with sending the complete repository corpus, while
+requiring all predeclared evidence sources to be returned. It tracks Graphify's
+published 71.5x figure as a target without treating different corpora or
+undisclosed tokenisation methodology as directly comparable.
 
 The smoke test builds real tarballs and installs them outside the workspace to
 check exports, browser isolation, CLI/MCP behaviour and licence notices.
