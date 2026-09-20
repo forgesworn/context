@@ -15,7 +15,8 @@ const questions = [
   { id: 'retrieval', query: 'chosen seeds related omitted context retrieval budget too small', required: ['packages/context/src/retrieval.ts'] },
   { id: 'graph-path', query: 'complete context graph path exceeds byte budget adjacency queue', required: ['packages/context/src/graph.ts'] },
   { id: 'blossom', query: 'Blossom upload authorisation ephemeral signer encrypted envelope', required: ['packages/context/src/blossom.ts'] },
-  { id: 'repository-scan', query: 'package manifest scanner internal workspace dependencies', required: ['packages/context-tools/src/repository-scan.ts'] },
+  { id: 'repository-scan', query: 'scanPackageEcosystem manifestsSkipped dependencyFields O_NOFOLLOW', required: ['packages/context-tools/src/repository-scan.ts'] },
+  { id: 'ecosystem-scan', query: 'scanEcosystem ecosystem manifest Markdown sections repositoriesScanned', required: ['packages/context-tools/src/ecosystem-scan.ts'] },
   { id: 'mcp', query: 'MCP context graph path tool schema authorised collection', required: ['packages/context-tools/src/context-mcp.ts'] },
 ]
 
