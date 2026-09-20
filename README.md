@@ -1,7 +1,11 @@
-# ForgeSworn Context
+# Z1P Core
 
-Portable signed, encrypted project evidence, bounded retrieval and authorised
-relationship graphs.
+Portable, signed evidence for people and agents.
+
+Z1P Core is the free, open-source foundation of [Z1P](https://z1p.app): signed,
+encrypted project evidence, bounded retrieval and authorised relationship
+graphs. It runs locally, requires no account and does not send source code or
+records to a hosted service.
 
 The Node tools include deterministic, bounded TypeScript and JavaScript source
 analysis that emits reviewable file, declaration, import and call evidence into
@@ -24,6 +28,18 @@ deterministic, so routine scans consume no model tokens.
 
 Both are MIT licensed. Provider routing, worker execution and application UI
 belong to consumers, not this library. No model provider is required by core.
+
+## Open-core boundary
+
+This repository will remain the inspectable local and protocol foundation:
+formats, cryptography, deterministic extraction, verification, bounded graph
+operations, CLI and MCP tools. The commercial Z1P Platform is a separate
+product for continuously maintained private graphs, repository connections,
+team access, review workflows, hosted operation and enterprise controls.
+
+The free core is intended to be useful on its own, not a time-limited trial.
+See [OPEN_CORE.md](OPEN_CORE.md) for the durable product boundary and
+compatibility policy.
 
 The formats and APIs are project-agnostic. A collection can describe one
 repository or an explicitly assembled ecosystem; graph operations never make

@@ -1,8 +1,10 @@
 # @forgesworn/context-tools
 
-Node file persistence, CLI and MCP tools for `@forgesworn/context`. MIT, ESM,
-Node 24+. Separate from the browser-safe core: filesystem and MCP dependencies
-never enter its root import. No KithMoot or NanoClaw runtime dependency.
+The local CLI and MCP adapter for Z1P Core. It provides Node file persistence
+and deterministic repository extraction around `@forgesworn/context`. MIT,
+ESM, Node 24+. Separate from the browser-safe core: filesystem and MCP
+dependencies never enter its root import. No KithMoot or NanoClaw runtime
+dependency.
 
 Install the patch release, which depends on the matching core package:
 
@@ -10,7 +12,7 @@ Install the patch release, which depends on the matching core package:
 npm install @forgesworn/context-tools@0.3.0
 ```
 
-The source is maintained in the ForgeSworn Context workspace. Build with
+The source is maintained in the public Z1P Core workspace. Build with
 `npm run build:context`, then `npm pack --workspace @forgesworn/context-tools`.
 For future versions, publish the matching core package first. Local tarballs
 can also be installed together.
