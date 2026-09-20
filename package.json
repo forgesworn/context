@@ -13,7 +13,7 @@
   "scripts": {
     "build": "npm run build --workspace @forgesworn/context && npm run build --workspace @forgesworn/context-tools",
     "build:context": "npm run build",
-    "test": "npm run test --workspace @forgesworn/context",
+    "test": "npm run test --workspace @forgesworn/context && npm run test --workspace @forgesworn/context-tools",
     "test:packages": "node test/context-package-smoke.mjs",
     "check": "npm run build && npm test && npm run test:packages"
   },

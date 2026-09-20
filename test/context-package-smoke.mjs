@@ -71,6 +71,14 @@ export const view = await vault.create({ title: 'Independent consumer', scope: '
   checkNotices(toolsConsumer, '@forgesworn/context-tools')
   const cli = join(toolsConsumer, 'node_modules/@forgesworn/context-tools/bin/encrypted-context.mjs')
   assert.match(execFileSync(process.execPath, [cli, '--help'], { encoding: 'utf8' }), /encrypted-context mcp/)
+  const ecosystem = join(toolsConsumer, 'ecosystem')
+  mkdirSync(join(ecosystem, 'alpha'), { recursive: true }); mkdirSync(join(ecosystem, 'beta'), { recursive: true })
+  writeFileSync(join(ecosystem, 'alpha/package.json'), JSON.stringify({ name: '@packed/alpha', dependencies: { '@packed/beta': '*' } }))
+  writeFileSync(join(ecosystem, 'beta/package.json'), JSON.stringify({ name: '@packed/beta', dependencies: { '@packed/alpha': '*' } }))
+  const scanned = JSON.parse(execFileSync(process.execPath, [cli, 'scan', ecosystem, '--observed-at', '1800000000'], { encoding: 'utf8' }))
+  assert.equal(scanned.records.length, 2)
+  assert.ok(scanned.records.every(record => record.source.startsWith('repo://') && !JSON.stringify(record).includes(ecosystem)))
+  assert.equal(scanned.records[0].relations[0].to, scanned.records[1].id)
   writeFileSync(join(toolsConsumer, 'test-key'), '09'.repeat(32), { mode: 0o600 })
   const pubkey = execFileSync(process.execPath, ['--input-type=module', '-e', "import {createNostrIdentity} from '@forgesworn/context/nostr'; process.stdout.write(createNostrIdentity(new Uint8Array(32).fill(9)).pubkey)"], { cwd: toolsConsumer, encoding: 'utf8' })
   const args = ['--identity', join(toolsConsumer, 'test-key'), '--expect-pubkey', pubkey, '--state', join(toolsConsumer, 'state.json'), '--personal']
@@ -83,6 +91,22 @@ export const view = await vault.create({ title: 'Independent consumer', scope: '
   assert.equal(retrieved.records[0].source, 'fixture://packaging')
   assert.equal(Buffer.byteLength(JSON.stringify(retrieved)), retrieved.bytesUsed)
   assert.ok(retrieved.bytesUsed <= 2048)
+  const related = call('context_append', { collection: created.id, expectedHead: appended.head, kind: 'fact', text: 'The packed graph adapter depends on persistence.', source: 'fixture://graph', observedAt: 1800000000,
+    relations: [{ to: appended.records[0].id, kind: 'depends-on' }] })
+  const graph = call('context_graph', { collection: created.id, query: 'graph adapter', maxBytes: 4096, maxDepth: 1 })
+  assert.deepEqual(graph.nodes.map(node => node.id), [related.records[1].id, appended.records[0].id])
+  assert.deepEqual(graph.edges, [{ from: related.records[1].id, to: appended.records[0].id, kind: 'depends-on' }])
+  assert.equal(Buffer.byteLength(JSON.stringify(graph)), graph.bytesUsed)
+  const path = call('context_graph_path', { collection: created.id, from: appended.records[0].id, to: related.records[1].id })
+  assert.equal(path.found, true)
+  assert.equal(path.nodes.length, 2)
+  const cycleA = '0a'.repeat(32), cycleB = '0b'.repeat(32)
+  const batched = call('context_append_batch', { collection: created.id, expectedHead: related.head, records: [
+    { id: cycleA, kind: 'evidence', text: 'Cycle package A', source: 'repo://a/package.json', observedAt: 1800000000, relations: [{ to: cycleB, kind: 'depends-on' }] },
+    { id: cycleB, kind: 'evidence', text: 'Cycle package B', source: 'repo://b/package.json', observedAt: 1800000000, relations: [{ to: cycleA, kind: 'depends-on' }] },
+  ] })
+  assert.equal(call('context_graph_path', { collection: created.id, from: cycleA, to: cycleB }).found, true)
+  assert.equal(batched.records.length, 4)
   assert.ok(!readFileSync(join(toolsConsumer, 'state.json'), 'utf8').includes('Packed CLI state'))
   execFileSync(process.execPath, ['--input-type=module', '-e', "import assert from 'node:assert/strict'; import {createRequire} from 'node:module'; assert.throws(()=>createRequire(import.meta.url).resolve('kithmoot'))"], { cwd: toolsConsumer, stdio: 'pipe' })
   console.log('Packed core: independent Node import, declarations and browser bundle passed.')

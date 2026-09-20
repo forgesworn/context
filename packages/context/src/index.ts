@@ -8,7 +8,9 @@ import { finalizeEvent, generateSecretKey, type Event, type EventTemplate } from
 import { verifyEventUncached } from './verify.js'
 import { encryptEnvelope, decryptEnvelope, uploadEnvelope, normaliseBlossomServer } from './blossom.js'
 import { retrieveView, type ContextRetrievalOptions, type ContextRetrieval } from './retrieval.js'
+import { graphView, graphPath, type ContextGraphOptions, type ContextGraph, type ContextGraphPathOptions, type ContextGraphPath } from './graph.js'
 export type { ContextRetrievalOptions, ContextRetrieval, ContextLink } from './retrieval.js'
+export type { ContextGraphOptions, ContextGraph, ContextGraphPathOptions, ContextGraphPath, ContextGraphNode, ContextGraphEdge } from './graph.js'
 
 export type ContextScope = 'personal' | 'kin' | 'kith'
 export type ContextRole = 'read' | 'write'
@@ -44,7 +46,13 @@ export interface ContextRecord {
   observedAt: number
   /** A correction retains the old signed record as evidence. */
   supersedes?: string
+  /** Signed, directed links to records in this collection. */
+  relations?: ContextRelation[]
 }
+export type ContextRecordInput = Omit<ContextRecord, 'id'>
+export const CONTEXT_RELATION_KINDS = ['relates-to', 'depends-on', 'implements', 'calls', 'imports', 'produces', 'consumes', 'supports', 'contradicts'] as const
+export type ContextRelationKind = typeof CONTEXT_RELATION_KINDS[number]
+export interface ContextRelation { to: string; kind: ContextRelationKind }
 interface RecordBody extends ContextRecord { v: 1; collection: string; policy: Event }
 interface Snapshot {
   v: 1; collection: string; policy: Event; revision: number; parent: string | null; ancestors: string[]; records: Event[]
@@ -127,6 +135,9 @@ function validators(verifyDelegation: VerifyDelegation = () => ({ ok: false })) 
     assert(role(p.body, e.pubkey, e.created_at) === 'write', 'Record author has no write grant.')
     assert(HEX.test(r.id) && ['fact', 'decision', 'task', 'blocker', 'question', 'evidence'].includes(r.kind) && text(r.text, 4000) && text(r.source, 1000) && seconds(r.observedAt), 'Invalid context record.')
     assert(r.supersedes === undefined || HEX.test(r.supersedes), 'Invalid correction reference.')
+    assert(r.relations === undefined || Array.isArray(r.relations) && r.relations.length <= 16 && r.relations.every(link =>
+      link && HEX.test(link.to) && link.to !== r.id && CONTEXT_RELATION_KINDS.includes(link.kind)) &&
+      new Set(r.relations.map(link => `${link.kind}:${link.to}`)).size === r.relations.length, 'Invalid context relations.')
     return { event: e, body: r }
   }
   function snapshot(value: unknown): { event: Event; body: Snapshot; policy: ContextPolicy } {
@@ -140,13 +151,18 @@ function validators(verifyDelegation: VerifyDelegation = () => ({ ok: false })) 
     assert(Array.isArray(s.ancestors) && s.ancestors.length < 256 && s.ancestors.length === s.revision - 1 && s.ancestors.every(a => HEX.test(a)) && new Set(s.ancestors).size === s.ancestors.length && (s.ancestors.at(-1) ?? null) === s.parent, 'Invalid context ancestry.')
     assert(role(p, e.pubkey, e.created_at) === 'write', 'Snapshot author has no write grant.')
     assert(Array.isArray(s.records) && s.records.length <= MAX_RECORDS, 'Too many context records.')
+    const rows = s.records.map(item => record(item, p.owner, p.collection))
+    const ids = new Set<string>()
+    for (const r of rows) {
+      assert(!ids.has(r.body.id), 'Duplicate context record.')
+      ids.add(r.body.id)
+    }
     const seen = new Set<string>()
-    for (const item of s.records) {
-      const r = record(item, p.owner, p.collection)
+    for (const r of rows) {
       const rp = policy(r.body.policy).body
       assert(r.event.created_at <= e.created_at && rp.epoch <= p.epoch && rp.scope === p.scope && rp.room === p.room, 'Record policy or timestamp does not match the collection.')
-      assert(!seen.has(r.body.id), 'Duplicate context record.')
       if (r.body.supersedes) assert(seen.has(r.body.supersedes), 'Correction refers to an unknown record.')
+      if (r.body.relations) for (const link of r.body.relations) assert(ids.has(link.to), 'Context relation refers to an unknown record in this collection.')
       seen.add(r.body.id)
     }
     return { event: e, body: s, policy: p }
@@ -272,6 +288,7 @@ export class ContextVault {
     const records = rows.filter(r => !replaced.has(r.body.id) && `${r.body.text}\n${r.body.source}`.toLocaleLowerCase().includes(query.toLocaleLowerCase())).map(({ event: e, body: r }) => ({
       id: r.id, kind: r.kind, text: r.text, source: r.source, observedAt: r.observedAt,
       ...(r.supersedes ? { supersedes: r.supersedes } : {}), author: e.pubkey, event: e.id,
+      ...(r.relations?.length ? { relations: structuredClone(r.relations) } : {}),
     }))
     return { id: p.collection, owner: p.owner, title: p.title, scope: p.scope, ...(p.room ? { room: p.room } : {}), epoch: p.epoch,
       head: entry.snapshot.id, revision: s.body.revision, updatedAt: entry.snapshot.created_at,
@@ -284,15 +301,49 @@ export class ContextVault {
     return retrieveView(this.read(collection), options)
   }
 
-  async append(collection: string, expectedHead: string, input: Omit<ContextRecord, 'id'>): Promise<ContextView> {
+  /** Build a compact, disposable graph from one currently authorised collection. */
+  graph(collection: string, options: ContextGraphOptions): ContextGraph {
+    return graphView(this.read(collection), options)
+  }
+
+  /** Find a bounded path without reading another collection or following sources. */
+  graphPath(collection: string, options: ContextGraphPathOptions): ContextGraphPath {
+    return graphPath(this.read(collection), options)
+  }
+
+  async append(collection: string, expectedHead: string, input: ContextRecordInput): Promise<ContextView> {
+    return this.#appendRecords(collection, expectedHead, [{ ...input, id: id() }])
+  }
+
+  /** Atomically append pre-identified records. Pre-assigned IDs allow links
+   * between records in the same batch, including cycles, without mutable graph
+   * state or unsigned follow-up edges. */
+  async appendBatch(collection: string, expectedHead: string, inputs: ContextRecord[]): Promise<ContextView> {
+    assert(Array.isArray(inputs) && inputs.length > 0 && inputs.length <= MAX_RECORDS, 'Context batch must contain 1 to 128 records.')
+    return this.#appendRecords(collection, expectedHead, structuredClone(inputs))
+  }
+
+  async #appendRecords(collection: string, expectedHead: string, inputs: ContextRecord[]): Promise<ContextView> {
     const before = this.#get(collection)
     assert(before.snapshot.id === expectedHead, 'Context changed; read the current head before writing.')
     const p = this.#checks.policy(before.policy).body
     assert(this.#checks.role(p, this.#identity.pubkey, this.#now()) === 'write', 'Context write permission required.')
-    const r = await this.#sign('record', { v: 1, collection, policy: before.policy, kind: input.kind,
-      text: input.text, source: input.source, observedAt: input.observedAt, supersedes: input.supersedes, id: id() })
-    this.#checks.record(r, p.owner, collection)
-    const next = await this.#build(before.policy, [...this.#checks.snapshot(before.snapshot).body.records, r], before)
+    const existing = this.#checks.snapshot(before.snapshot).body.records
+    assert(existing.length + inputs.length <= MAX_RECORDS, 'Too many context records.')
+    const known = new Set(existing.map(record => this.#checks.record(record, p.owner, collection).body.id))
+    for (const input of inputs) {
+      assert(HEX.test(input.id) && !known.has(input.id), 'Context batch record IDs must be unique 64-character lowercase hexadecimal values.')
+      known.add(input.id)
+    }
+    const signed: Event[] = []
+    for (const input of inputs) {
+      const r = await this.#sign('record', { v: 1, collection, policy: before.policy, kind: input.kind,
+        text: input.text, source: input.source, observedAt: input.observedAt, supersedes: input.supersedes,
+        relations: input.relations, id: input.id })
+      this.#checks.record(r, p.owner, collection)
+      signed.push(r)
+    }
+    const next = await this.#build(before.policy, [...existing, ...signed], before)
     assert(this.#get(collection).snapshot.id === expectedHead, 'Context changed while signing; retry from the current head.')
     this.#collections.set(collection, next)
     return this.read(collection)

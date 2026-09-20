@@ -9,7 +9,7 @@ its CLI/MCP adapter. It has its own manifest, exports, build and distributable t
 Install the package:
 
 ```sh
-npm install @forgesworn/context@0.2.0
+npm install @forgesworn/context@0.3.0
 ```
 
 From a source checkout, use `npm ci --ignore-scripts`,
@@ -65,6 +65,45 @@ not assumed obsolete by age alone. Results identify their cached revision and
 retain author, observation date, source and signed event ID. Remote grant changes
 and corrections still require explicit import of a newer authorised snapshot.
 
+## Authorised relationship graphs
+
+Records may carry up to 16 typed, directed `relations` to records in the same
+collection. Relations are part of the signed record. `appendBatch` atomically
+accepts pre-identified records, so imported graphs may contain forward links
+and cycles without mutable or unsigned follow-up edges. They describe an
+author's assertion (`depends-on`, `implements`, `calls`, `imports`, `produces`,
+`consumes`, `supports`, `contradicts` or `relates-to`); they do not prove it is
+true.
+
+```ts
+let view = await vault.create({ title: 'Project graph', scope: 'personal' })
+view = await vault.append(view.id, view.head, {
+  kind: 'evidence', text: 'Encrypted storage envelope',
+  source: 'file://packages/storage.ts', observedAt: 1800000000,
+})
+const storage = view.records.at(-1)!
+view = await vault.append(view.id, view.head, {
+  kind: 'fact', text: 'Project context depends on encrypted storage',
+  source: 'file://packages/context.ts', observedAt: 1800000000,
+  relations: [{ to: storage.id, kind: 'depends-on' }],
+})
+const graph = vault.graph(view.id, { query: 'project context', maxDepth: 2 })
+const path = vault.graphPath(view.id, {
+  from: storage.id, to: view.records.at(-1)!.id,
+})
+```
+
+`graph` returns compact labels and signed provenance under exact UTF-8 byte,
+node and depth budgets. `graphPath` returns the shortest deterministic path over
+explicit relations, while preserving each edge's asserted direction. Both are
+disposable views of one currently authorised, corrected snapshot: they do no
+network IO, never follow sources and never traverse another collection.
+
+The Node tools package provides a bounded package-manifest scanner. Further
+repository scanners and semantic extractors belong in optional adapters. They
+may propose records and relationships for any project or ecosystem, but the
+core does not silently promote generated output to trusted evidence.
+
 ## Storage and sharing
 
 Configure `servers` with explicitly enabled HTTPS Blossom origins. `fetch`
@@ -108,8 +147,8 @@ explicit protocol migration.
 
 ## Limits
 
-Literal search and bounded lexical retrieval with derived provenance links;
-no semantic graph extraction, embeddings, repository ingestion
+Literal search, bounded lexical retrieval and explicit signed relationship
+traversal; no semantic graph extraction, embeddings, repository ingestion
 or automatic claim generation. Records are evidence, never executable
 instructions or approval. Each vault holds up to 32 collections, each with
 128 records, 32 grants and 256 revisions. Corrections retain original records.

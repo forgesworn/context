@@ -8,8 +8,9 @@ rewritten history; commit IDs necessarily change. The source checkout was not
 modified. The local filter-repo commit map is under `.git/filter-repo`.
 
 The extracted repository is published at https://github.com/forgesworn/context.
-No replacement npm version has been published. Version 0.2.0 is retained for compatibility testing only;
-a future publish must use a new package version with verified consumer pins.
+No replacement npm version has been published. Version 0.2.0 was retained for
+compatibility testing only; version 0.3.0 is prepared for the first standalone
+release and still requires registry authentication and verified consumer pins.
 
 Package names, exports, signed/encrypted wire formats, source implementation,
 licences and notices are unchanged. Repository metadata and workspace build
