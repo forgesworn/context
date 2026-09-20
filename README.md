@@ -3,6 +3,11 @@
 Portable signed, encrypted project evidence, bounded retrieval and authorised
 relationship graphs.
 
+The Node tools include deterministic, bounded TypeScript and JavaScript source
+analysis that emits reviewable file, declaration, import and call evidence into
+the same signed graph format. It runs locally without executing a repository or
+contacting a model.
+
 - `packages/context`: browser-safe core, published as `@forgesworn/context`.
 - `packages/context-tools`: Node persistence, CLI and MCP, published as
   `@forgesworn/context-tools`.
@@ -22,13 +27,15 @@ npm run build
 npm test
 npm run test:packages
 npm run benchmark:tokens:check
+npm run benchmark:tokens:parity
 ```
 
-The [measured token-reduction benchmark](benchmarks/README.md) compares exact
-bounded retrieval payloads with sending the complete repository corpus, while
-requiring all predeclared evidence sources to be returned. It tracks Graphify's
-published 71.5x figure as a target without treating different corpora or
-undisclosed tokenisation methodology as directly comparable.
+The [measured token-reduction benchmarks](benchmarks/README.md) keep complete
+raw-evidence retrieval separate from compact source navigation. Both count exact
+bounded payloads and require all predeclared sources. The navigation gate tracks
+Graphify's published 71.5x figure without treating different corpora or
+undisclosed tokenisation methodology as directly comparable or claiming that a
+source pointer contains enough code to answer.
 
 The smoke test builds real tarballs and installs them outside the workspace to
 check exports, browser isolation, CLI/MCP behaviour and licence notices.
