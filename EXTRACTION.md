@@ -7,9 +7,8 @@ package smoke test. Original package commits and attribution are retained in
 rewritten history; commit IDs necessarily change. The source checkout was not
 modified. The local filter-repo commit map is under `.git/filter-repo`.
 
-This checkout is a prepared extraction, not a published replacement release.
-No remote is configured and no npm version is published. The proposed remote
-is forgesworn/context. Version 0.2.0 is retained for compatibility testing only;
+The extracted repository is published at https://github.com/forgesworn/context.
+No replacement npm version has been published. Version 0.2.0 is retained for compatibility testing only;
 a future publish must use a new package version with verified consumer pins.
 
 Package names, exports, signed/encrypted wire formats, source implementation,
@@ -22,4 +21,8 @@ Validation completed on Node 24.21.0: both package builds passed; 16 core tests
 across three files passed; the isolated real-tarball consumer smoke test passed.
 Both extracted source directories are byte-identical to the source checkout.
 The original KithMoot checkout remains clean. Oathrun/KithMoot consumer cutover,
-new-remote publication and a new npm release remain pending.
+and a new npm release remain pending.
+
+The standalone CI workflow passed on Node 22.13 and 24 at `55091b4`:
+https://github.com/forgesworn/context/actions/runs/35490548443.
+The local combined `npm run check` also passed after publication.
