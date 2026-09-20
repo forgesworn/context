@@ -13,12 +13,16 @@
   "scripts": {
     "build": "npm run build --workspace @forgesworn/context && npm run build --workspace @forgesworn/context-tools",
     "build:context": "npm run build",
+    "benchmark:tokens": "npm run build && node benchmarks/token-reduction.mjs",
+    "benchmark:tokens:check": "npm run build && node benchmarks/token-reduction.mjs --check",
+    "benchmark:tokens:parity": "npm run build && node benchmarks/token-reduction.mjs --check --require-parity",
     "test": "npm run test --workspace @forgesworn/context && npm run test --workspace @forgesworn/context-tools",
     "test:packages": "node test/context-package-smoke.mjs",
     "check": "npm run build && npm test && npm run test:packages"
   },
   "devDependencies": {
     "esbuild": "0.28.2",
+    "gpt-tokenizer": "4.0.0",
     "typescript": "5.9.3",
     "vitest": "4.1.11"
   },
