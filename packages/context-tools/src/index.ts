@@ -3,3 +3,5 @@ export { callContextTool, registerContextTools, serveContextMcp } from './contex
 export type { ContextTool } from './context-mcp.js'
 export { scanPackageEcosystem } from './repository-scan.js'
 export type { RepositoryScan, RepositoryScanOptions } from './repository-scan.js'
+export { scanSourceGraph } from './source-scan.js'
+export type { SourceGraphScan, SourceGraphScanOptions } from './source-scan.js'

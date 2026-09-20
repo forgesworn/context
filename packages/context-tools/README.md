@@ -53,7 +53,7 @@ records. These read-only tools preserve provenance and edge direction, never
 cross collection boundaries and do not claim that a signed relationship is
 true.
 
-## Local ecosystem scanning
+## Local ecosystem and source scanning
 
 `encrypted-context scan <directory>` recursively reads bounded `package.json`
 manifests without an identity, network access, source-file contents or package
@@ -74,8 +74,27 @@ duplicate package names are not linked, and inferred edges remain evidence to
 review. Nothing is signed or stored until the returned `records` are explicitly
 submitted with the collection's current head.
 
-Applications can import `ContextFileStore` from `./store`, tool registration
-and dispatch from `./mcp`, or `main` from `./cli`. The CLI's `configureVault`
+`encrypted-context scan-source <directory>` parses bounded local TypeScript and
+JavaScript files without executing code, loading a `tsconfig`, contacting a
+model or following symlinks. It emits deterministic file and declaration
+records plus syntax-backed internal `imports`, `calls` and `relates-to` edges.
+
+```sh
+encrypted-context scan-source /projects/my-project \
+  --max-files 64 --max-depth 8 --max-bytes 1048576 \
+  --max-file-bytes 262144 --max-records 128 --observed-at 1800000000
+```
+
+The first analyser supports `.ts`, `.tsx`, `.js`, `.jsx`, `.mts`, `.cts`,
+`.mjs` and `.cjs`. Identifier calls, imported named calls and `this.method()`
+within a class are linked only when their target is present and unambiguous.
+Dynamic imports, computed calls, object dispatch, package exports and type-level
+resolution are deliberately not inferred. These records are reviewable static
+evidence, not proof of runtime behaviour or semantic intent.
+
+Applications can import `scanSourceGraph` and `scanPackageEcosystem` from the
+package root, `ContextFileStore` from `./store`, tool registration and dispatch
+from `./mcp`, or `main` from `./cli`. The CLI's `configureVault`
 callback accepts trusted application configuration such as a proof verifier.
 The default accepts direct identity grants and refuses unrecognised agent
 proofs. KithMoot retains `kithmoot-context` with its verified ownership adapter;

@@ -39,11 +39,11 @@
     "@forgesworn/context": "0.3.0",
     "@modelcontextprotocol/sdk": "1.30.0",
     "@noble/hashes": "1.8.0",
+    "typescript": "5.9.3",
     "zod": "4.5.4"
   },
   "devDependencies": {
     "@types/node": "^22.20.1",
-    "typescript": "5.9.3",
     "vitest": "4.1.11"
   },
   "bin": {

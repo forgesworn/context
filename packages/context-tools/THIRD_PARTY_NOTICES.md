@@ -121,6 +121,19 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
+## typescript@5.9.3
+
+Declared licence: Apache-2.0. Source package: https://www.npmjs.com/package/typescript/v/5.9.3
+
+The complete Apache License 2.0 is included by the installed TypeScript package
+as `LICENSE.txt`: https://www.apache.org/licenses/LICENSE-2.0
+
+Copyright Microsoft Corporation and other contributors. Licensed under the
+Apache License, Version 2.0; you may not use the work except in compliance with
+the License. Unless required by applicable law or agreed to in writing,
+software distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+
 ## Transitive dependencies through the context core
 
 Also retain `@forgesworn/context/THIRD_PARTY_NOTICES.md`, including the

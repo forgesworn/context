@@ -16,13 +16,16 @@ record IDs, authors and event IDs. Signature and grant verification are tested
 elsewhere; excluding fresh signatures prevents random signature bytes from
 changing tokenizer merges between benchmark runs.
 
-Run `npm run benchmark:tokens:parity` for the aspirational gate. It currently
-fails until the measured aggregate reaches 71.5x with full evidence recall; it
-is deliberately separate from the regression check used in CI.
+Run `npm run benchmark:tokens:parity` for the distinct source-navigation gate.
+It compares the full raw TypeScript corpus with exact compact JSON returned from
+the deterministic source graph, requiring every predeclared source to be found.
+This measures the cost of knowing where to look, not the cost of reading enough
+source to answer a question. The raw-evidence benchmark above remains the answer
+evidence regression gate and the two results must not be combined.
 
 Graphify publishes a 71.5x result (about 123k naive tokens versus 1.7k per query)
 for its own 52-file mixed corpus. We record 71.5x as the parity target, but do
 not call results directly comparable: Graphify does not publish its tokenizer,
-full query set or evidence-recall protocol, and this benchmark uses a different
-corpus. The 10x CI floor protects current utility while work continues towards
-the stated target.
+full query set or evidence-recall protocol, and these benchmarks use a different
+corpus. Reaching the number demonstrates measured navigation compression parity,
+not reproduction of Graphify's result or sufficient evidence to answer.

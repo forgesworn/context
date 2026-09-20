@@ -15,7 +15,8 @@
     "build:context": "npm run build",
     "benchmark:tokens": "npm run build && node benchmarks/token-reduction.mjs",
     "benchmark:tokens:check": "npm run build && node benchmarks/token-reduction.mjs --check",
-    "benchmark:tokens:parity": "npm run build && node benchmarks/token-reduction.mjs --check --require-parity",
+    "benchmark:tokens:parity": "npm run build && node benchmarks/source-navigation.mjs --check",
+    "benchmark:navigation": "npm run build && node benchmarks/source-navigation.mjs",
     "test": "npm run test --workspace @forgesworn/context && npm run test --workspace @forgesworn/context-tools",
     "test:packages": "node test/context-package-smoke.mjs",
     "check": "npm run build && npm test && npm run test:packages"
