@@ -53,7 +53,8 @@ describe('portable context without a KithMoot runtime', () => {
     const a = new ContextVault({ identity: owner, fetch: store.fetch, servers: [origin], now: () => now })
     let view = await a.create({ title: 'Project decisions', scope: 'kith' })
     view = await a.setGrants(view.id, view.head, [{ subject: reader.pubkey, role: 'read', expiresAt: now + 100 }])
-    view = await a.append(view.id, view.head, { kind: 'decision', text: 'Keep the original signatures.', source: 'https://example.org/decision/42', observedAt: now })
+    view = await a.append(view.id, view.head, { kind: 'decision', text: 'Keep the original signatures.', source: 'https://example.org/decision/42', observedAt: now,
+      provenance: { derivation: 'extracted', method: 'typescript-ast', confidence: 90 } })
     expect(store.requests()).toBe(0)
     await a.upload(view.id, origin)
     const access = await a.access(view.id, reader.pubkey)
@@ -67,10 +68,26 @@ describe('portable context without a KithMoot runtime', () => {
     await restarted.restore(cache)
     expect(store.requests()).toBe(2)
     expect(restarted.read(view.id).records).toEqual(view.records)
+    expect(restarted.read(view.id).records[0].provenance).toEqual({ derivation: 'extracted', method: 'typescript-ast', confidence: 90 })
     await expect(restarted.append(view.id, view.head, { kind: 'fact', text: 'Unauthorised', source: 'fixture://42', observedAt: now })).rejects.toThrow('write permission')
     const expired = new ContextVault({ identity: reader, fetch: store.fetch, servers: [origin], now: () => now + 101 })
     await expect(expired.importAccess(access)).rejects.toThrow('not available')
     expect(store.requests()).toBe(2)
+  })
+
+  it('rejects malformed provenance while retaining records without it', async () => {
+    const vault = new ContextVault({ identity: owner, now: () => now })
+    let view = await vault.create({ title: 'Provenance validation', scope: 'personal' })
+    view = await vault.append(view.id, view.head, { kind: 'evidence', text: 'Legacy evidence', source: 'fixture://legacy', observedAt: now })
+    expect(view.records[0].provenance).toBeUndefined()
+    const base = { id: '41'.repeat(32), kind: 'evidence' as const, text: 'Invalid evidence', source: 'fixture://invalid', observedAt: now }
+    for (const provenance of [
+      { derivation: 'unknown', method: 'regex', confidence: 50 },
+      { derivation: 'inferred', method: 'Invalid Method', confidence: 50 },
+      { derivation: 'inferred', method: 'regex', confidence: 50.5 },
+      { derivation: 'inferred', method: 'regex', confidence: 101 },
+      { derivation: 'inferred', method: 'regex', confidence: 50, hidden: true },
+    ]) await expect(vault.appendBatch(view.id, view.head, [{ ...base, provenance } as never])).rejects.toThrow('Invalid context provenance')
   })
 
   it('refuses unknown proofs and personal sharing unless explicitly verified', async () => {

@@ -14,6 +14,20 @@ ambiguous packages, unretained targets and escaping links do not become graph
 edges. Existing signed graph queries can traverse the retained records without
 fetching their sources or contacting an LLM.
 
+## Provenance and confidence
+
+Records may carry signed `provenance` containing a derivation label
+(`extracted`, `inferred` or `ambiguous`), a stable method identifier and an
+integer confidence from 0 to 100. Confidence describes the strength of the
+stated extraction method, not whether the underlying claim is true or whether
+an actor is authorised to rely on it.
+
+TypeScript/JavaScript syntax records use `typescript-ast`; package manifests,
+ecosystem manifests and source files are direct extraction. Broad-language
+declarations use bounded lexical inference, while heuristic local-import file
+records are explicitly marked ambiguous. Provenance is signed, encrypted,
+retrieved and included in bounded graph output with the record.
+
 Prepared from forgesworn/kithmoot commit `2f5166fa067c61200e1d6ffe856ead246f3a6d0f`.
 The source checkout was clean. A separate no-hardlink clone was filtered to
 `packages/context`, `packages/context-tools`, root LICENSE and the standalone

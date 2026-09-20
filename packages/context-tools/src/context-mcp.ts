@@ -2,13 +2,16 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { z } from 'zod'
 import type { ContextFileStore } from './context-store.js'
-import { CONTEXT_RELATION_KINDS, type ContextGrant } from '@forgesworn/context'
+import { CONTEXT_DERIVATIONS, CONTEXT_RELATION_KINDS, type ContextGrant } from '@forgesworn/context'
 
 const key = z.string().regex(/^[0-9a-f]{64}$/)
 const record = {
   kind: z.enum(['fact', 'decision', 'task', 'blocker', 'question', 'evidence']),
   text: z.string().min(1).max(4000), source: z.string().min(1).max(1000),
   observedAt: z.number().int().nonnegative(), supersedes: key.optional(),
+  provenance: z.object({ derivation: z.enum(CONTEXT_DERIVATIONS),
+    method: z.string().regex(/^[a-z0-9](?:[a-z0-9._-]{0,62}[a-z0-9])?$/),
+    confidence: z.number().int().min(0).max(100) }).strict().optional(),
   relations: z.array(z.object({ to: key, kind: z.enum(CONTEXT_RELATION_KINDS) })).max(16).optional(),
 }
 const descriptions = {

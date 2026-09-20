@@ -127,7 +127,25 @@ Dynamic imports, computed calls, object dispatch, package exports and type-level
 resolution are deliberately not inferred. These records are reviewable static
 evidence, not proof of runtime behaviour or semantic intent.
 
-Applications can import `scanEcosystem`, `scanSourceGraph` and
+`encrypted-context scan-broad-source <directory>` adds conservative navigation
+for Python, Rust, Go, Java, Kotlin, Swift, C, C++, C#, Ruby and PHP. It uses a
+bounded lexical pass rather than pretending regular expressions are compiler
+ASTs. File observations are labelled `extracted`; declaration candidates are
+`inferred` with confidence 60; files carrying heuristically resolved local
+imports are `ambiguous` with confidence 30.
+
+```sh
+encrypted-context scan-broad-source /projects/my-project \
+  --max-files 64 --max-depth 8 --max-bytes 1048576 \
+  --max-file-bytes 262144 --max-records 128 --observed-at 1800000000
+```
+
+Only deliberately local forms are linked: relative Python imports, Rust
+modules, quoted C/C++ includes, Ruby `require_relative`, PHP `__DIR__` includes
+and relative Go imports. Package registries, build systems, namespaces and
+runtime dispatch are not resolved. All scanners remain model-free at runtime.
+
+Applications can import `scanEcosystem`, `scanSourceGraph`, `scanBroadSourceGraph` and
 `scanPackageEcosystem` from the package root, `ContextFileStore` from `./store`, tool registration and dispatch
 from `./mcp`, or `main` from `./cli`. The CLI's `configureVault`
 callback accepts trusted application configuration such as a proof verifier.

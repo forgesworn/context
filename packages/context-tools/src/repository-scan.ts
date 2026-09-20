@@ -124,6 +124,7 @@ export async function scanPackageEcosystem(root: string, options: RepositoryScan
     }
     relations.sort((a, b) => a.to.localeCompare(b.to))
     return { id: ids.get(manifest.path)!, kind: 'evidence', text: text(manifest), source: `repo://${manifest.path}`,
+      provenance: { derivation: 'extracted', method: 'package-manifest', confidence: 100 },
       observedAt, ...(relations.length ? { relations } : {}) }
   })
   return { root: canonicalRoot, records, packagesScanned: records.length, manifestsSkipped }

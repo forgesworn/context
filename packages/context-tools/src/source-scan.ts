@@ -34,6 +34,7 @@ const ignored = new Set(['.git', 'node_modules', 'build', 'dist', 'coverage', 'o
 const extensions = new Set(['.ts', '.tsx', '.js', '.jsx', '.mts', '.cts', '.mjs', '.cjs'])
 const resolutionExtensions = [...extensions]
 const decoder = new TextDecoder('utf-8', { fatal: true })
+const provenance = { derivation: 'extracted', method: 'typescript-ast', confidence: 90 } as const
 function assert(ok: unknown, message: string): asserts ok { if (!ok) throw new Error(message) }
 function normal(root: string, path: string): string { return relative(root, path).split(sep).join('/') }
 function validRecordSource(value: string): boolean { return value.length > 0 && value.length <= 1000 && !/[\u0000-\u001f]/u.test(value) }
@@ -188,7 +189,7 @@ export async function scanSourceGraph(root: string, options: SourceGraphScanOpti
       const kinds = new Map<string, number>()
       for (const symbol of candidate.file.symbols) kinds.set(symbol.kind, (kinds.get(symbol.kind) ?? 0) + 1)
       const summary = [...kinds].map(([kind, count]) => `${count} ${kind}${count === 1 ? '' : 's'}`).join(', ') || 'no named declarations'
-      return { id: ids.get(candidate.key)!, kind: 'evidence', text: `Source file ${candidate.file.path}: ${summary}; ${candidate.file.imports.length} resolved internal import${candidate.file.imports.length === 1 ? '' : 's'}.`, source: `repo://${candidate.file.path}`, observedAt, ...(relations.length ? { relations: relations.sort(relationSort).slice(0, 16) } : {}) }
+      return { id: ids.get(candidate.key)!, kind: 'evidence', text: `Source file ${candidate.file.path}: ${summary}; ${candidate.file.imports.length} resolved internal import${candidate.file.imports.length === 1 ? '' : 's'}.`, source: `repo://${candidate.file.path}`, observedAt, provenance, ...(relations.length ? { relations: relations.sort(relationSort).slice(0, 16) } : {}) }
     }
     const symbol = candidate.symbol
     if (retainedKeys.has(symbol.file)) relations.push(relation(ids.get(symbol.file)!, 'relates-to'))
@@ -212,7 +213,7 @@ export async function scanSourceGraph(root: string, options: SourceGraphScanOpti
       ts.forEachChild(node, visit)
     }
     if (['function', 'method', 'variable'].includes(symbol.kind)) visit(symbol.node)
-    return { id: ids.get(candidate.key)!, kind: 'evidence', text: `${symbol.exported ? 'Exported' : 'Local'} ${symbol.kind} ${symbol.name} in ${symbol.file} at line ${symbol.line}${symbol.parameters === undefined ? '' : ` with ${symbol.parameters} parameter${symbol.parameters === 1 ? '' : 's'}`}.`, source: `repo://${symbol.file}#${encodeURIComponent(symbol.name)}`, observedAt, ...(relations.length ? { relations: relations.sort(relationSort).slice(0, 16) } : {}) }
+    return { id: ids.get(candidate.key)!, kind: 'evidence', text: `${symbol.exported ? 'Exported' : 'Local'} ${symbol.kind} ${symbol.name} in ${symbol.file} at line ${symbol.line}${symbol.parameters === undefined ? '' : ` with ${symbol.parameters} parameter${symbol.parameters === 1 ? '' : 's'}`}.`, source: `repo://${symbol.file}#${encodeURIComponent(symbol.name)}`, observedAt, provenance, ...(relations.length ? { relations: relations.sort(relationSort).slice(0, 16) } : {}) }
   })
   return { root: canonicalRoot, records, filesScanned: parsed.length, filesSkipped, bytesRead,
     symbolsFound: parsed.reduce((sum, file) => sum + file.symbols.length, 0),

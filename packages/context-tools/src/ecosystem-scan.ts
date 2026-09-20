@@ -234,7 +234,12 @@ export async function scanEcosystem(manifestPath: string, options: EcosystemScan
     if (candidate.parent) add(retainedIds.get(candidate.parent), 'relates-to')
     for (const dependency of candidate.dependencies ?? []) { const targets = packageNames.get(dependency); if (targets?.length === 1) add(retainedIds.get(targets[0]), 'depends-on') }
     for (const link of candidate.links ?? []) add(docs.get(`${candidate.repo}\0${link}`), 'relates-to')
-    return { id: retainedIds.get(candidate.key)!, kind: 'evidence', text: candidate.text, source: candidate.source,
+    const provenance = candidate.type === 'section'
+      ? { derivation: 'extracted' as const, method: 'markdown-section', confidence: 90 }
+      : candidate.type === 'package' ? { derivation: 'extracted' as const, method: 'package-manifest', confidence: 100 }
+        : candidate.type === 'document' ? { derivation: 'extracted' as const, method: 'source-file', confidence: 100 }
+          : { derivation: 'extracted' as const, method: 'ecosystem-manifest', confidence: 100 }
+    return { id: retainedIds.get(candidate.key)!, kind: 'evidence', text: candidate.text, source: candidate.source, provenance,
       observedAt, ...(relations.length ? { relations: relations.slice(0, 16) } : {}) }
   })
   return { manifest: canonicalManifest, records, repositoriesScanned: roots.size, filesScanned, filesSkipped, bytesRead,

@@ -1,4 +1,4 @@
-import type { ContextRecord, ContextRelationKind, ContextView } from './index.js'
+import type { ContextProvenance, ContextRecord, ContextRelationKind, ContextView } from './index.js'
 
 export interface ContextGraphOptions {
   query: string
@@ -20,6 +20,7 @@ export interface ContextGraphNode {
   observedAt: number
   author: string
   event: string
+  provenance?: ContextProvenance
   match: 'query' | 'related'
   depth: number
 }
@@ -61,7 +62,8 @@ function label(text: string): string {
 }
 function compact(record: RecordView): Omit<ContextGraphNode, 'match' | 'depth'> {
   return { id: record.id, kind: record.kind, label: label(record.text), source: record.source,
-    observedAt: record.observedAt, author: record.author, event: record.event }
+    observedAt: record.observedAt, author: record.author, event: record.event,
+    ...(record.provenance ? { provenance: structuredClone(record.provenance) } : {}) }
 }
 function settle<T extends { bytesUsed: number }>(result: T): number {
   let bytes = encoder.encode(JSON.stringify(result)).length
