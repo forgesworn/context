@@ -1,11 +1,14 @@
 # @forgesworn/context
 
-Signed, encrypted collections of sourced facts, decisions, tasks, blockers,
-questions and evidence. MIT, ESM, browser and Node 24+. No KithMoot,
+The browser-safe foundation of Z1P Core: signed, encrypted collections of
+sourced facts, decisions, tasks, blockers, questions and evidence. MIT, ESM,
+browser and Node 24+. No KithMoot,
 NanoClaw, model provider, MCP SDK or hosted service dependency.
 
-This package is maintained in the ForgeSworn Context repository alongside
-its CLI/MCP adapter. It has its own manifest, exports, build and distributable tarball.
+This compatibility package is maintained in the public Z1P Core repository
+alongside its CLI/MCP adapter. Its established package, API and protocol names
+remain unchanged during the product rebrand. It has its own manifest, exports,
+build and distributable tarball.
 Install the package:
 
 ```sh

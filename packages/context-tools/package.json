@@ -1,7 +1,7 @@
 {
   "name": "@forgesworn/context-tools",
   "version": "0.3.0",
-  "description": "File cache, CLI and MCP tools for encrypted context",
+  "description": "Local CLI and MCP tools for Z1P Core encrypted context",
   "license": "MIT",
   "type": "module",
   "engines": {
