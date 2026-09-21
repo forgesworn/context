@@ -194,6 +194,10 @@ async function main() {
         symbolsFound: scan.symbolsFound,
         importsFound: scan.importsFound,
         callsFound: scan.callsFound,
+        scanBounds: {
+          maxFilesHit: scan.scanBounds.maxFilesHit,
+          maxDepthHit: scan.scanBounds.maxDepthHit,
+        },
         recordsRetained: scan.records.length,
         recordsOmitted: omitted,
       },
@@ -204,6 +208,8 @@ async function main() {
       },
       warnings: [
         'Bounded navigation, not whole-repository coverage; excluded files are not counted as omissions.',
+        'recordsOmitted counts constructed candidate records not retained under maxRecords; it is not an unknown unvisited-file count.',
+        'scanBounds are scoped discovery-uncertainty flags; both false does not prove complete repository coverage.',
         'Git status equality does not prove unchanged dirty contents.',
         'Retained local keys/cache; retrieval receipt is plaintext. Read actual source before edits.',
       ],
@@ -222,6 +228,10 @@ async function main() {
       dirty: before.dirty ? 'yes' : 'no',
       filesScanned: scan.filesScanned,
       filesSkipped: scan.filesSkipped,
+      scanBounds: {
+        maxFilesHit: scan.scanBounds.maxFilesHit,
+        maxDepthHit: scan.scanBounds.maxDepthHit,
+      },
       recordsRetained: scan.records.length,
       recordsOmitted: omitted,
       collection,

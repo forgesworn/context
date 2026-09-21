@@ -23,6 +23,19 @@ export interface SourceGraphScan {
   symbolsFound: number
   importsFound: number
   callsFound: number
+  /** Scoped uncertainty about discovery. Both flags false does not prove
+   * complete coverage: ignored directories, non-source extensions, and
+   * read/byte/size exclusions remain outside this signal. */
+  scanBounds: {
+    /** True when the eligible file discovery count reached the configured
+     * maxFiles cap. This is not proof that additional eligible files exist;
+     * the cap may have been reached exactly at the last eligible file. */
+    maxFilesHit: boolean
+    /** True when an otherwise traversable directory was not descended
+     * because the configured maxDepth was reached. Ignored/hidden
+     * directories that are never inspected do not set this flag. */
+    maxDepthHit: boolean
+  }
 }
 
 type SymbolKind = 'function' | 'class' | 'method' | 'interface' | 'type' | 'enum' | 'variable'
@@ -98,6 +111,8 @@ export async function scanSourceGraph(root: string, options: SourceGraphScanOpti
 
   const discovered: string[] = []
   let filesSkipped = 0
+  let maxFilesHit = false
+  let maxDepthHit = false
   async function visit(directory: string, depth: number): Promise<void> {
     if (discovered.length >= maxFiles) return
     const entries = []
@@ -108,15 +123,21 @@ export async function scanSourceGraph(root: string, options: SourceGraphScanOpti
       const path = join(directory, entry.name)
       const info = await lstat(path).catch(() => undefined)
       if (!info || info.isSymbolicLink()) { if (info?.isSymbolicLink()) filesSkipped++; continue }
-      if (info.isDirectory()) { if (depth < maxDepth) await visit(path, depth + 1); if (discovered.length >= maxFiles) return; continue }
+      if (info.isDirectory()) {
+        if (depth < maxDepth) await visit(path, depth + 1)
+        else maxDepthHit = true
+        if (discovered.length >= maxFiles) return
+        continue
+      }
       if (!info.isFile() || !extensions.has(extname(entry.name))) continue
       if (!validRecordSource(`repo://${normal(canonicalRoot, path)}`)) { filesSkipped++; continue }
       if (info.size > maxFileBytes) { filesSkipped++; continue }
       discovered.push(path)
-      if (discovered.length >= maxFiles) return
+      if (discovered.length >= maxFiles) { maxFilesHit = true; return }
     }
   }
   await visit(canonicalRoot, 0)
+  if (discovered.length >= maxFiles) maxFilesHit = true
   discovered.sort((a, b) => normal(canonicalRoot, a).localeCompare(normal(canonicalRoot, b)))
   const selected: { path: string; text: string; bytes: number }[] = []
   let bytesRead = 0
@@ -263,5 +284,6 @@ export async function scanSourceGraph(root: string, options: SourceGraphScanOpti
   })
   return { root: canonicalRoot, records, filesScanned: parsed.length, filesSkipped, bytesRead,
     symbolsFound: parsed.reduce((sum, file) => sum + file.symbols.length, 0),
-    importsFound: parsed.reduce((sum, file) => sum + file.imports.length, 0), callsFound }
+    importsFound: parsed.reduce((sum, file) => sum + file.imports.length, 0), callsFound,
+    scanBounds: { maxFilesHit, maxDepthHit } }
 }
