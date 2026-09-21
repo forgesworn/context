@@ -129,3 +129,11 @@ dispatch while another job owned the endpoint; its usage fields are unknown.
 This was a real coding task using Z1P navigation, not a paired savings test.
 Host selection/review usage and billing cost remain unknown. Local worker
 receipts: `/private/tmp/z1p-scan-flags.mMGZHK/`.
+
+A bounded Claude CLI acceptance attempt requested Haiku, disabled built-in
+tools and approved only repository refresh/search for that invocation. Claude
+returned HTTP 429 before any tool call: weekly limit reached, reset reported
+as 22 September at noon Europe/London. The CLI reported zero tokens and cost.
+No retry or fallback was attempted, and saved permissions were not changed.
+Actual Claude tool-use acceptance remains blocked; connection health alone
+does not establish it.
