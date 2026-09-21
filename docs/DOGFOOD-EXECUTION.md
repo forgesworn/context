@@ -182,22 +182,38 @@ partially retained after host corrections. Flash was not retried. Host GPT-6
 handled integration and review; complete host/worker cost attribution is still
 unavailable, and this pass establishes no whole-task monetary saving.
 
-The six recorded Codex task sessions in this pass reported 804,914 cumulative
-input tokens, including 711,936 cached input tokens, and 9,575 output tokens.
+The seven recorded Codex task sessions in this pass reported 966,308 cumulative
+input tokens, including 853,504 cached input tokens, and 10,668 output tokens.
 Those totals include the incomplete lifecycle attempt; cached input is a subset
 and reasoning output is already included. Collaboration-worker and host usage
 remain unavailable. These are acceptance and development receipts without a
 paired baseline, not an inference-cost comparison.
 
+The repairs and helper are committed as `10c9d65` and `2dd3fc7` respectively.
+[Candidate CI passed](https://github.com/forgesworn/context/actions/runs/35600896950)
+for `2dd3fc7ab1f202e94b8fcba4b336773b675b9d1b`, including package checks,
+benchmarks, navigation smoke and synthetic scale checks. Tarballs from that clean
+commit were installed in a separate commit-pinned directory. The installed CLI
+passed all nine smoke checks and positive/negative retrieval in both sibling
+roots. A fresh Luna/medium Codex session then repeated the complete lifecycle,
+including old-cursor rejection, against that exact installed release.
+
+All three local client bindings now select the new pinned release with their
+original explicit roots. Existing sessions need restarting to load it; an index
+refresh does not reload implementation code. The preceding pinned release and
+private per-root configuration backups remain available for rollback. This is
+internal installation and client acceptance, not registry publication or room
+consumer acceptance. The packet helper itself remains a checkout script.
+
 ## Gate status
 
 | Goal | Status | Remaining acceptance |
 | --- | --- | --- |
-| D0 reproducible pilot | Local lifecycle and build passed | Actual Codex edit/stale/refresh/old-cursor exercise now passed; candidate CI and installed-build receipts are recorded with each release |
+| D0 reproducible pilot | Passed | Named commits, matching CI, independent pinned install and actual Codex edit/stale/refresh/old-cursor exercise passed |
 | D1 daily Context use | Passed | Orientation, source-backed boundary diagnosis and accepted packet coding tasks span fresh clients; continue recording normal use |
-| D2 source selection | Passed locally with qualified review | Sol/high review defects repaired; root, policy, cancellation and cursor regressions pass |
+| D2 source selection | Passed with qualified review | Sol/high review defects repaired; root, policy, cancellation and cursor regressions pass locally and in CI |
 | D3 two additional repositories | Scoped clients passed; gate partial | Negative cross-root checks passed both ways; raw disabled-session tool absence remains unproven by the available CLI output |
-| D4 reusable worker packets | Passed locally | Build and read-only verification implemented; two coding tasks accepted with source packets, repairs and host review recorded |
+| D4 reusable worker packets | Passed | Build and read-only verification implemented; two coding tasks accepted with source packets, repairs and host review recorded; CI passed |
 | D5 whole-task savings | Open | Predeclared eight-pair trial with complete host/worker accounting |
 | D6 consumer/room integration | Open | Coordinate with Oathrun's own authority and execution gates |
 | D7 dependable distribution | Internal install passed; public open | Public publication and consumer upgrades still require G0–G4 |

@@ -12,10 +12,12 @@ discovery and cost per accepted task. Start with the existing local Codex MCP
 bridge, then expand to KithMoot and Oathrun through explicit repository bindings.
 Measure the complete workflow before claiming savings.
 
-**The current checkout can be dogfooded now.** Complete D0 and D1 to make that
-pilot reproducible and routine. Complete D2 before expanding to other repository
-roots. Public package release, hosted services and enterprise indexing are not
-prerequisites for this local pilot.
+**The current checkout can be dogfooded now.** D0, D1, D2 and D4 have passed:
+the pilot is reproducible, routine tasks have accepted outcomes, selection has
+qualified review, and source packets support two accepted coding tasks. Next,
+finish D3's disabled-tool evidence and run D5's whole-task comparison. Public
+package release, hosted services and enterprise indexing are not prerequisites
+for this local pilot. See the execution ledger for the exact scope and evidence.
 
 These D goals are the internal adoption sequence. [G0–G4](../GOALS.md) remain the
 public release gates. A passed D goal does not automatically close a G gate.
