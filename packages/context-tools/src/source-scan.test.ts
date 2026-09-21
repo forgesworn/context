@@ -227,4 +227,84 @@ describe('bounded TypeScript and JavaScript source graph scan', () => {
     expect(fileRecord.text).not.toContain('localOne')
     expect(fileRecord.text).not.toContain('localTwo')
   })
+
+  it('reports maxFilesHit at cap and preserves bounded discovery semantics', async () => {
+    const root = await fixture()
+    await source(root, 'a.ts', 'export function a() {}')
+    await source(root, 'b.ts', 'export function b() {}')
+    await source(root, 'c.ts', 'export function c() {}')
+    const first = await scanSourceGraph(root, { observedAt: 123, maxFiles: 1, maxRecords: 128 })
+    expect(first).toMatchObject({
+      filesScanned: 1,
+      filesSkipped: 0,
+      symbolsFound: 1,
+      scanBounds: { maxFilesHit: true, maxDepthHit: false },
+    })
+    expect(first.records).toHaveLength(2)
+    expect(Math.max(0, first.filesScanned + first.symbolsFound - first.records.length)).toBe(0)
+
+    const second = await scanSourceGraph(root, { observedAt: 123, maxFiles: 64, maxRecords: 1 })
+    expect(second).toMatchObject({
+      filesScanned: 3,
+      filesSkipped: 0,
+      symbolsFound: 3,
+      scanBounds: { maxFilesHit: false, maxDepthHit: false },
+    })
+    expect(second.records).toHaveLength(1)
+    expect(second.filesScanned + second.symbolsFound - second.records.length).toBe(5)
+  })
+
+  it('reports maxFilesHit at an exact cap with no additional eligible files', async () => {
+    const root = await fixture()
+    await source(root, 'only.ts', 'export function only() {}')
+    const result = await scanSourceGraph(root, { observedAt: 123, maxFiles: 1 })
+    expect(result.scanBounds.maxFilesHit).toBe(true)
+    expect(result.scanBounds.maxDepthHit).toBe(false)
+    expect(result.filesScanned).toBe(1)
+  })
+
+  it('leaves both scan bounds false for a below-cap flat scan', async () => {
+    const root = await fixture()
+    await source(root, 'one.ts', 'export function one() {}')
+    await source(root, 'two.ts', 'export function two() {}')
+    const result = await scanSourceGraph(root, { observedAt: 123, maxFiles: 64, maxDepth: 8 })
+    expect(result.scanBounds).toEqual({ maxFilesHit: false, maxDepthHit: false })
+  })
+
+  it('reports maxDepthHit only when an otherwise traversable directory is not descended', async () => {
+    const root = await fixture()
+    await source(root, 'root.ts', 'export function rootFn() {}')
+    await source(root, 'nested/deep.ts', 'export function deep() {}')
+    const shallow = await scanSourceGraph(root, { observedAt: 123, maxDepth: 0 })
+    expect(shallow.filesScanned).toBe(1)
+    expect(shallow.scanBounds).toEqual({ maxFilesHit: false, maxDepthHit: true })
+    expect(shallow.records.map(record => record.source)).toContain('repo://root.ts')
+    expect(shallow.records.every(record => !record.source.includes('nested'))).toBe(true)
+
+    const deep = await scanSourceGraph(root, { observedAt: 123, maxDepth: 4 })
+    expect(deep.filesScanned).toBe(2)
+    expect(deep.scanBounds).toEqual({ maxFilesHit: false, maxDepthHit: false })
+    expect(deep.records.map(record => record.source)).toContain('repo://nested/deep.ts')
+  })
+
+  it('does not set maxDepthHit for ignored directories that are never inspected', async () => {
+    const root = await fixture()
+    await source(root, 'root.ts', 'export function rootFn() {}')
+    await source(root, '.hidden/no.ts', 'export function hidden() {}')
+    await source(root, 'node_modules/no.ts', 'export function dependency() {}')
+    const result = await scanSourceGraph(root, { observedAt: 123, maxDepth: 0 })
+    expect(result.filesScanned).toBe(1)
+    expect(result.scanBounds).toEqual({ maxFilesHit: false, maxDepthHit: false })
+    expect(result.records.every(record => !record.source.includes('hidden') && !record.source.includes('node_modules'))).toBe(true)
+  })
+
+  it('keeps records unchanged across repeated scans with the same observedAt and flags', async () => {
+    const root = await fixture()
+    await source(root, 'a.ts', 'export function a() {}')
+    await source(root, 'nested/b.ts', 'export function b() {}')
+    const first = await scanSourceGraph(root, { observedAt: 123, maxFiles: 1 })
+    const second = await scanSourceGraph(root, { observedAt: 123, maxFiles: 1 })
+    expect(first.records).toEqual(second.records)
+    expect(first.scanBounds).toEqual(second.scanBounds)
+  })
 })

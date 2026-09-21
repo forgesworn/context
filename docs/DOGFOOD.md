@@ -16,7 +16,7 @@ The harness creates a fresh `mkdtemp` directory under `os.tmpdir()` with mode `0
 ## What It Does
 
 1. Checks `git rev-parse HEAD` and `git status --porcelain=v1` before and after scanning. If either changes mid-scan, it fails.
-2. Scans the repo with `scanSourceGraph` using bounded limits: 64 files, depth 8, 1 MiB total, 256 KiB per file, 128 records max.
+2. Scans the repo with `scanSourceGraph` using bounded limits: 64 files, depth 8, 1 MiB total, 256 KiB per file, 128 records max. The receipt and stdout summary report `scanBounds.maxFilesHit` and `scanBounds.maxDepthHit` as scoped discovery-uncertainty flags. Both false does not prove complete coverage: ignored directories, non-source extensions, and read/size exclusions remain outside these flags.
 3. Spawns the CLI via `StdioClientTransport` with the absolute path `packages/context-tools/bin/encrypted-context.mjs`.
 4. Connects an MCP `Client` named `z1p-dogfood` version `0.1.0`.
 5. Verifies required tools exist, then creates a context, appends scan records, lists, retrieves with `maxBytes: 8192` / `maxRecords: 8`, checks `bytesUsed` exactly, tests invalid `maxBytes: 1` rejection, rechecks retrieval, closes, reconnects, and verifies `context_read` head and record count match.
@@ -26,7 +26,8 @@ The harness creates a fresh `mkdtemp` directory under `os.tmpdir()` with mode `0
 ## Caveats
 
 - **Timeout scope.** The MCP phase has a 120-second watchdog with a further two seconds allowed for transport cleanup. The initial scan and Git checks are outside that watchdog. Cancellation semantics are not qualified by this check.
-- **Bounded navigation, not whole-repo coverage.** The scanner reads at most 64 files. Results may omit relevant code. Always read full source before editing.
+- **Bounded navigation, not whole-repo coverage.** The scanner reads at most 64 files. Results may omit relevant code. `scanBounds` reports only whether the file cap or depth cap was reached during discovery; it is not a coverage proof. Always read full source before editing.
+- **`recordsOmitted` is candidate omissions.** `recordsOmitted` keeps its legacy numeric formula (`filesScanned + symbolsFound - records.length`) and counts constructed candidate records not retained under `maxRecords`. It is not an unknown unvisited-file count.
 - **Freshness.** Every run creates a new collection. Re-run after any source edit or before any new task. The one-shot command always makes a fresh collection.
 - **Dirty status equality does not prove unchanged file contents.** If the repo is dirty, the harness cannot verify content stability.
 - **MCP client is not desktop acceptance.** This harness exercises the MCP protocol and persistence. It does not measure real user acceptance or savings.
@@ -111,3 +112,20 @@ enlarge the signed v1 format or automatically sign repository source.
 The [first paired diagnostic trial](PAIRED-TRIAL.md) now records the scanner
 truncation diagnosis, actual fixture checks and worker usage including repairs.
 It is a host-assisted context-selection experiment, not end-to-end billing proof.
+
+## Scan-bound reporting acceptance — 21 September 2026
+
+The follow-up implementation adds `scanBounds` without changing signed records,
+discovery quotas or `filesSkipped` semantics. Six regression tests cover capped
+and below-cap scans, exact-cap uncertainty, depth pruning, ignored directories
+and repeatability. All 106 tests, independent package checks and both benchmark
+gates passed. A real harness run confirmed identical flags in stdout and the
+saved receipt, plus invalid-request rejection and restart persistence.
+
+Ollama Flash (`deepseek-v4.1-flash:cloud`, thinking off) produced the accepted
+patch in one dispatched request: 13,528 input and 2,619 output tokens, 16,147
+total, with no repair. A preceding busy receipt was rejected locally before
+dispatch while another job owned the endpoint; its usage fields are unknown.
+This was a real coding task using Z1P navigation, not a paired savings test.
+Host selection/review usage and billing cost remain unknown. Local worker
+receipts: `/private/tmp/z1p-scan-flags.mMGZHK/`.
