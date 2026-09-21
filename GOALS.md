@@ -8,6 +8,11 @@ This is an acceptance plan, not a claim that the gates have passed.  Existing co
 
 Current results and open blockers are recorded in [RELEASE_EVIDENCE.md](RELEASE_EVIDENCE.md).
 
+For immediate internal use, follow the [ForgeSworn dogfooding goals](docs/FORGESWORN-DOGFOOD-GOALS.md).
+They define the shorter D0–D7 adoption sequence, model and effort assignments,
+and whole-task savings experiment. Local dogfooding can start before the public
+release gates below are complete.
+
 ## Order of work
 
 1. Establish the release baseline and remaining gaps.
