@@ -124,8 +124,9 @@ After reopening, inspect `/mcp`, then ask:
 Refresh after source edits. The two clients have independent ephemeral indexes;
 refreshing one does not refresh the other. No inference is needed to build or
 query the index. The agent interpreting its results may still incur inference
-costs. Real accepted-task savings require the paired trial in
-[DOGFOOD.md](DOGFOOD.md), which has not been run.
+costs. The [first paired diagnostic trial](PAIRED-TRIAL.md) used fewer worker
+tokens with selected excerpts, including repairs, but host selection/review
+costs were not measured. End-to-end inference-bill savings remain unproven.
 
 Configuration reference: [official Codex MCP documentation](https://learn.chatgpt.com/docs/extend/mcp?surface=cli).
 
