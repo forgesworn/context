@@ -41,6 +41,11 @@ The free core is intended to be useful on its own, not a time-limited trial.
 See [OPEN_CORE.md](OPEN_CORE.md) for the durable product boundary and
 compatibility policy.
 
+See [GOALS.md](GOALS.md) for the core-first release gates, required evidence
+and whole-task inference-cost evaluation.
+The current candidate results and blockers are recorded in
+[RELEASE_EVIDENCE.md](RELEASE_EVIDENCE.md).
+
 The formats and APIs are project-agnostic. A collection can describe one
 repository or an explicitly assembled ecosystem; graph operations never make
 another collection visible or turn an extracted relationship into authority.

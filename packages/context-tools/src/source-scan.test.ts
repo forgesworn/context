@@ -150,4 +150,81 @@ describe('bounded TypeScript and JavaScript source graph scan', () => {
       'repo://a.ts', 'repo://b.ts', 'repo://a.ts#publicA', 'repo://b.ts#publicB',
     ])
   })
+
+  it('early file with many exports does not starve later file anchors under maxRecords 4', async () => {
+    const root = await fixture()
+    await source(root, 'early.ts', `export function e1() {}\nexport function e2() {}\nexport function e3() {}\nexport function e4() {}`)
+    await source(root, 'later.ts', `export function onlyExport() {}`)
+    const result = await scanSourceGraph(root, { observedAt: 123, maxRecords: 4 })
+    expect(result.records.length).toBe(4)
+    const sources = result.records.map(record => record.source)
+    expect(sources).toContain('repo://early.ts')
+    expect(sources).toContain('repo://later.ts')
+    expect(sources).toContain('repo://early.ts#e1')
+    expect(sources).toContain('repo://later.ts#onlyExport')
+    const laterExport = bySource(result.records, 'repo://later.ts#onlyExport')!
+    expect(laterExport).toBeDefined()
+  })
+
+  it('file summary includes exported names with exact omitted count under name and text bounds', async () => {
+    const root = await fixture()
+    const longName = `long${'a'.repeat(650)}`
+    await source(root, 'mixed.ts', [
+      `export function shortOne() {}`,
+      `export function shortTwo() {}`,
+      `export function ${longName}() {}`,
+      `export function shortThree() {}`,
+    ].join('\n'))
+    const first = await scanSourceGraph(root, { observedAt: 123 })
+    const second = await scanSourceGraph(root, { observedAt: 123 })
+    expect(first).toEqual(second)
+    const fileRecord = bySource(first.records, 'repo://mixed.ts')!
+    expect(fileRecord.text).toContain('exported: shortOne, shortTwo, shortThree')
+    expect(fileRecord.text).toContain('(+1 omitted)')
+    expect(fileRecord.text).not.toContain(longName)
+    expect(fileRecord.text).toContain('shortThree')
+    const exportedSegment = fileRecord.text.slice(fileRecord.text.indexOf('exported:'))
+    const namesSegment = exportedSegment.slice('exported: '.length, exportedSegment.indexOf('.'))
+    expect(namesSegment.length).toBeLessThan(600)
+    expect(fileRecord.text.length).toBeLessThan(4000)
+    const identity = createNostrIdentity(new Uint8Array(32).fill(29))
+    const vault = new ContextVault({ identity, now: () => 123 })
+    const view = await vault.create({ title: 'Long name source', scope: 'personal' })
+    await expect(vault.appendBatch(view.id, view.head, first.records)).resolves.toBeDefined()
+  })
+
+  it('reports omitted exports when no anchor name fits within the budget', async () => {
+    const root = await fixture()
+    const firstName = `first${'a'.repeat(650)}`
+    const secondName = `second${'b'.repeat(650)}`
+    await source(root, 'alllong.ts', [
+      `export function ${firstName}() {}`,
+      `export function ${secondName}() {}`,
+    ].join('\n'))
+    const result = await scanSourceGraph(root, { observedAt: 123 })
+    const fileRecord = bySource(result.records, 'repo://alllong.ts')!
+    expect(fileRecord.text).toContain('(+2 omitted)')
+    expect(fileRecord.text).not.toContain(firstName)
+    expect(fileRecord.text).not.toContain(secondName)
+    const identity = createNostrIdentity(new Uint8Array(32).fill(28))
+    const vault = new ContextVault({ identity, now: () => 123 })
+    const view = await vault.create({ title: 'All long names', scope: 'personal' })
+    await expect(vault.appendBatch(view.id, view.head, result.records)).resolves.toBeDefined()
+  })
+
+  it('file anchors include every exported name and exclude local ones', async () => {
+    const root = await fixture()
+    await source(root, 'anchors.ts', [
+      `export function exportedOne() {}`,
+      `function localOne() {}`,
+      `export function exportedTwo() {}`,
+      `function localTwo() {}`,
+    ].join('\n'))
+    const result = await scanSourceGraph(root, { observedAt: 123 })
+    const fileRecord = bySource(result.records, 'repo://anchors.ts')!
+    expect(fileRecord.text).toContain('exportedOne')
+    expect(fileRecord.text).toContain('exportedTwo')
+    expect(fileRecord.text).not.toContain('localOne')
+    expect(fileRecord.text).not.toContain('localTwo')
+  })
 })
