@@ -53,6 +53,12 @@ must not leave its old text retrievable from the previous index. Status remains
 available to diagnose the condition. Failed refresh retains the prior generation
 but does not grant permission to bypass the new policy.
 
+A generation also belongs to the observed root directory identity. Replacing
+that directory at the same path blocks old-generation search until explicit
+refresh. Root and policy checks are repeated after source inspection and before
+search results are committed, so a change observed during either stage rejects
+the operation without consuming its input cursor.
+
 The process still runs with the operator's OS permissions. These exclusions are
 not a secret detector, filesystem sandbox or shared-room access grant. Policy
 files and source can change while being read; hashes identify observed bytes,

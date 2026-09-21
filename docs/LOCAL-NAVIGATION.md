@@ -78,8 +78,10 @@ can still be validated as current. Changed or unverifiable policy blocks search
 until successful refresh, preventing retrieval of newly excluded source. Status
 exposes the indexed policy digest, summary and freshness separately. Each search
 response carries the
-freshness snapshot observed before that search began (and a bounded error when
-it is `unknown`); it never silently replaces the generation.
+source-freshness snapshot observed before that search began (and a bounded error
+when it is `unknown`). Root identity and policy are checked again before the
+result is committed; a detected change blocks the result. Search never silently
+replaces the generation.
 
 Responses default to 32,768 bytes and 40 lines. Requests may choose up to
 262,144 bytes and 100 lines; the byte count covers the JSON result body, not MCP

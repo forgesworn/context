@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { promises as fsp } from 'node:fs';
+import { constants as fsConstants, promises as fsp } from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { createHash } from 'node:crypto';
@@ -110,6 +110,58 @@ describe('RepositoryNavigation', () => {
     await expect(nav.search({ term: 'shared', cursor: page.nextCursor })).rejects.toThrow(/policy is stale/);
     await nav.refresh();
     expect((await nav.search({ term: 'shared' })).results).toEqual([]);
+  });
+
+  it('blocks a policy change made during freshness source reads without consuming the cursor', async () => {
+    const root = await mkFixture();
+    const source = await writeFile(root, 'secret.ts', 'shared one\nshared two\n');
+    const canonicalSource = await fsp.realpath(source);
+    const nav = new RepositoryNavigation(root);
+    await nav.refresh();
+    const first = await nav.search({ term: 'shared', maxResults: 1 });
+    const cursor = first.nextCursor!;
+    const originalOpen = fsp.open.bind(fsp);
+    let tightened = false;
+    vi.spyOn(fsp, 'open').mockImplementation(async (file, flags) => {
+      const handle = await originalOpen(file, flags);
+      if (!tightened && String(file) === canonicalSource) {
+        tightened = true;
+        await writeFile(root, '.gitignore', 'secret.ts\n');
+      }
+      return handle;
+    });
+    await expect(nav.search({ term: 'shared', cursor })).rejects.toThrow(/policy is stale/);
+    vi.restoreAllMocks();
+    await fsp.unlink(path.join(root, '.gitignore'));
+    const continued = await nav.search({ term: 'shared', cursor });
+    expect(continued.results[0].line).toBe(2);
+  });
+
+  it('does not publish a refresh if policy changes after discovery', async () => {
+    const root = await mkFixture();
+    const source = await writeFile(root, 'secret.ts', 'shared one\nshared two\n');
+    const canonicalSource = await fsp.realpath(source);
+    const nav = new RepositoryNavigation(root);
+    const original = await nav.refresh();
+    const first = await nav.search({ term: 'shared', maxResults: 1 });
+    const originalOpen = fsp.open.bind(fsp);
+    let tightened = false;
+    vi.spyOn(fsp, 'open').mockImplementation(async (file, flags) => {
+      const handle = await originalOpen(file, flags);
+      if (!tightened && String(file) === canonicalSource) {
+        tightened = true;
+        await writeFile(root, '.gitignore', 'secret.ts\n');
+      }
+      return handle;
+    });
+    await expect(nav.refresh()).rejects.toThrow(/policy changed during refresh/);
+    vi.restoreAllMocks();
+    const stale = await nav.status();
+    expect(stale.generation).toBe(original.generation);
+    expect(stale.policy.freshness).toBe('stale');
+    await fsp.unlink(path.join(root, '.gitignore'));
+    const continued = await nav.search({ term: 'shared', cursor: first.nextCursor });
+    expect(continued.results[0].line).toBe(2);
   });
 
   it('blocks an old generation when policy validation fails', async () => {
@@ -475,6 +527,66 @@ describe('RepositoryNavigation', () => {
     await fsp.symlink(target, linkPath, 'dir');
     const nav = new RepositoryNavigation(linkPath);
     await expect(nav.refresh()).rejects.toThrow();
+  });
+
+  it('blocks an old generation when the configured root is replaced until explicit refresh', async () => {
+    const parent = await fsp.mkdtemp(path.join(os.tmpdir(), 'repo-nav-root-replace-'));
+    owned.push(parent);
+    const root = path.join(parent, 'root');
+    const moved = path.join(parent, 'moved-root');
+    await fsp.mkdir(root);
+    await writeFile(root, 'old.ts', 'oldprojecttoken private\n');
+    const nav = new RepositoryNavigation(root);
+    await nav.refresh();
+
+    await fsp.rename(root, moved);
+    await fsp.mkdir(root);
+    await writeFile(root, 'new.ts', 'newprojecttoken public\n');
+
+    const status = await nav.status();
+    expect(status.freshness).toBe('unknown');
+    expect(status.policy.freshness).toBe('unknown');
+    await expect(nav.search({ term: 'oldprojecttoken' })).rejects.toThrow(/policy is unknown/);
+
+    await nav.refresh();
+    expect((await nav.search({ term: 'oldprojecttoken' })).results).toEqual([]);
+    expect((await nav.search({ term: 'newprojecttoken' })).results).toHaveLength(1);
+  });
+
+  it('rejects an ancestor symlink swap before reading bytes from the replacement file', async () => {
+    const root = await mkFixture();
+    const outside = await mkFixture();
+    const source = await writeFile(root, 'src/secret.ts', 'inside token\n');
+    const canonicalSource = await fsp.realpath(source);
+    await writeFile(outside, 'secret.ts', 'outsidetoken must-not-read\n');
+    const nav = new RepositoryNavigation(root);
+    const originalOpen = fsp.open.bind(fsp);
+    let swapped = false;
+    let outsideReads = 0;
+    let usedNonblockingOpen = false;
+    vi.spyOn(fsp, 'open').mockImplementation(async (file, flags) => {
+      if (!swapped && String(file) === canonicalSource) {
+        swapped = true;
+        await fsp.rename(path.join(root, 'src'), path.join(root, 'src-original'));
+        await fsp.symlink(outside, path.join(root, 'src'), 'dir');
+      }
+      if (String(file) === canonicalSource) {
+        usedNonblockingOpen = (Number(flags) & fsConstants.O_NONBLOCK) !== 0;
+      }
+      const handle = await originalOpen(file, flags);
+      if (swapped && String(file) === canonicalSource) {
+        const originalRead = handle.read.bind(handle);
+        vi.spyOn(handle, 'read').mockImplementation(async (...args) => {
+          outsideReads++;
+          return Reflect.apply(originalRead, handle, args);
+        });
+      }
+      return handle;
+    });
+
+    await expect(nav.refresh()).rejects.toThrow(/file changed before open/);
+    expect(usedNonblockingOpen).toBe(true);
+    expect(outsideReads).toBe(0);
   });
 
   it('handles Unicode line bytes correctly', async () => {

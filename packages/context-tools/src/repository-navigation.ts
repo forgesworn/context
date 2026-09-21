@@ -156,9 +156,11 @@ interface IndexedFile {
 interface Generation {
   id: string;
   builtAt: number;
+  rootIdentity: RootIdentity;
   revision: string;
   policyRevision: string;
   policySummary: NavigationPolicySummary;
+  policyDirectories: string[];
   files: IndexedFile[];
   byToken: Map<string, number[]>;
   // Flat list of locations sorted by path then line, indexable by number.
@@ -184,12 +186,26 @@ interface Manifest {
   revision: string;
 }
 
+interface RootIdentity {
+  path: string;
+  dev: number;
+  ino: number;
+}
+
+interface DiscoveredFile {
+  abs: string;
+  rel: string;
+  dev: number;
+  ino: number;
+}
+
 interface Discovery {
-  files: { abs: string; rel: string }[];
+  files: DiscoveredFile[];
   exclusions: NavigationExclusions;
   policy: NavigationPolicy;
   policyRevision: string;
   policySummary: NavigationPolicySummary;
+  policyDirectories: string[];
 }
 
 interface FreshnessInspection {
@@ -250,6 +266,10 @@ function isInsideRoot(root: string, candidate: string): boolean {
   if (candidate === root) return true;
   const rootWithSep = root.endsWith(path.sep) ? root : root + path.sep;
   return candidate.startsWith(rootWithSep);
+}
+
+function sameRootIdentity(a: RootIdentity, b: RootIdentity): boolean {
+  return a.path === b.path && a.dev === b.dev && a.ino === b.ino;
 }
 
 const yieldNow = (): Promise<void> =>
@@ -413,14 +433,24 @@ export class RepositoryNavigation {
     throwIfAborted(signal);
     this.refreshInFlight = true;
     try {
-      const canonical = await this.resolveRoot(signal);
+      const rootIdentity = await this.resolveRoot(signal);
       throwIfAborted(signal);
 
-      const gen = await this.buildGeneration(canonical, signal);
+      const gen = await this.buildGeneration(rootIdentity, signal);
+      throwIfAborted(signal);
+
+      const policyRevision = await this.reinspectPolicy(
+        rootIdentity,
+        gen.policyDirectories,
+        signal,
+      );
+      if (policyRevision !== gen.policyRevision) {
+        throw new Error('RepositoryNavigation: policy changed during refresh');
+      }
       throwIfAborted(signal);
 
       // Publish atomically. Successful refresh invalidates all cursors.
-      this.canonicalRoot = canonical;
+      this.canonicalRoot = rootIdentity.path;
       this.generation = gen;
       this.cursors.clear();
       return this.makeStatus(gen, 'current', undefined, {
@@ -622,6 +652,27 @@ export class RepositoryNavigation {
       throw new Error('RepositoryNavigation: result exceeds maxBytes; increase maxBytes');
     }
 
+    let commitPolicyRevision: string;
+    try {
+      commitPolicyRevision = await this.reinspectPolicy(
+        gen.rootIdentity,
+        gen.policyDirectories,
+        signal,
+      );
+    } catch (error) {
+      if (signal?.aborted) throw error;
+      throw new Error(
+        `RepositoryNavigation: search blocked because policy is unknown: ${boundedError(error)}`,
+      );
+    }
+    throwIfAborted(signal);
+    if (commitPolicyRevision !== gen.policyRevision) {
+      throw new Error('RepositoryNavigation: search blocked because policy is stale');
+    }
+    if (this.generation === null || this.generation.id !== generationAtStart) {
+      throw new Error('RepositoryNavigation: generation changed during search');
+    }
+
     // Commit phase: single-use semantics. Recheck that the input cursor is
     // still the registered one immediately before committing so that a
     // concurrent replay of the same cursor cannot double-consume; the loser
@@ -684,7 +735,7 @@ export class RepositoryNavigation {
     }
   }
 
-  private async resolveRoot(signal?: AbortSignal): Promise<string> {
+  private async resolveRoot(signal?: AbortSignal): Promise<RootIdentity> {
     throwIfAborted(signal);
     const absInput = path.resolve(this.rootInput);
     const lstat = await fsp.lstat(absInput);
@@ -697,12 +748,15 @@ export class RepositoryNavigation {
     }
     const real = await fsp.realpath(absInput);
     throwIfAborted(signal);
-    const realStat = await fsp.stat(real);
+    const realStat = await fsp.lstat(real);
     throwIfAborted(signal);
     if (!realStat.isDirectory()) {
       throw new Error('RepositoryNavigation: root must be a directory');
     }
-    return real;
+    if (realStat.dev !== lstat.dev || realStat.ino !== lstat.ino) {
+      throw new Error('RepositoryNavigation: root changed while resolving');
+    }
+    return { path: real, dev: realStat.dev, ino: realStat.ino };
   }
 
   private async inspectFreshness(
@@ -712,8 +766,11 @@ export class RepositoryNavigation {
     let discovery: Discovery;
     try {
       throwIfAborted(signal);
-      const root = await this.resolveRoot(signal);
-      discovery = await this.discoverEligible(root, signal);
+      const rootIdentity = await this.resolveRoot(signal);
+      if (!sameRootIdentity(rootIdentity, generation.rootIdentity)) {
+        throw new Error('RepositoryNavigation: root identity changed; explicit refresh required');
+      }
+      discovery = await this.discoverEligible(rootIdentity.path, signal);
     } catch (error) {
       if (signal?.aborted) throw error;
       const message = boundedError(error);
@@ -734,17 +791,53 @@ export class RepositoryNavigation {
       summary: generation.policySummary,
     };
     if (policy.freshness !== 'current') return { freshness: 'stale', policy };
+    let manifest: Manifest | undefined;
+    let manifestError: unknown;
     try {
-      const manifest = await this.buildManifest(discovery, signal);
+      manifest = await this.buildManifest(discovery, signal);
       throwIfAborted(signal);
-      return {
-        freshness: manifest.revision === generation.revision ? 'current' : 'stale',
-        policy,
-      };
     } catch (error) {
       if (signal?.aborted) throw error;
-      return { freshness: 'unknown', error: boundedError(error), policy };
+      manifestError = error;
     }
+    let confirmedPolicyRevision: string;
+    try {
+      confirmedPolicyRevision = await this.reinspectPolicy(
+        generation.rootIdentity,
+        discovery.policyDirectories,
+        signal,
+      );
+    } catch (error) {
+      if (signal?.aborted) throw error;
+      const message = boundedError(error);
+      return {
+        freshness: 'unknown',
+        error: message,
+        policy: {
+          freshness: 'unknown',
+          digest: generation.policyRevision,
+          summary: generation.policySummary,
+          error: message,
+        },
+      };
+    }
+    if (confirmedPolicyRevision !== generation.policyRevision) {
+      return {
+        freshness: 'stale',
+        policy: {
+          freshness: 'stale',
+          digest: generation.policyRevision,
+          summary: generation.policySummary,
+        },
+      };
+    }
+    if (manifestError !== undefined) {
+      return { freshness: 'unknown', error: boundedError(manifestError), policy };
+    }
+    return {
+      freshness: manifest!.revision === generation.revision ? 'current' : 'stale',
+      policy,
+    };
   }
 
   private async buildManifest(discovery: Discovery, signal?: AbortSignal): Promise<Manifest> {
@@ -755,7 +848,7 @@ export class RepositoryNavigation {
       throwIfAborted(signal);
       await yieldNow();
       throwIfAborted(signal);
-      const { raw } = await this.readSource(entry.abs, this.limits.maxFileBytes, signal);
+      const { raw } = await this.readSource(entry, this.limits.maxFileBytes, signal);
       throwIfAborted(signal);
       if (totalBytes + raw.byteLength > this.limits.maxBytes) {
         throw new Error(`RepositoryNavigation: maxBytes quota exceeded (${this.limits.maxBytes})`);
@@ -776,7 +869,8 @@ export class RepositoryNavigation {
       symlinks: 0, ignored: 0, policy: 0, unsupported: 0, oversizedFiles: 0,
       oversizedLines: 0, maxDepth: 0, visitedCap: 0,
     };
-    const files: { abs: string; rel: string }[] = [];
+    const files: DiscoveredFile[] = [];
+    const policyDirectories: string[] = [''];
     let visitedEntries = 0;
     const policy = await NavigationPolicy.load(root, signal);
     const stack: { dir: string; rel: string; depth: number; scope: NavigationPolicyScope }[] = [
@@ -834,8 +928,14 @@ export class RepositoryNavigation {
           const real = await fsp.realpath(full);
           throwIfAborted(signal);
           if (!isInsideRoot(root, real)) { exclusions.symlinks++; continue; }
+          const realStat = await fsp.lstat(real);
+          throwIfAborted(signal);
+          if (!realStat.isDirectory() || realStat.dev !== stat.dev || realStat.ino !== stat.ino) {
+            throw new Error(`RepositoryNavigation: directory changed during discovery: ${full}`);
+          }
           const scope = await policy.enterDirectory(rel, frame.scope, signal);
           throwIfAborted(signal);
+          policyDirectories.push(rel);
           subdirs.push({ dir: real, rel, depth: frame.depth + 1, scope });
           continue;
         }
@@ -845,10 +945,20 @@ export class RepositoryNavigation {
         const real = await fsp.realpath(full);
         throwIfAborted(signal);
         if (!isInsideRoot(root, real)) { exclusions.symlinks++; continue; }
+        const realStat = await fsp.lstat(real);
+        throwIfAborted(signal);
+        if (!realStat.isFile() || realStat.dev !== stat.dev || realStat.ino !== stat.ino) {
+          throw new Error(`RepositoryNavigation: file changed during discovery: ${full}`);
+        }
         if (files.length >= this.limits.maxFiles) {
           throw new Error(`RepositoryNavigation: maxFiles quota exceeded (${this.limits.maxFiles})`);
         }
-        files.push({ abs: real, rel: toPosix(path.relative(root, real)) });
+        files.push({
+          abs: real,
+          rel: toPosix(path.relative(root, real)),
+          dev: realStat.dev,
+          ino: realStat.ino,
+        });
       }
       subdirs.reverse();
       for (const subdir of subdirs) stack.push(subdir);
@@ -861,15 +971,16 @@ export class RepositoryNavigation {
       policy,
       policyRevision: manifestRevision(policyFiles),
       policySummary: policy.summary(),
+      policyDirectories,
     };
   }
 
   private async buildGeneration(
-    root: string,
+    rootIdentity: RootIdentity,
     signal?: AbortSignal,
   ): Promise<Generation> {
     const limits = this.limits;
-    const discovery = await this.discoverEligible(root, signal);
+    const discovery = await this.discoverEligible(rootIdentity.path, signal);
     const { files: discovered, exclusions } = discovery;
 
     const indexedFiles: IndexedFile[] = [];
@@ -886,7 +997,7 @@ export class RepositoryNavigation {
       if (signal?.aborted) {
         throw new Error('RepositoryNavigation: aborted');
       }
-      const { content, raw } = await this.readSource(entry.abs, limits.maxFileBytes, signal);
+      const { content, raw } = await this.readSource(entry, limits.maxFileBytes, signal);
       throwIfAborted(signal);
       const rawBytes = raw.byteLength;
       if (totalBytes + rawBytes > limits.maxBytes) {
@@ -961,9 +1072,11 @@ export class RepositoryNavigation {
     return {
       id: randomUUID(),
       builtAt: Date.now(),
+      rootIdentity,
       revision: manifestRevision([...discovery.policy.manifest(), ...indexedFiles]),
       policyRevision: discovery.policyRevision,
       policySummary: discovery.policySummary,
+      policyDirectories: discovery.policyDirectories,
       files: indexedFiles,
       byToken,
       locations,
@@ -979,14 +1092,14 @@ export class RepositoryNavigation {
   }
 
   private async readSource(
-    filePath: string,
+    file: DiscoveredFile,
     maxFileBytes: number,
     signal?: AbortSignal,
   ): Promise<{ content: string; raw: Buffer }> {
     throwIfAborted(signal);
     const handle = await fsp.open(
-      filePath,
-      fsConstants.O_RDONLY | fsConstants.O_NOFOLLOW,
+      file.abs,
+      fsConstants.O_RDONLY | fsConstants.O_NONBLOCK | fsConstants.O_NOFOLLOW,
     );
     try {
       throwIfAborted(signal);
@@ -994,12 +1107,15 @@ export class RepositoryNavigation {
       throwIfAborted(signal);
       if (!before.isFile()) {
         throw new Error(
-          `RepositoryNavigation: not a regular file: ${filePath}`,
+          `RepositoryNavigation: not a regular file: ${file.abs}`,
         );
+      }
+      if (before.dev !== file.dev || before.ino !== file.ino) {
+        throw new Error(`RepositoryNavigation: file changed before open: ${file.abs}`);
       }
       if (before.size > maxFileBytes) {
         throw new Error(
-          `RepositoryNavigation: file exceeds maxFileBytes quota (${maxFileBytes}): ${filePath}`,
+          `RepositoryNavigation: file exceeds maxFileBytes quota (${maxFileBytes}): ${file.abs}`,
         );
       }
       const cap = maxFileBytes;
@@ -1015,7 +1131,7 @@ export class RepositoryNavigation {
       }
       if (pos > cap) {
         throw new Error(
-          `RepositoryNavigation: file exceeds maxFileBytes quota (${maxFileBytes}): ${filePath}`,
+          `RepositoryNavigation: file exceeds maxFileBytes quota (${maxFileBytes}): ${file.abs}`,
         );
       }
       const after = await handle.stat();
@@ -1027,7 +1143,7 @@ export class RepositoryNavigation {
         after.ctimeMs !== before.ctimeMs
       ) {
         throw new Error(
-          `RepositoryNavigation: file observed changed during read: ${filePath}`,
+          `RepositoryNavigation: file observed changed during read: ${file.abs}`,
         );
       }
       const raw = buf.subarray(0, pos);
@@ -1037,6 +1153,42 @@ export class RepositoryNavigation {
     } finally {
       await handle.close();
     }
+  }
+
+  private async reinspectPolicy(
+    expectedRoot: RootIdentity,
+    directories: readonly string[],
+    signal?: AbortSignal,
+  ): Promise<string> {
+    const before = await this.resolveRoot(signal);
+    if (!sameRootIdentity(before, expectedRoot)) {
+      throw new Error('RepositoryNavigation: root identity changed; explicit refresh required');
+    }
+    const policy = await NavigationPolicy.load(before.path, signal);
+    const scopes = new Map<string, NavigationPolicyScope>([
+      ['', policy.rootDirectoryScope()],
+    ]);
+    const ordered = [...new Set(directories)]
+      .filter(directory => directory !== '')
+      .sort((a, b) => {
+        const depth = a.split('/').length - b.split('/').length;
+        return depth !== 0 ? depth : a < b ? -1 : a > b ? 1 : 0;
+      });
+    for (const directory of ordered) {
+      throwIfAborted(signal);
+      const parentPath = path.posix.dirname(directory);
+      const parent = scopes.get(parentPath === '.' ? '' : parentPath);
+      if (!parent) {
+        throw new Error(`RepositoryNavigation: missing policy parent for ${directory}`);
+      }
+      scopes.set(directory, await policy.enterDirectory(directory, parent, signal));
+    }
+    const revision = manifestRevision(policy.manifest());
+    const after = await this.resolveRoot(signal);
+    if (!sameRootIdentity(after, expectedRoot)) {
+      throw new Error('RepositoryNavigation: root identity changed; explicit refresh required');
+    }
+    return revision;
   }
 }
 
