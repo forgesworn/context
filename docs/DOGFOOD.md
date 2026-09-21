@@ -107,3 +107,7 @@ and [Claude Code MCP scopes](https://code.claude.com/docs/en/mcp#local-scope).
 This signed snapshot remains a separate tool from the newer
 [local repository navigation bridge](LOCAL-NAVIGATION.md). The bridge does not
 enlarge the signed v1 format or automatically sign repository source.
+
+The [first paired diagnostic trial](PAIRED-TRIAL.md) now records the scanner
+truncation diagnosis, actual fixture checks and worker usage including repairs.
+It is a host-assisted context-selection experiment, not end-to-end billing proof.
