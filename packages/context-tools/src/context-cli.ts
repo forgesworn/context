@@ -27,6 +27,7 @@ export async function main(options: ContextCliOptions = {}): Promise<void> {
   } })
   if (values.help) {
     process.stdout.write((options.name ?? 'encrypted-context') + ' mcp|call <tool> --identity <existing agent hex-key file> --expect-pubkey <agent hex pubkey> --state <encrypted cache> --room <room hex id> [--server <HTTPS origin> ...]\n' +
+      (options.name ?? 'encrypted-context') + ' navigate <directory>\n' +
       (options.name ?? 'encrypted-context') + ' scan <directory> [--max-packages 64] [--max-depth 4] [--observed-at <epoch-seconds>]\n' +
       (options.name ?? 'encrypted-context') + ' scan-source <directory> [--max-files 64] [--max-depth 8] [--max-bytes 1048576] [--max-file-bytes 262144] [--max-records 128] [--observed-at <epoch-seconds>]\n' +
       (options.name ?? 'encrypted-context') + ' scan-broad-source <directory> [--max-files 64] [--max-depth 8] [--max-bytes 1048576] [--max-file-bytes 262144] [--max-records 128] [--observed-at <epoch-seconds>]\n' +
@@ -34,6 +35,13 @@ export async function main(options: ContextCliOptions = {}): Promise<void> {
     return
   }
   const integer = (value: string | undefined): number | undefined => value === undefined ? undefined : Number(value)
+  if (positionals[0] === 'navigate') {
+    if (positionals.length !== 2) throw new Error('Choose one directory to navigate.')
+    if (Object.keys(values).length > 0) throw new Error('navigate takes no flags. See --help.')
+    const { serveRepositoryNavigationMcp } = await import('./repository-navigation-mcp.js')
+    await serveRepositoryNavigationMcp(positionals[1])
+    return
+  }
   if (positionals[0] === 'scan-broad-source') {
     if (positionals.length !== 2) throw new Error('Choose one directory to scan.')
     const result = await scanBroadSourceGraph(positionals[1], { maxFiles: integer(values['max-files']),
