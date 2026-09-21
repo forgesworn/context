@@ -30,6 +30,10 @@ The `local-source-unsigned` index is ephemeral. Each process needs its own
 refresh. Signed `context_*` collections are separate and retain their 128-record
 limit. This workflow does not automatically select a worker model.
 
+For a worker coding task, assemble and verify a [bounded source packet](WORKER-PACKETS.md)
+after locating and reading the relevant source. Review the packet before dispatch
+and keep accepted changes, checks and repair receipts with the task evidence.
+
 Build from the checkout with `npm run build`. An MCP stdio client launches:
 
 ```sh
