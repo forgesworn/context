@@ -40,6 +40,199 @@ async function writeFileBuffer(root: string, rel: string, content: Buffer): Prom
 }
 
 describe('RepositoryNavigation', () => {
+  it('reports unavailable before refresh and a stable current manifest revision afterwards', async () => {
+    const root = await mkFixture();
+    await writeFile(root, 'a.ts', 'alpha shared\n');
+    const nav = new RepositoryNavigation(root);
+    const before = await nav.status();
+    expect(before.freshness).toBe('unavailable');
+    expect(before.revision).toBeNull();
+    const refreshed = await nav.refresh();
+    expect(refreshed.freshness).toBe('current');
+    expect(refreshed.revision).toMatch(/^[a-f0-9]{64}$/);
+    expect((await nav.status()).revision).toBe(refreshed.revision);
+  });
+
+  it('marks indexed source stale without changing its generation or invalidating its cursor', async () => {
+    const root = await mkFixture();
+    await writeFile(root, 'a.ts', 'shared one\nshared two\nshared three\n');
+    const nav = new RepositoryNavigation(root);
+    const firstStatus = await nav.refresh();
+    const first = await nav.search({ term: 'shared', maxResults: 1 });
+    await writeFile(root, 'a.ts', 'shared changed\nshared two\nshared three\n');
+    const stale = await nav.status();
+    expect(stale.freshness).toBe('stale');
+    expect(stale.generation).toBe(firstStatus.generation);
+    expect(stale.revision).toBe(firstStatus.revision);
+    const continued = await nav.search({ term: 'shared', maxResults: 1, cursor: first.nextCursor });
+    expect(continued.freshness).toBe('stale');
+    expect(continued.results.length).toBe(1);
+  });
+
+  it('detects eligible additions and deletions but ignores excluded and unsupported paths', async () => {
+    const root = await mkFixture();
+    const indexed = await writeFile(root, 'a.ts', 'alpha\n');
+    const nav = new RepositoryNavigation(root);
+    await nav.refresh();
+    await writeFile(root, 'notes.txt', 'not indexed\n');
+    await writeFile(root, 'node_modules/ignored.ts', 'not indexed\n');
+    expect((await nav.status()).freshness).toBe('current');
+    const added = await writeFile(root, 'b.ts', 'beta\n');
+    expect((await nav.status()).freshness).toBe('stale');
+    await fsp.unlink(added);
+    expect((await nav.status()).freshness).toBe('current');
+    await fsp.unlink(indexed);
+    expect((await nav.status()).freshness).toBe('stale');
+  });
+
+  it('reports unknown freshness on inspection failure while retaining the prior generation and cursor', async () => {
+    const root = await mkFixture();
+    await writeFile(root, 'a.ts', 'shared one\nshared two\n');
+    const nav = new RepositoryNavigation(root);
+    const refreshed = await nav.refresh();
+    const first = await nav.search({ term: 'shared', maxResults: 1 });
+    await writeFileBuffer(root, 'bad.ts', Buffer.from([0xff, 0xfe]));
+    const unknown = await nav.status();
+    expect(unknown.freshness).toBe('unknown');
+    expect(unknown.freshnessError).toBeTruthy();
+    expect(unknown.freshnessError!.length).toBeLessThanOrEqual(500);
+    expect(unknown.generation).toBe(refreshed.generation);
+    const continued = await nav.search({ term: 'shared', maxResults: 1, cursor: first.nextCursor });
+    expect(continued.freshness).toBe('unknown');
+    expect(continued.freshnessError).toBeTruthy();
+  });
+
+  it('rejects cancelled freshness inspection after one source open and retains its cursor', async () => {
+    const root = await mkFixture();
+    await writeFile(root, 'a.ts', 'shared one\nshared two\n');
+    await writeFile(root, 'b.ts', 'shared three\n');
+    const nav = new RepositoryNavigation(root);
+    await nav.refresh();
+    const first = await nav.search({ term: 'shared', maxResults: 1 });
+    const ctl = new AbortController();
+    const originalOpen = fsp.open.bind(fsp);
+    let opens = 0;
+    vi.spyOn(fsp, 'open').mockImplementation(async (file, flags) => {
+      opens++;
+      const handle = await originalOpen(file, flags);
+      ctl.abort();
+      return handle;
+    });
+    await expect(nav.status(ctl.signal)).rejects.toThrow(/aborted/);
+    expect(opens).toBe(1);
+    await expect(nav.search({ term: 'shared', cursor: first.nextCursor }, ctl.signal)).rejects.toThrow(/aborted/);
+    vi.restoreAllMocks();
+    const searchCtl = new AbortController();
+    let searchOpens = 0;
+    vi.spyOn(fsp, 'open').mockImplementation(async (file, flags) => {
+      searchOpens++;
+      const handle = await originalOpen(file, flags);
+      searchCtl.abort();
+      return handle;
+    });
+    await expect(nav.search({
+      term: 'shared', maxResults: 1, cursor: first.nextCursor,
+    }, searchCtl.signal)).rejects.toThrow(/aborted/);
+    expect(searchOpens).toBe(1);
+    vi.restoreAllMocks();
+    const continued = await nav.search({
+      term: 'shared', maxResults: 1, cursor: first.nextCursor,
+    });
+    expect(continued.results[0].line).toBe(2);
+  });
+
+  it('stops cancelled refresh during discovery before source reads and retains its generation', async () => {
+    const root = await mkFixture();
+    await writeFile(root, 'a.ts', 'shared one\nshared two\n');
+    const nav = new RepositoryNavigation(root);
+    const before = await nav.refresh();
+    const first = await nav.search({ term: 'shared', maxResults: 1 });
+    await writeFile(root, 'b.ts', 'shared three\n');
+    const ctl = new AbortController();
+    const originalLstat = fsp.lstat.bind(fsp);
+    const originalOpen = fsp.open.bind(fsp);
+    let lstatCalls = 0;
+    let opens = 0;
+    vi.spyOn(fsp, 'open').mockImplementation(async (file, flags) => {
+      opens++;
+      return originalOpen(file, flags);
+    });
+    vi.spyOn(fsp, 'lstat').mockImplementation(async (target) => {
+      const stat = await originalLstat(target);
+      lstatCalls++;
+      if (lstatCalls === 2) ctl.abort();
+      return stat;
+    });
+    await expect(nav.refresh(ctl.signal)).rejects.toThrow(/aborted/);
+    expect(opens).toBe(0);
+    vi.restoreAllMocks();
+    expect((await nav.status()).generation).toBe(before.generation);
+    const continued = await nav.search({ term: 'shared', cursor: first.nextCursor });
+    expect(continued.results[0].line).toBe(2);
+  });
+
+  it('closes a directory handle when cancellation follows opendir', async () => {
+    const root = await mkFixture();
+    await writeFile(root, 'a.ts', 'shared one\n');
+    const nav = new RepositoryNavigation(root);
+    const before = await nav.refresh();
+    const ctl = new AbortController();
+    const originalOpendir = fsp.opendir.bind(fsp);
+    let closes = 0;
+    vi.spyOn(fsp, 'opendir').mockImplementation(async (dir) => {
+      const handle = await originalOpendir(dir);
+      const originalClose = handle.close.bind(handle);
+      vi.spyOn(handle, 'close').mockImplementation(async () => {
+        closes++;
+        return originalClose();
+      });
+      ctl.abort();
+      return handle;
+    });
+    await expect(nav.refresh(ctl.signal)).rejects.toThrow(/aborted/);
+    expect(closes).toBe(1);
+    vi.restoreAllMocks();
+    expect((await nav.status()).generation).toBe(before.generation);
+  });
+
+  it('publishes a refresh from its one build pass without a second manifest scan', async () => {
+    const root = await mkFixture();
+    await writeFile(root, 'a.ts', 'alpha\n');
+    await writeFile(root, 'b.ts', 'beta\n');
+    const nav = new RepositoryNavigation(root);
+    const originalOpen = fsp.open.bind(fsp);
+    let opens = 0;
+    vi.spyOn(fsp, 'open').mockImplementation(async (file, flags) => {
+      opens++;
+      return originalOpen(file, flags);
+    });
+    const status = await nav.refresh();
+    expect(opens).toBe(2);
+    expect(status.freshness).toBe('current');
+  });
+
+  it('returns bounded self-consistent unknown metadata when refresh publishes during status', async () => {
+    const root = await mkFixture();
+    await writeFile(root, 'a.ts', 'alpha\n');
+    const nav = new RepositoryNavigation(root);
+    await nav.refresh();
+    const originalOpen = fsp.open.bind(fsp);
+    let refresh: Promise<Awaited<ReturnType<RepositoryNavigation['refresh']>>> | undefined;
+    vi.spyOn(fsp, 'open').mockImplementation(async (file, flags) => {
+      if (!refresh) {
+        refresh = nav.refresh();
+        await refresh;
+      }
+      return originalOpen(file, flags);
+    });
+    const status = await nav.status();
+    const refreshed = await refresh;
+    expect(status.generation).toBe(refreshed.generation);
+    expect(status.revision).toBe(refreshed.revision);
+    expect(status.freshness).toBe('unknown');
+    expect(status.freshnessError).toMatch(/generation changed/);
+  });
+
   it('finds line 10001 in a >10000 line fixture', async () => {
     const root = await mkFixture();
     const lines: string[] = [];
@@ -176,7 +369,7 @@ describe('RepositoryNavigation', () => {
       await writeFile(root, `extra${i}.ts`, `shared ${i}\n`);
     }
     await expect(nav.refresh()).rejects.toThrow(/maxFiles/);
-    const st = nav.status();
+    const st = await nav.status();
     expect(st.generation).toBeTruthy();
     const r2 = await nav.search({ term: 'shared', cursor });
     expect(r2.results.length).toBeGreaterThan(0);
@@ -197,7 +390,7 @@ describe('RepositoryNavigation', () => {
       await writeFile(root, `extra${i}.ts`, `shared ${i}\n`);
     }
     await expect(nav.refresh()).rejects.toThrow(/maxFiles/);
-    const st2 = nav.status();
+    const st2 = await nav.status();
     expect(st2.generation).toBe(gen1);
     const r2 = await nav.search({ term: 'shared', cursor });
     expect(r2.results.length).toBeGreaterThan(0);
@@ -333,7 +526,7 @@ describe('RepositoryNavigation', () => {
     await new Promise<void>((resolve) => setImmediate(resolve));
     ctl.abort();
     await expect(p).rejects.toThrow(/aborted/);
-    const st2 = nav.status();
+    const st2 = await nav.status();
     expect(st2.generation).toBe(gen1);
     const r = await nav.search({ term: 'alpha', maxResults: 1, maxBytes: 1024 });
     expect(r.results.length).toBe(1);
@@ -431,7 +624,7 @@ describe('RepositoryNavigation', () => {
     const bad = Buffer.from([0xff, 0xfe, 0x00, 0x80, 0x81, 0x82]);
     await writeFileBuffer(root, 'bad.ts', bad);
     await expect(nav.refresh()).rejects.toThrow();
-    const st2 = nav.status();
+    const st2 = await nav.status();
     expect(st2.generation).toBe(gen1);
     const r2 = await nav.search({ term: 'shared', cursor });
     expect(r2.results.length).toBeGreaterThan(0);
@@ -558,7 +751,7 @@ describe('RepositoryNavigation', () => {
       expect(typeof r.nextCursor).toBe('string');
       cursors.push(r.nextCursor!);
     }
-    expect(nav.status().cursors).toBe(128);
+    expect((await nav.status()).cursors).toBe(128);
     await expect(
       nav.search({ term: 'shared', maxResults: 1 }),
     ).rejects.toThrow(/capacity reached/);
@@ -568,7 +761,7 @@ describe('RepositoryNavigation', () => {
       cursor: cursors[0],
     });
     expect(advanced.results.length).toBeGreaterThan(0);
-    expect(nav.status().cursors).toBe(128);
+    expect((await nav.status()).cursors).toBe(128);
   });
 
   it('budget failure does not consume cursor: 1024 rejected then 4096 succeeds; 1-result then continuation works', async () => {

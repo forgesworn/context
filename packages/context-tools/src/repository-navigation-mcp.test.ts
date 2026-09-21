@@ -73,8 +73,14 @@ describe('repository navigation MCP adapter', () => {
         isError?: boolean
       }
       expect(status.isError).not.toBe(true)
-      const parsedStatus = JSON.parse(textOf(status)) as { generation: string | null }
+      const parsedStatus = JSON.parse(textOf(status)) as {
+        generation: string | null
+        freshness: string
+        revision: string | null
+      }
       expect(parsedStatus.generation).toBeNull()
+      expect(parsedStatus.freshness).toBe('unavailable')
+      expect(parsedStatus.revision).toBeNull()
 
       const early = (await client.callTool({
         name: 'repository_search',
@@ -87,16 +93,26 @@ describe('repository navigation MCP adapter', () => {
         arguments: {},
       })) as { content: Array<{ type: string; text: string }>; isError?: boolean }
       expect(refreshed.isError).not.toBe(true)
-      const refreshedStatus = JSON.parse(textOf(refreshed)) as { generation: string | null }
+      const refreshedStatus = JSON.parse(textOf(refreshed)) as {
+        generation: string | null
+        freshness: string
+        revision: string | null
+      }
       expect(typeof refreshedStatus.generation).toBe('string')
+      expect(refreshedStatus.freshness).toBe('current')
+      expect(refreshedStatus.revision).toMatch(/^[a-f0-9]{64}$/)
 
       const afterRefresh = (await client.callTool({
         name: 'repository_status',
         arguments: {},
       })) as { content: Array<{ type: string; text: string }>; isError?: boolean }
       expect(afterRefresh.isError).not.toBe(true)
-      const afterStatus = JSON.parse(textOf(afterRefresh)) as { generation: string | null }
+      const afterStatus = JSON.parse(textOf(afterRefresh)) as {
+        generation: string | null
+        freshness: string
+      }
       expect(afterStatus.generation).toBe(refreshedStatus.generation)
+      expect(afterStatus.freshness).toBe('current')
     } finally {
       await serverClose()
     }
@@ -115,10 +131,12 @@ describe('repository navigation MCP adapter', () => {
       const text = textOf(result)
       const parsed = JSON.parse(text) as {
         bytesUsed: number
+        freshness: string
         results: Array<{ path: string; line: number; text: string }>
       }
       expect(parsed.bytesUsed).toBe(Buffer.byteLength(text, 'utf8'))
       expect(parsed.bytesUsed).toBeLessThanOrEqual(8192)
+      expect(parsed.freshness).toBe('current')
       expect(parsed.results.length).toBeGreaterThanOrEqual(1)
       expect(parsed.results[0].path).toBe('alpha.ts')
       expect(parsed.results[0].text).toContain('alphaToken')

@@ -14,7 +14,12 @@ a replacement for signed evidence. Results must say `local-source-unsigned`.
 The engine retains source lines and their file hashes from an explicit refresh.
 It does not mix old index positions with live source reads. A successful refresh
 replaces the generation and invalidates prior cursors; a failed refresh retains
-the old generation. Neither result proves that the filesystem is still current.
+the old generation. `repository_status` hashes the same bounded indexed-file
+manifest and reports `freshness`: `unavailable` before refresh, `current` when
+the manifest matches, `stale` when it differs, and `unknown` when inspection
+cannot complete. It does not refresh, mutate the index or invalidate cursors.
+Neither result proves whole-repository coverage because exclusions and bounds
+remain outside the manifest.
 
 Build limits cover source bytes, files, indexed lines and postings. Query limits
 cover visited postings, returned records and encoded response bytes. They do
@@ -43,6 +48,16 @@ no arbitrary path arguments on tools, and no network transport. Existing signed
 This bridge is not encrypted persistent indexing, incremental refresh,
 enterprise readiness or evidence of lower inference bills.
 
+The [daily workflow](DAILY-USE.md) covers normal agent use. Run the
+[repeatable stdio smoke](NAVIGATION-SMOKE.md) to verify refresh, stale source,
+cursor recovery and restart in two fresh processes.
+
+Cancellation propagates through freshness inspection and source reads. An
+aborted status/search does not consume a continuation cursor. Refresh returns
+the generation built by its single read pass; it does not rescan after
+publication. A concurrent refresh during status inspection yields consistent
+new-generation metadata with `unknown` freshness instead of an unbounded retry.
+
 ## Local use
 
 Build with `npm run build`, then configure an MCP stdio client to run:
@@ -53,8 +68,15 @@ node packages/context-tools/bin/encrypted-context.mjs navigate /absolute/reposit
 
 There is no identity or encrypted-cache argument. Each process owns its own
 index. Call `repository_refresh` before searching and again after source edits;
-`repository_status` reports the generation and exclusion counts. Search for one
+`repository_status` reports the generation, revision, exclusion counts and
+freshness. Refresh explicitly whenever freshness is `stale` or `unknown`.
+Search for one
 identifier with `repository_search`, for example `RepositoryNavigation`.
+
+Search deliberately remains available on a stale generation so an agent can
+finish reviewing a bounded prior result. Each search response carries the
+freshness snapshot observed before that search began (and a bounded error when
+it is `unknown`); it never silently replaces the generation.
 
 Responses default to 32,768 bytes and 40 lines. Requests may choose up to
 262,144 bytes and 100 lines; the byte count covers the JSON result body, not MCP
