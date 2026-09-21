@@ -33,6 +33,32 @@ limit. This workflow does not automatically select a worker model.
 For a worker coding task, assemble and verify a [bounded source packet](WORKER-PACKETS.md)
 after locating and reading the relevant source. Review the packet before dispatch
 and keep accepted changes, checks and repair receipts with the task evidence.
+Record host preparation, worker attempts and review costs using the
+[whole-task report format](TASK-COST-REPORT.md). Partial records remain useful,
+but do not qualify as a measured savings result.
+
+For the current internal worker setup, select the M4 tunnel explicitly:
+
+```sh
+python3 "$HOME/.codex/skills/ollama-workers/scripts/ollama_task.py" \
+  --endpoint http://127.0.0.1:11435 status
+```
+
+The endpoint option goes before the subcommand. Use the same endpoint for
+`inventory` and `run`; check the prompt with `check` before dispatch. Local
+`qwen3.8:latest` and cloud `deepseek-v4.1-flash:cloud` both completed reviewed
+tasks with `--think false` on 21 September 2026. Use Qwen for bounded extraction
+and Flash for ordinary implementation and tests, following the adoption goals.
+The helper already defaults to this tunnel, but explicit selection prevents
+environment overrides from choosing another daemon.
+
+At that check, the M4 reported plan `max`; this Mac's separate port 11434
+reported `free`. Plan labels do not establish remaining quota or billing cost.
+The earlier port-11434 Flash refusal does not describe the verified M4 route.
+Stop on a new refusal and inspect the retained `httpError.body` before recovery.
+Keep account limits unchanged and reconcile unknown requests before replay;
+the separate Oathrun Pro reservations remain unresolved. See the
+[recovery evidence](DOGFOOD-EXECUTION.md#worker-availability-recovery) for scope.
 
 Build from the checkout with `npm run build`. An MCP stdio client launches:
 

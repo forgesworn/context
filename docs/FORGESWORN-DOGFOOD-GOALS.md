@@ -67,7 +67,10 @@ Allow one focused repair after a terminal inadequate draft, then resize the
 packet or escalate with the compiler/test evidence. A timeout or unknown outcome
 requires reconciliation before replay. Do not silently switch providers after
 a refusal or spending hold. Use Pro only after checking current endpoint state;
-this review did not run model inference or qualify provider availability.
+the original planning review did not qualify provider availability. A later
+[recovery check](DOGFOOD-EXECUTION.md#worker-availability-recovery) accepted live
+Qwen and Flash tasks through the M4 tunnel with thinking off. Use that explicitly
+verified endpoint for daily work; Pro's separate unresolved jobs are unaffected.
 
 Codex effort names and Ollama thinking flags are separate controls. Official
 model references confirm the proposed Codex effort levels for
@@ -169,6 +172,10 @@ whole conversation. Keep routing, execution and disclosure policy in the
 consumer/worker layer; do not introduce a provider dependency into Core.
 
 ### D5: Measure cost per accepted outcome
+
+Use the developer-only [whole-task cost report](TASK-COST-REPORT.md) to validate
+declared controls and retain incomplete accounting explicitly. Its unlocked
+template is preparation, not an executed or accepted eight-pair trial.
 
 Predeclare eight paired tasks: two each for orientation, bug diagnosis, change
 impact and accepted code changes, distributed across at least two qualified

@@ -1,0 +1,211 @@
+{
+  "protocol": {
+    "version": 1,
+    "experimentId": "DRAFT-replace-before-locking",
+    "lockedAt": null,
+    "measurementDefinitionSha256": "0000000000000000000000000000000000000000000000000000000000000000",
+    "pairs": [
+      {
+        "id": "orientation-context",
+        "category": "orientation",
+        "repository": {
+          "name": "context",
+          "revision": "0000000000000000000000000000000000000000",
+          "qualificationEvidence": "PLACEHOLDER: retain current scoped-root qualification evidence"
+        },
+        "taskDefinitionSha256": "0000000000000000000000000000000000000000000000000000000000000000",
+        "acceptanceDefinitionSha256": "0000000000000000000000000000000000000000000000000000000000000000",
+        "baselineOrder": 1,
+        "assistedOrder": 2,
+        "roles": [
+          {
+            "role": "host",
+            "provider": "PLACEHOLDER",
+            "model": "PLACEHOLDER",
+            "effort": "PLACEHOLDER",
+            "settingsSha256": "0000000000000000000000000000000000000000000000000000000000000000"
+          }
+        ],
+        "acceptanceCheckIds": [
+          "PLACEHOLDER-executable-acceptance"
+        ]
+      },
+      {
+        "id": "orientation-kithmoot",
+        "category": "orientation",
+        "repository": {
+          "name": "kithmoot",
+          "revision": "0000000000000000000000000000000000000000",
+          "qualificationEvidence": "PLACEHOLDER: retain current scoped-root qualification evidence"
+        },
+        "taskDefinitionSha256": "0000000000000000000000000000000000000000000000000000000000000000",
+        "acceptanceDefinitionSha256": "0000000000000000000000000000000000000000000000000000000000000000",
+        "baselineOrder": 2,
+        "assistedOrder": 1,
+        "roles": [
+          {
+            "role": "host",
+            "provider": "PLACEHOLDER",
+            "model": "PLACEHOLDER",
+            "effort": "PLACEHOLDER",
+            "settingsSha256": "0000000000000000000000000000000000000000000000000000000000000000"
+          }
+        ],
+        "acceptanceCheckIds": [
+          "PLACEHOLDER-executable-acceptance"
+        ]
+      },
+      {
+        "id": "diagnosis-context",
+        "category": "diagnosis",
+        "repository": {
+          "name": "context",
+          "revision": "0000000000000000000000000000000000000000",
+          "qualificationEvidence": "PLACEHOLDER: retain current scoped-root qualification evidence"
+        },
+        "taskDefinitionSha256": "0000000000000000000000000000000000000000000000000000000000000000",
+        "acceptanceDefinitionSha256": "0000000000000000000000000000000000000000000000000000000000000000",
+        "baselineOrder": 1,
+        "assistedOrder": 2,
+        "roles": [
+          {
+            "role": "host",
+            "provider": "PLACEHOLDER",
+            "model": "PLACEHOLDER",
+            "effort": "PLACEHOLDER",
+            "settingsSha256": "0000000000000000000000000000000000000000000000000000000000000000"
+          }
+        ],
+        "acceptanceCheckIds": [
+          "PLACEHOLDER-executable-acceptance"
+        ]
+      },
+      {
+        "id": "diagnosis-kithmoot",
+        "category": "diagnosis",
+        "repository": {
+          "name": "kithmoot",
+          "revision": "0000000000000000000000000000000000000000",
+          "qualificationEvidence": "PLACEHOLDER: retain current scoped-root qualification evidence"
+        },
+        "taskDefinitionSha256": "0000000000000000000000000000000000000000000000000000000000000000",
+        "acceptanceDefinitionSha256": "0000000000000000000000000000000000000000000000000000000000000000",
+        "baselineOrder": 2,
+        "assistedOrder": 1,
+        "roles": [
+          {
+            "role": "host",
+            "provider": "PLACEHOLDER",
+            "model": "PLACEHOLDER",
+            "effort": "PLACEHOLDER",
+            "settingsSha256": "0000000000000000000000000000000000000000000000000000000000000000"
+          }
+        ],
+        "acceptanceCheckIds": [
+          "PLACEHOLDER-executable-acceptance"
+        ]
+      },
+      {
+        "id": "impact-context",
+        "category": "impact",
+        "repository": {
+          "name": "context",
+          "revision": "0000000000000000000000000000000000000000",
+          "qualificationEvidence": "PLACEHOLDER: retain current scoped-root qualification evidence"
+        },
+        "taskDefinitionSha256": "0000000000000000000000000000000000000000000000000000000000000000",
+        "acceptanceDefinitionSha256": "0000000000000000000000000000000000000000000000000000000000000000",
+        "baselineOrder": 1,
+        "assistedOrder": 2,
+        "roles": [
+          {
+            "role": "host",
+            "provider": "PLACEHOLDER",
+            "model": "PLACEHOLDER",
+            "effort": "PLACEHOLDER",
+            "settingsSha256": "0000000000000000000000000000000000000000000000000000000000000000"
+          }
+        ],
+        "acceptanceCheckIds": [
+          "PLACEHOLDER-executable-acceptance"
+        ]
+      },
+      {
+        "id": "impact-kithmoot",
+        "category": "impact",
+        "repository": {
+          "name": "kithmoot",
+          "revision": "0000000000000000000000000000000000000000",
+          "qualificationEvidence": "PLACEHOLDER: retain current scoped-root qualification evidence"
+        },
+        "taskDefinitionSha256": "0000000000000000000000000000000000000000000000000000000000000000",
+        "acceptanceDefinitionSha256": "0000000000000000000000000000000000000000000000000000000000000000",
+        "baselineOrder": 2,
+        "assistedOrder": 1,
+        "roles": [
+          {
+            "role": "host",
+            "provider": "PLACEHOLDER",
+            "model": "PLACEHOLDER",
+            "effort": "PLACEHOLDER",
+            "settingsSha256": "0000000000000000000000000000000000000000000000000000000000000000"
+          }
+        ],
+        "acceptanceCheckIds": [
+          "PLACEHOLDER-executable-acceptance"
+        ]
+      },
+      {
+        "id": "code-change-context",
+        "category": "code-change",
+        "repository": {
+          "name": "context",
+          "revision": "0000000000000000000000000000000000000000",
+          "qualificationEvidence": "PLACEHOLDER: retain current scoped-root qualification evidence"
+        },
+        "taskDefinitionSha256": "0000000000000000000000000000000000000000000000000000000000000000",
+        "acceptanceDefinitionSha256": "0000000000000000000000000000000000000000000000000000000000000000",
+        "baselineOrder": 1,
+        "assistedOrder": 2,
+        "roles": [
+          {
+            "role": "host",
+            "provider": "PLACEHOLDER",
+            "model": "PLACEHOLDER",
+            "effort": "PLACEHOLDER",
+            "settingsSha256": "0000000000000000000000000000000000000000000000000000000000000000"
+          }
+        ],
+        "acceptanceCheckIds": [
+          "PLACEHOLDER-executable-acceptance"
+        ]
+      },
+      {
+        "id": "code-change-kithmoot",
+        "category": "code-change",
+        "repository": {
+          "name": "kithmoot",
+          "revision": "0000000000000000000000000000000000000000",
+          "qualificationEvidence": "PLACEHOLDER: retain current scoped-root qualification evidence"
+        },
+        "taskDefinitionSha256": "0000000000000000000000000000000000000000000000000000000000000000",
+        "acceptanceDefinitionSha256": "0000000000000000000000000000000000000000000000000000000000000000",
+        "baselineOrder": 2,
+        "assistedOrder": 1,
+        "roles": [
+          {
+            "role": "host",
+            "provider": "PLACEHOLDER",
+            "model": "PLACEHOLDER",
+            "effort": "PLACEHOLDER",
+            "settingsSha256": "0000000000000000000000000000000000000000000000000000000000000000"
+          }
+        ],
+        "acceptanceCheckIds": [
+          "PLACEHOLDER-executable-acceptance"
+        ]
+      }
+    ]
+  },
+  "receipts": []
+}

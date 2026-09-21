@@ -205,6 +205,77 @@ private per-root configuration backups remain available for rollback. This is
 internal installation and client acceptance, not registry publication or room
 consumer acceptance. The packet helper itself remains a checkout script.
 
+## Worker availability recovery
+
+On 21 September 2026, after the pinned-build acceptance, the operator requested
+DeepSeek and Ollama recovery for everyday work. Read-only checks found both
+daemons on version 0.34.2 with no helper pending marker. Account metadata reported
+`free` for this Mac's port 11434 and `max` for the M4 tunnel on port 11435.
+The earlier Flash 402 was on port 11434; its discarded body remains unavailable,
+so the plan difference is not proof of that refusal's cause.
+
+Two new, independent tasks through the M4 tunnel completed with HTTP 200:
+
+| Model | Thinking | Task and host review | Reported input / output | Seconds |
+| --- | --- | --- | --- | --- |
+| `qwen3.8:latest` | Off | Endpoint facts extracted as JSON; every supplied field and model name checked and accepted | 150 / 179 | 5.119 |
+| `deepseek-v4.1-flash:cloud` | Off | Recovery checklist; partially retained with explicit loopback address, precise helper responsibilities and request-specific refusal wording | 230 / 179 | 2.236 |
+
+The first Qwen dispatch encountered an occupied helper lock before inference.
+After checking that no pending marker or lock owner remained, a fresh output
+directory was used. The busy receipt was retained; it has no reported usage.
+Initial diagnostic CLI argument errors and GET requests to the POST-only account
+metadata endpoint also made no inference requests.
+
+This verifies local Qwen and cloud Flash availability on the M4 for subsequent
+authorised tasks. It does not qualify Pro or reconcile its two earlier Oathrun
+jobs. No refused task was replayed, no reservation was cleared, and no account
+limit or auto-top-up setting changed. The local-port refusal remains terminal.
+The helper default already selects the M4; daily commands now make the endpoint
+explicit to avoid environment-dependent selection.
+
+Private prompt, response and review receipts are retained under the
+`20260921-worker-recovery-4vm3a4cz` evidence directory. Host GPT-6 reviewed the
+outputs and edited these instructions; exact host effort and usage are not
+available. Successful worker usage totals 380 input and 358 output tokens;
+there is no paired baseline or monetary savings claim.
+
+## D5 report tooling; experiment remains open
+
+The developer-only [whole-task reporter](TASK-COST-REPORT.md) validates a declared
+eight-pair protocol and private receipts. It preserves missing evidence as
+incomplete, includes failed attempts, keeps cached/reasoning token subsets
+separate, and requires attributed variable costs rather than estimating money
+from worker usage. Cost and review decisions compare decimal amounts exactly;
+floating-point rounding cannot relax either decision threshold. The committed
+template is explicitly unlocked, with placeholder definitions and no results.
+
+This development task used Context navigation and bounded source packets.
+`package.json` was excluded by the source extension policy; its exact content
+was read separately and retained with its hash. No navigation scope was widened.
+Sol/high designed and reviewed the measurement boundaries. Two Flash/thinking-off
+implementation responses through the M4 reached their output limits and were
+rejected without applying source. Terra/medium implemented the reporter and
+repaired review findings. A later narrow Flash packet supplied three useful
+regressions; one incorrect result-field assertion was repaired by Flash using
+the actual Node failure. Host GPT-6 integrated the result and checked it; the
+host effort setting is not exposed.
+
+All 16 focused reporter tests pass. Six independent CLI fixtures exercise the
+exact cost boundary, missing host cost, missing elapsed time, failed quality,
+higher review time and an empty draft. These are synthetic acceptance fixtures,
+not measurements of the eight real task pairs. Sol/high accepted the reporter
+for the repository gate after the accounting repairs.
+
+The four Flash calls reported 8,458 input and 29,097 output tokens, including
+both rejected outputs and the test repair. Complete host/collaboration usage,
+whole-task review time and attributed monetary costs remain unknown. Private
+prompts, failures, review receipts and independent CLI evidence are retained in
+`20260921-d5-report-9cgygyyu`. This task establishes no monetary savings; D5 still
+requires locked executable task definitions, actual paired runs and complete
+accounting. The developer reporter does not change the pinned navigation
+package, select models or execute provider calls.
+
 ## Gate status
 
 | Goal | Status | Remaining acceptance |
@@ -214,7 +285,7 @@ consumer acceptance. The packet helper itself remains a checkout script.
 | D2 source selection | Passed with qualified review | Sol/high review defects repaired; root, policy, cancellation and cursor regressions pass locally and in CI |
 | D3 two additional repositories | Scoped clients passed; gate partial | Negative cross-root checks passed both ways; raw disabled-session tool absence remains unproven by the available CLI output |
 | D4 reusable worker packets | Passed | Build and read-only verification implemented; two coding tasks accepted with source packets, repairs and host review recorded; CI passed |
-| D5 whole-task savings | Open | Predeclared eight-pair trial with complete host/worker accounting |
+| D5 whole-task savings | Report tooling ready; experiment open | Lock executable eight-pair definitions, then run with complete host/worker accounting; the unlocked template is not trial evidence |
 | D6 consumer/room integration | Open | Coordinate with Oathrun's own authority and execution gates |
 | D7 dependable distribution | Internal install passed; public open | Public publication and consumer upgrades still require G0–G4 |
 
