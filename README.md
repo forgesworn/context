@@ -46,6 +46,14 @@ and whole-task inference-cost evaluation.
 The current candidate results and blockers are recorded in
 [RELEASE_EVIDENCE.md](RELEASE_EVIDENCE.md).
 
+To try a disposable local scan → signed cache → MCP retrieval workflow from
+this checkout, see [the dogfood walkthrough](docs/DOGFOOD.md). It reports scan
+omissions and checks restart persistence; it does not measure inference savings.
+
+For repository navigation beyond the signed collection's 128-record limit,
+see [local repository navigation](docs/LOCAL-NAVIGATION.md): a separate unsigned,
+in-memory MCP index with explicit refresh, larger response budgets and pagination.
+
 The formats and APIs are project-agnostic. A collection can describe one
 repository or an explicitly assembled ecosystem; graph operations never make
 another collection visible or turn an extracted relationship into authority.
