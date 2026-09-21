@@ -173,12 +173,44 @@ export async function scanSourceGraph(root: string, options: SourceGraphScanOpti
   // Preserve repository coverage before declaration detail. Exported symbols
   // are the most useful navigation entry points when the collection's bounded
   // record capacity cannot retain every local declaration.
-  const files = parsed.map(file => ({ key: file.path, type: 'file' as const, file }))
-  const symbols = parsed.flatMap(file => file.symbols.map(symbol => ({ key: symbol.key, type: 'symbol' as const, file, symbol })))
-  const candidates = [...files, ...symbols.filter(candidate => candidate.symbol.exported),
-    ...symbols.filter(candidate => !candidate.symbol.exported)]
-  const retained = candidates.slice(0, maxRecords)
+  type FileCandidate = { key: string; type: 'file'; file: ParsedFile }
+  type SymbolCandidate = { key: string; type: 'symbol'; file: ParsedFile; symbol: ParsedSymbol }
+  type Candidate = FileCandidate | SymbolCandidate
+  const files: FileCandidate[] = parsed.map(file => ({ key: file.path, type: 'file', file }))
+  const symbols: SymbolCandidate[] = parsed.flatMap(file => file.symbols.map(symbol => ({ key: symbol.key, type: 'symbol', file, symbol })))
+  const exportedSymbols = symbols.filter(candidate => candidate.symbol.exported)
+  const localSymbols = symbols.filter(candidate => !candidate.symbol.exported)
+  const exportedByFile = new Map<string, SymbolCandidate[]>(parsed.map(file => [file.path, []]))
+  const localByFile = new Map<string, SymbolCandidate[]>(parsed.map(file => [file.path, []]))
+  for (const candidate of exportedSymbols) exportedByFile.get(candidate.file.path)!.push(candidate)
+  for (const candidate of localSymbols) localByFile.get(candidate.file.path)!.push(candidate)
+  const retained: Candidate[] = files.slice(0, maxRecords)
   const retainedKeys = new Set(retained.map(candidate => candidate.key))
+  // Round-robin across per-file buckets so an early file with many exports
+  // cannot starve later files. Exports are visited before locals and files
+  // are retained first; each bucket preserves source order and the record
+  // cap still terminates every loop.
+  const rounds = Math.max(1, ...parsed.map(file => Math.max(exportedByFile.get(file.path)!.length, localByFile.get(file.path)!.length)))
+  for (let round = 0; round < rounds && retained.length < maxRecords; round++) {
+    for (const file of parsed) {
+      if (retained.length >= maxRecords) break
+      const bucket = exportedByFile.get(file.path)!
+      if (round < bucket.length) {
+        const candidate = bucket[round]
+        if (!retainedKeys.has(candidate.key)) { retained.push(candidate); retainedKeys.add(candidate.key) }
+      }
+    }
+  }
+  for (let round = 0; round < rounds && retained.length < maxRecords; round++) {
+    for (const file of parsed) {
+      if (retained.length >= maxRecords) break
+      const bucket = localByFile.get(file.path)!
+      if (round < bucket.length) {
+        const candidate = bucket[round]
+        if (!retainedKeys.has(candidate.key)) { retained.push(candidate); retainedKeys.add(candidate.key) }
+      }
+    }
+  }
   const ids = new Map(retained.map(candidate => [candidate.key, id(candidate.type, candidate.key)]))
   const symbolsByFile = new Map(parsed.map(file => [file.path, new Map(file.symbols.map(symbol => [symbol.name, symbol]))]))
   let callsFound = 0
@@ -189,7 +221,21 @@ export async function scanSourceGraph(root: string, options: SourceGraphScanOpti
       const kinds = new Map<string, number>()
       for (const symbol of candidate.file.symbols) kinds.set(symbol.kind, (kinds.get(symbol.kind) ?? 0) + 1)
       const summary = [...kinds].map(([kind, count]) => `${count} ${kind}${count === 1 ? '' : 's'}`).join(', ') || 'no named declarations'
-      return { id: ids.get(candidate.key)!, kind: 'evidence', text: `Source file ${candidate.file.path}: ${summary}; ${candidate.file.imports.length} resolved internal import${candidate.file.imports.length === 1 ? '' : 's'}.`, source: `repo://${candidate.file.path}`, observedAt, provenance, ...(relations.length ? { relations: relations.sort(relationSort).slice(0, 16) } : {}) }
+      const nameList: string[] = []
+      let namesLength = 0
+      let omitted = 0
+      for (const symbol of candidate.file.symbols) {
+        if (!symbol.exported) continue
+        const separator = nameList.length ? ', ' : ''
+        if (namesLength + separator.length + symbol.name.length > 600) { omitted++; continue }
+        nameList.push(symbol.name)
+        namesLength += separator.length + symbol.name.length
+      }
+      const omittedText = omitted ? ` (+${omitted} omitted)` : ''
+      const names = nameList.length || omitted
+        ? `; exported: ${nameList.join(', ')}${omittedText}`
+        : ''
+      return { id: ids.get(candidate.key)!, kind: 'evidence', text: `Source file ${candidate.file.path}: ${summary}; ${candidate.file.imports.length} resolved internal import${candidate.file.imports.length === 1 ? '' : 's'}${names}.`, source: `repo://${candidate.file.path}`, observedAt, provenance, ...(relations.length ? { relations: relations.sort(relationSort).slice(0, 16) } : {}) }
     }
     const symbol = candidate.symbol
     if (retainedKeys.has(symbol.file)) relations.push(relation(ids.get(symbol.file)!, 'relates-to'))

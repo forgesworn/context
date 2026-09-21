@@ -19,4 +19,7 @@ jobs:
       - run: npm run build
       - run: npm test
       - run: npm run benchmark:tokens:check
+      - run: npm run benchmark:tokens:parity
+      - run: node --test benchmarks/scale/sqlite.test.mjs benchmarks/scale/postings.test.mjs
+      - run: node benchmarks/scale/postings-bench.mjs --records 10000
       - run: npm run test:packages
