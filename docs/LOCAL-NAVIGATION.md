@@ -73,8 +73,11 @@ freshness. Refresh explicitly whenever freshness is `stale` or `unknown`.
 Search for one
 identifier with `repository_search`, for example `RepositoryNavigation`.
 
-Search deliberately remains available on a stale generation so an agent can
-finish reviewing a bounded prior result. Each search response carries the
+Search remains available on a source-stale generation when its selection policy
+can still be validated as current. Changed or unverifiable policy blocks search
+until successful refresh, preventing retrieval of newly excluded source. Status
+exposes the indexed policy digest, summary and freshness separately. Each search
+response carries the
 freshness snapshot observed before that search began (and a bounded error when
 it is `unknown`); it never silently replaces the generation.
 
@@ -98,10 +101,13 @@ promise that every repository of that size fits process memory.
 Supported suffixes: `.ts`, `.tsx`, `.js`, `.jsx`, `.mts`, `.cts`, `.mjs`, `.cjs`,
 `.py`, `.rs`, `.go`, `.java`, `.kt`, `.swift`, `.c`, `.cpp`, `.h`, `.cs`, `.rb`,
 `.php`, `.md`. This is lexical navigation, not language-aware parsing. Hidden
-entries and `node_modules`, `dist`, `build`, `coverage`, `out`, `vendor` are
+entries and `node_modules`, `dist`, `build`, `coverage`, `out`, `vendor`, `target` are
 excluded. Lines over 2,048 UTF-8 bytes are excluded and counted. Files without
-an allowed suffix are excluded. There is no `.gitignore` or secret-detection
-policy: choose a root whose source the client is authorised to read.
+an allowed suffix are excluded. Root and nested `.gitignore` files and optional
+`.z1p-navigation.json` prefix selection narrow this scope. See
+[repository policy](NAVIGATION-POLICY.md) for precedence, bounds and policy-change
+behaviour. These exclusions are not secret detection: choose a root whose source
+the client is authorised to read.
 
 Symlink entries and a symlink root are rejected or excluded, and reads check
 regular-file metadata and use `O_NOFOLLOW`. This is not a filesystem sandbox

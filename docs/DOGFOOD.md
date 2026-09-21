@@ -114,8 +114,9 @@ enlarge the signed v1 format or automatically sign repository source.
 The local navigation bridge now exposes an explicit manifest freshness signal
 through its existing `repository_status` tool: `unavailable`, `current`,
 `stale`, or `unknown`. It compares only the bounded, allowlisted indexed-file
-manifest, so `current` is not whole-repository coverage proof. A stale index
-remains searchable and each result carries its start-of-search freshness;
+manifest, so `current` is not whole-repository coverage proof. A source-stale
+index with currently validated policy remains searchable, and each result
+carries its start-of-search freshness;
 clients must explicitly refresh when status is stale or unknown. The package
 suite covers unavailable/current/stale/unknown states, manifest additions and
 deletions, excluded paths, cursor retention, UTF-8 byte accounting and MCP JSON

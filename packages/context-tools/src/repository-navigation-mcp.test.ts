@@ -77,10 +77,12 @@ describe('repository navigation MCP adapter', () => {
         generation: string | null
         freshness: string
         revision: string | null
+        policy: { freshness: string; digest: string | null }
       }
       expect(parsedStatus.generation).toBeNull()
       expect(parsedStatus.freshness).toBe('unavailable')
       expect(parsedStatus.revision).toBeNull()
+      expect(parsedStatus.policy).toEqual({ freshness: 'unavailable', digest: null })
 
       const early = (await client.callTool({
         name: 'repository_search',
@@ -97,10 +99,14 @@ describe('repository navigation MCP adapter', () => {
         generation: string | null
         freshness: string
         revision: string | null
+        policy: { freshness: string; digest: string | null; summary?: unknown }
       }
       expect(typeof refreshedStatus.generation).toBe('string')
       expect(refreshedStatus.freshness).toBe('current')
       expect(refreshedStatus.revision).toMatch(/^[a-f0-9]{64}$/)
+      expect(refreshedStatus.policy.freshness).toBe('current')
+      expect(refreshedStatus.policy.digest).toMatch(/^[a-f0-9]{64}$/)
+      expect(refreshedStatus.policy.summary).toBeTruthy()
 
       const afterRefresh = (await client.callTool({
         name: 'repository_status',

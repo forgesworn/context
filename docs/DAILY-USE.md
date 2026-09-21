@@ -20,6 +20,8 @@ For a tiny edit in a known file, read that file directly.
 4. After edits, refresh explicitly. Failed refresh retains the old generation;
    do not treat it as updated. On missing evidence, exclusions or quota failure,
    use bounded `rg`/file reads and record the fallback.
+   Changed or unverifiable repository policy blocks old-snapshot search until a
+   successful refresh; inspect `repository_status.policy` to diagnose it.
 5. Record the task, source commit and working-tree changes, client/model/effort,
    retrieved evidence, checks, repairs and accepted outcome. Include host and
    worker usage, elapsed time and review time; unavailable values are `null`.

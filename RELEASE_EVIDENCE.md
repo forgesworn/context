@@ -1,5 +1,9 @@
 # Z1P Core release candidate evidence ledger
 
+Latest implementation and adoption results are in the
+[dogfood execution ledger](docs/DOGFOOD-EXECUTION.md). The dated snapshots below
+remain historical evidence; internal pilot acceptance is separate from G0–G4.
+
 ## Current internal adoption review, 21 September 2026
 
 The [ForgeSworn dogfooding plan](docs/FORGESWORN-DOGFOOD-GOALS.md) now tracks

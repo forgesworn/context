@@ -2,6 +2,9 @@
 
 Reviewed: 21 September 2026. Owner: ForgeSworn engineering.
 
+Execution has started. See [the execution ledger](DOGFOOD-EXECUTION.md) for
+current results; the initial inventory below is the planning snapshot.
+
 ## Outcome and immediate decision
 
 Use Z1P Core during ordinary ForgeSworn development to reduce repeated source
@@ -119,8 +122,8 @@ the baseline. Claude qualification can follow when its lane is available.
 
 ### D2: Make wider repository use deliberate
 
-The current bridge uses fixed directory and extension exclusions. It does not
-honour `.gitignore` or detect secrets. Define project-local include/exclude
+At planning time the bridge used fixed directory and extension exclusions and
+did not honour `.gitignore`. Define project-local include/exclude
 configuration, Git ignore semantics and how explicitly included files behave.
 Test an ignored source fixture, generated directories (including Rust `target`),
 hidden files, symlinks, excluded Markdown, deletion, rename and policy changes.
@@ -245,5 +248,6 @@ finish D7's public half when the release gates pass.
 
 For each goal record status, owner, exact model/effort, starting revision,
 changed files, accepted outcome, checks, usage including failures, evidence
-location and remaining limits. All D goals are **open** at this review; working
-components above do not imply that their full adoption gates are complete.
+location and remaining limits. Current statuses are in the
+[execution ledger](DOGFOOD-EXECUTION.md); working components alone do not imply
+that their full adoption gates are complete.

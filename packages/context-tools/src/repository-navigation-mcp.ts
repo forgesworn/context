@@ -18,8 +18,9 @@ export function createRepositoryNavigationServer(root: string): RepositoryNaviga
       instructions:
         'Unsigned local repository navigation. Call repository_refresh explicitly ' +
         'before first use and after source changes; repository_status reports the ' +
-        'index freshness and indexed generation. Refresh explicitly when freshness ' +
-        'is stale or unknown. repository_search performs exact case-insensitive ASCII ' +
+        'index freshness, indexed generation, and local policy state. Refresh explicitly ' +
+        'when freshness is stale or unknown. Policy changes or validation failures block ' +
+        'search until refresh. repository_search performs exact case-insensitive ASCII ' +
         'token line navigation — it is not semantic search and not a signed context ' +
         'room. Use nextCursor to page for more results, increasing the response ' +
         'budget as needed. Exclusions mean results are not whole-repository ' +
@@ -35,8 +36,8 @@ export function createRepositoryNavigationServer(root: string): RepositoryNaviga
     {
       description:
         'Return the current in-memory index status for the configured repository ' +
-        'root, including indexed generation, freshness and exclusion metadata. No ' +
-        'refresh is performed.',
+        'root, including indexed generation, freshness, policy, and exclusion metadata. ' +
+        'No refresh is performed.',
       inputSchema: z.object({}).strict(),
       annotations: { readOnlyHint: true, openWorldHint: false },
     },

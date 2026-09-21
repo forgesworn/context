@@ -85,6 +85,67 @@ describe('RepositoryNavigation', () => {
     expect((await nav.status()).freshness).toBe('stale');
   });
 
+  it('honours root and nested gitignore policy without indexing denied source', async () => {
+    const root = await mkFixture();
+    await writeFile(root, '.gitignore', 'ignored.ts\nnested/*.ts\n!nested/kept.ts\n');
+    await writeFile(root, 'ignored.ts', 'shared denied\n');
+    await writeFile(root, 'nested/drop.ts', 'shared denied\n');
+    await writeFile(root, 'nested/kept.ts', 'shared kept\n');
+    const nav = new RepositoryNavigation(root);
+    const status = await nav.refresh();
+    expect(status.exclusions.policy).toBeGreaterThanOrEqual(2);
+    const result = await nav.search({ term: 'shared' });
+    expect(result.results.map(record => record.path)).toEqual(['nested/kept.ts']);
+  });
+
+  it('blocks old results when policy tightens until refresh replaces the generation', async () => {
+    const root = await mkFixture();
+    await writeFile(root, 'a.ts', 'shared one\nshared two\n');
+    const nav = new RepositoryNavigation(root);
+    await nav.refresh();
+    const page = await nav.search({ term: 'shared', maxResults: 1 });
+    await writeFile(root, '.gitignore', 'a.ts\n');
+    const changed = await nav.status();
+    expect(changed.policy.freshness).toBe('stale');
+    await expect(nav.search({ term: 'shared', cursor: page.nextCursor })).rejects.toThrow(/policy is stale/);
+    await nav.refresh();
+    expect((await nav.search({ term: 'shared' })).results).toEqual([]);
+  });
+
+  it('blocks an old generation when policy validation fails', async () => {
+    const root = await mkFixture();
+    await writeFile(root, 'a.ts', 'shared one\n');
+    const nav = new RepositoryNavigation(root);
+    await nav.refresh();
+    await fsp.symlink(path.join(root, 'a.ts'), path.join(root, '.gitignore'));
+    const status = await nav.status();
+    expect(status.policy.freshness).toBe('unknown');
+    await expect(nav.search({ term: 'shared' })).rejects.toThrow(/policy is unknown/);
+  });
+
+  it('does not count or hash policy-denied source files', async () => {
+    const root = await mkFixture();
+    await writeFile(root, '.gitignore', 'ignored.ts\n');
+    await writeFile(root, 'ignored.ts', 'shared ignored\n');
+    await writeFile(root, 'kept.ts', 'shared kept\n');
+    const nav = new RepositoryNavigation(root, { maxFiles: 1 });
+    await nav.refresh();
+    await writeFile(root, 'ignored.ts', 'shared changed but ignored\n');
+    expect((await nav.status()).freshness).toBe('current');
+    expect((await nav.search({ term: 'shared' })).results.map(record => record.path)).toEqual(['kept.ts']);
+  });
+
+  it('honours an explicit empty include policy as deny-all', async () => {
+    const root = await mkFixture();
+    await writeFile(root, '.z1p-navigation.json', '{"version":1,"include":[]}\n');
+    await writeFile(root, 'a.ts', 'shared denied\n');
+    const nav = new RepositoryNavigation(root);
+    const status = await nav.refresh();
+    expect(status.counts.files).toBe(0);
+    expect(status.exclusions.policy).toBeGreaterThan(0);
+    expect((await nav.search({ term: 'shared' })).results).toEqual([]);
+  });
+
   it('reports unknown freshness on inspection failure while retaining the prior generation and cursor', async () => {
     const root = await mkFixture();
     await writeFile(root, 'a.ts', 'shared one\nshared two\n');
@@ -354,7 +415,7 @@ describe('RepositoryNavigation', () => {
     expect(res.results.length).toBe(0);
   });
 
-  it('failed overquota refresh retains old results and cursors', async () => {
+  it('failed overquota refresh retains its generation but blocks the old cursor', async () => {
     const root = await mkFixture();
     const lines: string[] = [];
     for (let i = 0; i < 50; i++) lines.push(`shared line ${i}`);
@@ -371,11 +432,11 @@ describe('RepositoryNavigation', () => {
     await expect(nav.refresh()).rejects.toThrow(/maxFiles/);
     const st = await nav.status();
     expect(st.generation).toBeTruthy();
-    const r2 = await nav.search({ term: 'shared', cursor });
-    expect(r2.results.length).toBeGreaterThan(0);
+    expect(st.policy.freshness).toBe('unknown');
+    await expect(nav.search({ term: 'shared', cursor })).rejects.toThrow(/policy is unknown/);
   });
 
-  it('failed refresh keeps prior generation and existing cursor usable', async () => {
+  it('failed discovery refresh keeps prior generation but blocks its existing cursor', async () => {
     const root = await mkFixture();
     const lines: string[] = [];
     for (let i = 0; i < 40; i++) lines.push(`token shared ${i}`);
@@ -392,9 +453,8 @@ describe('RepositoryNavigation', () => {
     await expect(nav.refresh()).rejects.toThrow(/maxFiles/);
     const st2 = await nav.status();
     expect(st2.generation).toBe(gen1);
-    const r2 = await nav.search({ term: 'shared', cursor });
-    expect(r2.results.length).toBeGreaterThan(0);
-    expect(r2.generation).toBe(gen1);
+    expect(st2.policy.freshness).toBe('unknown');
+    await expect(nav.search({ term: 'shared', cursor })).rejects.toThrow(/policy is unknown/);
   });
 
   it('skips symlinks', async () => {
@@ -786,7 +846,7 @@ describe('RepositoryNavigation', () => {
     expect(cont.results.length).toBeGreaterThan(0);
   });
 
-  it('byte budget: one 500-char line fits 1024, two do not; cursor continues to second line', async () => {
+  it('byte budget: one 500-char line fits 1152, two do not; cursor continues to second line', async () => {
     const root = await mkFixture();
     const l1 = 'a'.repeat(500) + ' shared';
     const l2 = 'b'.repeat(500) + ' shared';
@@ -796,17 +856,17 @@ describe('RepositoryNavigation', () => {
     const page = await nav.search({
       term: 'shared',
       maxResults: 100,
-      maxBytes: 1024,
+      maxBytes: 1152,
     });
     expect(page.results.length).toBe(1);
     expect(page.visited).toBe(2);
     expect(page.stopReason).toBe('max-bytes');
     expect(typeof page.nextCursor).toBe('string');
-    expect(page.bytesUsed).toBeLessThanOrEqual(1024);
+    expect(page.bytesUsed).toBeLessThanOrEqual(1152);
     const next = await nav.search({
       term: 'shared',
       maxResults: 100,
-      maxBytes: 1024,
+      maxBytes: 1152,
       cursor: page.nextCursor!,
     });
     expect(next.results.length).toBe(1);

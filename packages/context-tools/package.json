@@ -39,6 +39,7 @@
     "@forgesworn/context": "0.3.0",
     "@modelcontextprotocol/sdk": "1.30.0",
     "@noble/hashes": "1.8.0",
+    "ignore": "7.0.9",
     "typescript": "5.9.3",
     "zod": "4.5.4"
   },
