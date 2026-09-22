@@ -1,0 +1,50 @@
+{
+  "version": 2,
+  "checkerSha256": "539b5d7cd593f0dd6c5707b3426e243e90092614921c8024b8a69a5c49ffaa9c",
+  "kind": "structured",
+  "requiredFindingIds": [
+    "contract",
+    "callers",
+    "privacy",
+    "tests",
+    "guard",
+    "compatibility"
+  ],
+  "reviewerRubric": {
+    "contract": "Required: shortId returns the first eight characters only for exactly 64 lower-case hexadecimal characters, and [invalid-id] for every other input.",
+    "callers": "Required: server/forwarder.mjs passes config.roomId and config.pubkey through shortId before startup logging.",
+    "privacy": "Required, both: (a) the invalid marker is a constant; stating that the literal [invalid-id] is returned for all invalid input satisfies this; (b) it echoes no part of the input, including no prefix.",
+    "tests": "Required, both: (a) the existing permissive expectations (\"never returns more than it was given\", which returns 'abcd' and '' unchanged) must be replaced; (b) new cases cover each of: empty, short, long, upper-case, non-hex and Unicode input. All six classes must be named.",
+    "guard": "Required, both: (a) the log-redaction scan (test/log-redaction-scan.test.ts) is retained and still rejects direct full-identifier logging; (b) the forwarder startup logging assertion is retained. Fails if: either is dismissed as unrelated or not mentioned.",
+    "compatibility": "Required, both: (a) valid canonical 64-character lower-case hex identifiers keep the same eight-character display; (b) malformed configured identifiers now display as [invalid-id], visibly invalid, instead of a prefix."
+  },
+  "requiredEvidence": [
+    {
+      "path": "src/log-redact.ts",
+      "token": "export function shortId"
+    },
+    {
+      "path": "server/forwarder.mjs",
+      "token": "shortId(config.roomId)"
+    },
+    {
+      "path": "server/forwarder.mjs",
+      "token": "shortId(config.pubkey)"
+    },
+    {
+      "path": "src/log-redact.test.ts",
+      "token": "never returns more than it was given"
+    },
+    {
+      "path": "test/log-redaction-scan.test.ts",
+      "token": "shortId"
+    }
+  ],
+  "basedOn": "d5-20260921/acceptance/impact-kithmoot.json",
+  "reviewerRules": [
+    "Judge each dimension against the whole answer: the summary and every finding. A required point stated under a different finding id counts; never fail a dimension for placement alone.",
+    "A required point passes only when the answer states it explicitly, in words a reader could quote. Different wording is fine; a point that is only implied by other statements does not pass.",
+    "Where a dimension lists items, each listed item must be named. A generic phrase such as \"edge cases\" or \"all semantics unchanged\" does not cover named items.",
+    "A dimension passes when every required point is stated, no \"fails if\" condition applies and nothing it states contradicts the frozen source excerpts. Points marked \"not required\" never cause a failure. Accepted alternatives pass equally."
+  ]
+}

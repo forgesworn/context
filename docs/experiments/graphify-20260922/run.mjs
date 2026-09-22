@@ -2,7 +2,8 @@
 // Three-way retrieval comparison runner: plain tools, Graphify, Context.
 // Usage: node run.mjs --local /private/local.json [--protocol DIR] [--task ID | --all] [--arms plain,graphify,context] [--skip-review]
 // --protocol selects a directory holding protocol.json and context-instructions.txt (default: this directory).
-// protocol.json may set "codeAcceptance": "checker-and-scope" to accept code tasks without the model reviewer.
+// protocol.json may set "codeAcceptance": "checker-and-scope" to accept code tasks without the model reviewer,
+// and "rubricDir" to review structured tasks against later rubrics (for example ../rubric-v2-20260923).
 // local.json (private, machine-specific): { evidence, roots: { context, kithmoot }, node, contextCli, graphifyBin, graphifyAlwaysOn }
 import { spawn, spawnSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
@@ -46,7 +47,9 @@ function cleanEnv(extraPath) {
 
 function loadTask(id) {
   const task = JSON.parse(readFileSync(join(packDir, 'tasks', `${id}.json`), 'utf8'))
-  const acceptance = JSON.parse(readFileSync(join(packDir, 'acceptance', `${id}.json`), 'utf8'))
+  // protocol.rubricDir (optional, relative to the protocol directory) supplies later structured rubrics; the checker is unchanged.
+  const override = protocol.rubricDir ? join(protocolDir, protocol.rubricDir, 'acceptance', `${id}.json`) : null
+  const acceptance = JSON.parse(readFileSync(override && existsSync(override) ? override : join(packDir, 'acceptance', `${id}.json`), 'utf8'))
   return { task, acceptance }
 }
 
@@ -196,6 +199,11 @@ function reviewerPrompt({ task, acceptance, workspace, answer, checker, diff }) 
     '',
   ]
   if (acceptance.kind === 'structured') {
+    if (acceptance.reviewerRules) {
+      lines.push('Review rules:')
+      for (const rule of acceptance.reviewerRules) lines.push(`- ${rule}`)
+      lines.push('')
+    }
     lines.push('Private rubric (dimension id: expected substance):')
     for (const [id, text] of Object.entries(acceptance.reviewerRubric)) lines.push(`- ${id}: ${text}`)
     lines.push('', 'Reference evidence the rubric author expected (absence is not automatic failure if the claim is supported by other cited source):')

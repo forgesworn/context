@@ -20,6 +20,8 @@ the changed tool was never called. Every later comparison uses this design.
 - **Code-change acceptance.** Checker plus the deterministic scope check
   (`"codeAcceptance": "checker-and-scope"`, see `code-acceptance-20260923/`);
   the model reviewer judges structured answers only.
+- **Structured rubrics.** Version 2 (`"rubricDir": "../rubric-v2-20260923"`), with
+  explicit required points and review rules; not comparable with earlier verdicts.
 - **Arms.** Plain tools, Graphify, and Context at its current build, which
   includes `repository_explore` and `repository_coverage` with the exact-quote
   check. A category checklist in the instructions, if tested, is a fourth arm
