@@ -28,6 +28,7 @@ function stable(value) {
   return value;
 }
 function serialize(value) { return JSON.stringify(stable(value)); }
+export { serialize as serializePacket };
 function strictText(bytes, label) {
   try { return new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }).decode(bytes); }
   catch { throw new Error(`worker-packet: ${label} is not valid UTF-8`); }
@@ -219,7 +220,7 @@ async function validateAllowedSnapshots(root, allowedFiles) {
   }
 }
 
-async function buildPacketFromSpec({ root: rootInput, spec: specInput }) {
+export async function buildPacketFromSpec({ root: rootInput, spec: specInput }) {
   const rootInfo = await canonicalRoot(rootInput);
   const root = rootInfo.root;
   const spec = parseSpec(serialize(specInput));

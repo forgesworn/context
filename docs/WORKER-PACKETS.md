@@ -1,5 +1,8 @@
 # Source packets for workers
 
+To preserve progress, decisions and check outcomes for another session, use the
+[verified task handover](TASK-HANDOVERS.md) after building a fresh source packet.
+
 Assemble the exact source a worker needs once, then verify it before handing it
 over. This checkout helper runs locally, outside Core. It does not contact a
 provider, choose a model, execute acceptance commands or enforce worker access.
