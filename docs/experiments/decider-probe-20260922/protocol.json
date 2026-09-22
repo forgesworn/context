@@ -1,0 +1,53 @@
+{
+  "probeId": "decider-probe-20260922",
+  "lockedAt": "2026-09-22T22:10:40.224Z",
+  "purpose": "Test whether batched yes/no completeness questions, derived from the task brief and the task category only, predict which recorded answers the blind reviewer rejected, before building any decider into the loop.",
+  "decider": {
+    "model": "claude-sonnet-5",
+    "effort": "low",
+    "maxTurns": 2,
+    "disallowedTools": [
+      "Bash",
+      "Read",
+      "Edit",
+      "Write",
+      "Grep",
+      "Glob",
+      "TodoWrite",
+      "WebFetch",
+      "WebSearch",
+      "Agent",
+      "ToolSearch",
+      "Workflow",
+      "NotebookEdit"
+    ],
+    "sees": "task prompt, required finding ids and the answer's summary and findings; never the rubric, source, checker result, arm or verdict"
+  },
+  "questions": {
+    "perFinding": "Does finding '{id}' give concrete specifics (named functions, files, conditions or cases) for its part of the task, rather than a general statement?",
+    "all": [
+      "Does the answer address every item the task prompt explicitly asks for?",
+      "Where the answer describes several steps or checks, does it attribute each to the specific function or component that performs it?"
+    ],
+    "orientation": [
+      "Does it describe the steps in the order they happen at run time?"
+    ],
+    "diagnosis": [
+      "Does it explain why the existing check or code path fails to catch the fault, not only what the fault is?",
+      "Would the proposed regression test still compile and still exercise the fault after the proposed repair is applied?"
+    ],
+    "impact": [
+      "Does it state which existing behaviours, guards or tests must remain unchanged?",
+      "Does it enumerate the specific new input cases or scenarios tests must add, beyond rewriting existing tests?",
+      "Does it state the consequences for existing callers, configuration or stored data?"
+    ]
+  },
+  "sample": "Every recorded orientation, diagnosis and impact answer with a receipt in the v1, v2, S5 and v3 evidence directories (60 answers, 15 accepted). Code-change tasks are excluded (no answer text).",
+  "measures": {
+    "score": "sum over questions of (1 - probabilityYes)",
+    "auc": "probability that a rejected answer scores higher than an accepted one, over all answers and over checker-passed answers",
+    "anyFlag": "answers with at least one 'no', and how many rejections they catch"
+  },
+  "decisionRule": "Build an in-loop decider only if AUC over checker-passed answers is at least 0.75 and any-flag catches at least two thirds of reviewer rejections while flagging no more than half of accepted answers. Otherwise record the result and stop.",
+  "biasCaveat": "The question author had read the private rubrics and v2/v3 reviewer reasons for these tasks, so the questions may encode rubric knowledge. A passing result here is necessary, not sufficient: confirmation needs fresh held-out tasks whose rubrics the author has not seen."
+}

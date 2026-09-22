@@ -125,6 +125,14 @@ replaced presence-only retrieval ranking in `@forgesworn/context` with BM25
 plus a source-label bonus, after the token gate proved sensitive to unrelated
 files; the gate now passes at 36.5x with full evidence recall.
 
+Two follow-ups the same night: `repository_coverage` gained an exact-quote
+check, which on replay flags all three inexact quotes behind v3's checker
+failures and none in accepted answers; and a
+[replay probe](experiments/decider-probe-20260922/RESULTS.md) of batched
+yes/no completeness questions over 60 recorded answers did not meet its rule
+(AUC 0.70, 58 percent of rejections caught), so no model-judged gate is built.
+Further comparisons follow the [repeated-run design](experiments/REPEATED-RUNS.md).
+
 ## Proposed competitive decision rule
 
 Before any three-way trial, pin Graphify's revision/configuration, define tasks
