@@ -1,0 +1,59 @@
+{
+  "schema": "context-daily-use-draft-v1",
+  "recordType": "ordinary-use-not-controlled-pair",
+  "taskId": null,
+  "developerId": null,
+  "accountId": null,
+  "billingPeriod": null,
+  "repositoryId": null,
+  "worktreeId": null,
+  "revision": null,
+  "dirtySourceEvidenceRef": null,
+  "taskClass": null,
+  "acceptanceDefinitionRef": null,
+  "startedAt": null,
+  "finishedAt": null,
+  "client": null,
+  "clientVersion": null,
+  "provider": null,
+  "model": null,
+  "effort": null,
+  "context": {
+    "used": null,
+    "versionOrCommit": null,
+    "generationOrPacketHash": null,
+    "freshness": null,
+    "retrievedBytes": null,
+    "scanRefreshSeconds": null,
+    "fallbackReasons": []
+  },
+  "usageCoverage": {
+    "allAttempts": null,
+    "hostPreparation": null,
+    "workers": null,
+    "review": null,
+    "missingIntervals": [],
+    "sourceReceiptRefs": []
+  },
+  "attempts": [],
+  "normalisedUsage": {
+    "definitionRef": null,
+    "inputTokens": null,
+    "outputTokens": null,
+    "cachedInputTokens": null,
+    "cacheWriteInputTokens": null,
+    "reasoningOutputTokens": null,
+    "coverageComplete": null
+  },
+  "outcome": {
+    "accepted": null,
+    "acceptanceEvidenceRefs": [],
+    "repairCount": null,
+    "elapsedSeconds": null,
+    "reviewSeconds": null,
+    "regressions": null
+  },
+  "charges": [],
+  "knownLimitEvents": [],
+  "notes": null
+}

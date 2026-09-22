@@ -28,6 +28,58 @@ inclusive ranges. `allowedFiles` describes editable paths and may include new
 files; source evidence can also come from files the worker must not edit.
 These are task boundaries for review, not a filesystem sandbox.
 
+## Request a packet through MCP
+
+The repository navigation server also exposes `repository_packet`. A client can
+request source directly without invoking the checkout helper or writing a task
+specification to disk. Restart the server after installing/building this version,
+then call `repository_refresh` and retain its `generation`.
+
+```json
+{
+  "mode": "plan",
+  "expectedGeneration": "generation returned by repository_refresh",
+  "maxBytes": 65536,
+  "spec": {
+    "version": 1,
+    "task": "Inspect the selected implementation and its test",
+    "acceptanceChecks": ["Return complete selected syntax blocks"],
+    "allowedFiles": ["src/example.ts", "src/example.test.ts"],
+    "sources": [
+      {"path": "src/example.ts", "line": 24},
+      {"path": "src/example.test.ts", "line": 12}
+    ],
+    "exclusions": ["No public protocol changes"],
+    "unresolvedQuestions": []
+  }
+}
+```
+
+Replace the example paths and anchors with located evidence. Use `mode: "build"`
+and `{path, startLine, endLine}` source entries for reviewed exact ranges,
+including languages without syntax planning. The server accepts an inline spec;
+it cannot accept a different root, spec-file path, output path or shell command.
+The configured root must be a Git repository with a committed HEAD. Internal
+`git rev-parse` calls read provenance; the tool does not execute acceptance checks.
+
+The response contains the packet, navigation generation/revision/policy and,
+for planning, coverage metadata. The complete response must fit `maxBytes`
+(default/maximum 65,536 bytes), including metadata. Oversized selections fail
+without truncation. The tool rejects unavailable, stale or unknown navigation
+and a mismatched generation, and checks freshness again before returning. Refresh
+and rebuild after relevant changes. This is bounded freshness checking, not an
+atomic snapshot against hostile concurrent filesystem changes.
+Only one packet request runs at a time; a concurrent request fails immediately.
+Cancellation is checked around assembly and freshness inspection. The shared
+bounded assembler does not interrupt an individual file read or Git provenance
+check already in progress; cancelled results are not returned as successful packets.
+
+Source remains unsigned data. Complete syntax does not prove complete task
+evidence, and `allowedFiles` does not grant editing authority. Review sufficiency
+and retain the response with the task receipt before delegating work.
+
+## Use the checkout CLI
+
 ```sh
 node scripts/worker-packet.mjs build \
   --root /absolute/repository --spec /private/task.json --out /private/packet.json
@@ -39,6 +91,55 @@ node scripts/worker-packet.mjs verify \
 Verify immediately before dispatch. Changed relevant source, repository revision
 or policy requires a fresh packet and another sufficiency review. Verification
 is not an atomic filesystem snapshot or a signature proving authorship.
+
+## Plan complete syntax blocks
+
+For TypeScript and JavaScript, `plan` accepts the same task fields as `build`,
+but each source is a line anchor: `{"path":"src/example.ts","line":24}`.
+Locate a relevant implementation and its focused tests first, then anchor their
+declarations or callback calls. The helper resolves complete syntax blocks and
+merges overlapping or adjacent ranges before building an ordinary v1 packet:
+
+```sh
+node scripts/worker-packet.mjs plan \
+  --root /absolute/repository --spec /private/anchors.json --out /private/packet.json
+
+node scripts/worker-packet.mjs verify \
+  --root /absolute/repository --packet /private/packet.json
+```
+
+The output file is the same private, verifiable packet used by `build`. Standard
+output includes unsigned coverage metadata mapping every anchor to its resolved
+range, the merged ranges and a digest of the emitted packet. Retain this metadata
+with the task receipt; inspect it before dispatch. Repeated anchors do not repeat
+the same source lines in the packet.
+
+The planner selects the smallest enclosing supported function, method,
+constructor, accessor, named arrow/function-expression owner, or statement-level
+call with a direct function callback. A callback call is a syntactic category,
+not a guarantee that it is a test: nested `it(...)` inside `describe(...)` selects
+the `it` call, but an anchor inside a smaller callback-bearing helper may select
+that helper. Anchor the outer declaration/call when its whole block is needed.
+
+Planning supports `.ts`, `.tsx`, `.js`, `.jsx`, `.mts`, `.cts`, `.mjs` and `.cjs`.
+It rejects malformed source, ambiguous or unsupported anchors, excluded paths,
+and an oversized result rather than truncating a branch. Interfaces, plain data,
+Markdown and other languages still use reviewed exact ranges with `build`.
+Source, root, HEAD and relevant policy must agree between planning and assembly.
+Line anchors use the packet format's LF/CRLF convention; bare CR and Unicode
+line separators require the exact-range fallback. A selected block's boundary
+lines must not contain unrelated code; the conservative guard also rejects
+trailing comments outside the selected node. Inspect the coverage and choose
+reviewed exact ranges when syntax planning cannot express the intended evidence.
+
+Complete syntax is **not complete task evidence**. Select dependencies, fixtures,
+types and external contracts explicitly using the appropriate helper mode.
+Source remains untrusted data. Before a behavioural handoff, record the relevant
+conditions, outcomes and exceptions; require the worker to distinguish what the
+source proves from what remains unknown. Review can read additional evidence.
+The planner does not run tests, prove claims, select models or claim savings.
+See [the savings plan](SAVINGS-PLAN.md) for the measured problem and acceptance
+criteria.
 
 Packets retain whole-file hashes, exact excerpts and policy provenance. Paths
 must be literal and relative to the explicitly selected root. Navigation

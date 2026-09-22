@@ -1,23 +1,159 @@
 # ForgeSworn dogfooding and inference-cost goals
 
-Reviewed: 21 September 2026. Owner: ForgeSworn engineering.
+Updated: 22 September 2026. Accountable owner: the product owner. Execution owner: Context development lead.
+
+Scope clarified 22 September: this is the internal adoption plan, not the
+general product roadmap. [Product direction](../PRODUCT_DIRECTION.md) and
+[release goals](../GOALS.md) govern the MIT developer tool for other projects.
+D6's Oathrun/KithMoot application integration is optional for that product;
+the worker model assignments here are our development workflow, not required
+Context infrastructure or an automatic routing feature.
+
+The active product queue is [OS0–OS6](OPEN-SOURCE-EXECUTION.md), with owners,
+locations and model/effort assignments. These internal D goals remain adoption
+evidence; enterprise work is parked until open-source value is demonstrated.
 
 Execution has started. See [the execution ledger](DOGFOOD-EXECUTION.md) for
 current results; the initial inventory below is the planning snapshot.
 
 ## Outcome and immediate decision
 
-Use Z1P Core during ordinary ForgeSworn development to reduce repeated source
-discovery and cost per accepted task. Start with the existing local Codex MCP
-bridge, then expand to KithMoot and Oathrun through explicit repository bindings.
-Measure the complete workflow before claiming savings.
+Our first outcome is lower monthly Claude/Codex spending, or more accepted
+frontier development within the same subscription, for ForgeSworn developers.
+Use Context during real ecosystem work and measure from the first task. Build
+the general MIT tool through this use; do not wait for enterprise services,
+public publication, a complete ecosystem graph or the full benchmark campaign.
 
-**The current checkout can be dogfooded now.** D0, D1, D2 and D4 have passed:
+Start with the product owner and the existing Heartwood session, then explicitly selected
+Heartwood-related repositories such as Sapwood and Heartwood Ledger. Add another
+developer when available; no staffing dependency blocks the first pilot. Qualify
+Claude Code alongside Codex. Using Oathrun as a source repository is separate
+from integrating its runtime, which remains optional.
+
+## Immediate savings goals: FS0–FS5
+
+These goals take scheduling priority for the next delivery slice. They apply
+OS0–OS2 and the smallest useful OS4 language changes to our own development;
+they do not replace public G gates or alter locked D5 experiments. Existing D0–D7
+sections below remain the historical adoption sequence. Model names/effort are
+the assignments in [the execution plan](OPEN-SOURCE-EXECUTION.md), not product
+dependencies or automatic session switches.
+
+| Goal / priority | Work and responsible owner | Where | Implementation / execution | Review and done condition |
+| --- | --- | --- | --- | --- |
+| **FS0 — Establish the baseline. Start now** | the product owner supplies available usage/billing exports; Context lead records coverage, plan period, seats and current unknowns | Private local evidence; publish only sanitised aggregates | Deterministic import/normalisation; Flash/off for a bounded adapter if needed | Terra/medium checks accounting. Record the last complete billing period where available and current period-to-date for Claude and Codex-associated accounts separately. Missing baseline does not block adoption |
+| **FS1 — Put Context in the daily path. Start now** | Context integration owner qualifies MCP and repeatable setup; each application session owns its code and acceptance | `packages/context-tools`, client docs, explicitly selected project bindings; Heartwood task stays with its existing owner | Flash/off scoped setup/fixtures, Terra/medium integration; existing frontier model for daily work. Claude qualification: Sonnet/medium, then Opus/high; Codex keeps the selected developer model | Real source-backed task use in both clients, refresh/restart/disable verified, no provider credentials in Context. Expand toward three explicitly selected ecosystem repositories; unsupported evidence has a bounded fallback |
+| **FS2 — Capture real task usage. First implementation priority alongside FS1** | Context tooling owner produces provider-neutral receipts and an offline daily/weekly summary | Developer scripts/tests and `docs/TASK-COST-REPORT.md`; private client event/usage exports outside Git | Deterministic event parsing/counting; Flash/off bounded adapters/fixtures; Terra/medium integration | Terra/medium accounting review; Sol/high only for a new disclosure boundary. Both client sources covered or explicitly incomplete; deduplicate cumulative usage and shared subscriptions; all attempts/review included. Begin manually with the linked receipt now |
+| **FS3 — Review benefit every week. After receipts start** | Context lead produces a summary; the product owner checks whether the workflow helps; independent reviewer checks comparison claims | Private receipt aggregate; sanitised weekly section in `docs/DOGFOOD-EXECUTION.md` | Deterministic totals; Terra/medium interprets results. New paired checks keep the same frontier model/effort within each pair: Sol/high for Codex or Opus/high for Claude | First checkpoint after five working days or ten completed pilot tasks, whichever arrives first. Show coverage, acceptance, usage/task, repeated reads, review time and cost. Qualify one prospective pair per client before extending controlled trials; do not relabel daily work as a control arm |
+| **FS4 — Fix the largest measured waste. Repeat after FS3** | Context lead chooses one concrete cause; Context implementer fixes it | Packet/MCP adapters, Rust/TS/Kotlin extractors or freshness code in Context; application changes remain in their own repos | Flash/off small mechanical changes; Terra/medium integration; Sol/high resolver/provenance contracts | Same task acceptance, focused regressions and new usage evidence. Target repeated source discovery, insufficient packets or language gaps; deeper graph/index work only when it fixes observed waste |
+| **FS5 — Reconcile each billing period. After a complete period** | the product owner owns invoice/account reconciliation and any plan decision; Context lead prepares the report | Private account ledger and [monthly template](examples/monthly-savings-review.md) | Deterministic account totals; Terra/medium summary; Sol/high if causal interpretation is disputed | Report actual bills, overages/credits/API charges, output quality and usage separately for each provider/account. Identify measured savings, estimated avoided spend and unknown attribution. Never change a plan automatically |
+
+FS0, FS1 and FS2 can proceed together. Do not rerun completed application work
+solely to fill a report. Capture current sessions from a stated boundary if
+earlier usage is missing, and label those tasks partial. Keep daily-use recording
+short: attach source receipts rather than asking a frontier model to narrate
+every tool call. A report generator must run offline without a model.
+
+## What we mean by savings
+
+| Measure | How to establish it | What we may claim |
+| --- | --- | --- |
+| Less context/model usage | Whole-task input/output, cache fields and all attempts; controlled same-task/model comparison | Measured token reduction for that cohort; not automatically cheaper bills |
+| More subscription headroom | Provider-reported allowance/limit observations where exposed, plus accepted work and review time | Observed headroom or fewer limit interruptions; never derive proprietary allowance units from raw tokens |
+| Lower variable spending | Attributable API/extra-usage charges for comparable accepted work, including external workers | Measured variable-cost reduction; do not price included subscription tokens as API charges |
+| Lower monthly bill | Reconciled same-currency invoices/account charges for comparable periods, with seats/plan/workload changes reported | Actual bill change. Attribute a portion to Context only where supporting evidence exists |
+| Avoided upgrade or estimated savings | Explicit counterfactual, applicable terms/rates, dated evidence and uncertainty | An estimate shown separately from cash already saved |
+
+Keep Claude and Codex/client usage cohorts separate. A ChatGPT account may fund
+Codex and other use; Claude accounts may include work outside the pilot. Count
+each subscription once at account level and retain an unallocated-use bucket.
+Do not divide a subscription fee into fictitious per-token savings or count a
+single account charge once per repository/developer. Record developer/repo/task
+identifiers for coverage, not intrusive staff productivity ranking.
+
+Record input, output, cached input, cache-write input and reasoning fields with
+the source's exact semantics. Cached/reasoning values may be subsets; normalise
+per provider and preserve raw fields. Deduplicate request IDs and distinguish
+per-request usage from cumulative session counters. Unknowns remain `null`.
+Track record coverage explicitly: accepted and failed tasks, missing receipts,
+unallocated account use and excluded intervals. Incomplete coverage cannot
+establish a total saving.
+
+Monthly account spend includes subscription charges plus extra usage/API charges
+not already included on the same invoice, minus credits/refunds counted once.
+Report currencies separately unless using a documented dated FX basis; keep tax
+basis consistent. Account bill reduction is prior comparable-period spend minus
+current spend, not by itself a causal Context estimate. Note seats, plan changes,
+working days, task mix and acceptance/review differences before interpreting it.
+
+Any work moved to DeepSeek/GLM or another provider adds its own charges and review
+overhead to the overall result. Keep Context implementation/evaluation investment
+visible separately from recurring task cost; do not hide it or assume payback.
+For a complete positive baseline, token/cost reduction is
+`(baseline - assisted) / baseline`; zero or unknown baselines produce no percentage.
+Compare task classes within fixed provider/model settings before aggregating.
+
+Our target for a new controlled cohort is at least **20% lower total model tokens
+per accepted result**, all assisted tasks meeting the same acceptance checks and
+no increased aggregate review time. This is a target, not an observed saving;
+lock the protocol before runs. Monetary goals remain conditional on attributable
+cost. Subscription-only use may show capacity benefits while cash savings stay
+zero. The failed historical comparison remains in the ledger.
+
+## Start with the next ecosystem task
+
+1. The application owner records task, repo/worktree/revision, chosen client,
+   actual model/effort and acceptance checks. Copy the
+   [daily receipt](examples/daily-use-receipt.json) into private evidence storage;
+   record the source and coverage of any available usage export.
+2. Use existing Context status/refresh/search and a sufficient verified packet.
+   Read direct source for a tiny known-file edit; avoid ceremonial graph queries.
+   The existing Heartwood owner continues its task without a second investigation.
+3. Attach the resulting checks and all usage/review/repair evidence. Missing
+   accounting stays explicit; an accepted code change can still have incomplete
+   measurement. Record Context overhead and fallback reasons.
+4. The Context lead reviews the first cohort, fixes one measured bottleneck and
+   maintains the weekly scorecard. Do not wait for eight pairs to start adoption.
+
+The daily receipt and monthly review are manual templates, not inputs accepted
+by the existing strict paired-task reporter. The separate
+[FS2 daily importer](DAILY-USAGE.md) now reads explicit Codex request exports and
+fixture-qualified Claude transcripts and creates offline task summaries. Explicit
+Ollama helper receipts are now supported, with operator-supplied attempt IDs and
+timestamps. Explicit `start`/`finish` commands now capture task windows and produce
+import specs with unknown acceptance/coverage. Real Claude exports and complete
+everyday captures remain open; automatic session discovery is excluded. Read-only local
+exports are the source, not new provider authentication inside Context.
+Private prompts, source and billing remain local; no telemetry upload is added.
+
+As of this update: local Codex use is evidenced; actual Claude task acceptance,
+routine whole-task accounting and monthly cash savings remain open. The previous
+controlled assisted answer failed and increased combined executor/reviewer input.
+No new paid model trial, account inspection or billing reconciliation ran for
+this planning change. Public external-project acceptance follows this initial
+ForgeSworn pilot; enterprise stays deferred.
+
+**The current checkout can be dogfooded now.** D0, D1, D2, D3 and D4 have passed:
 the pilot is reproducible, routine tasks have accepted outcomes, selection has
 qualified review, and source packets support two accepted coding tasks. Next,
-finish D3's disabled-tool evidence and run D5's whole-task comparison. Public
+address the [corrected qualification's assisted-answer failure](D5-RESULTS.md)
+and retrieval/review overhead before expanding the whole-task comparison. The
+harness now works; baseline passed, assisted failed semantic review, and no
+monetary savings are established. Heartwood is also dogfooding in a separate
+session; keep its active task independent of the controlled comparison. Public
 package release, hosted services and enterprise indexing are not prerequisites
 for this local pilot. See the execution ledger for the exact scope and evidence.
+
+The [savings improvement plan](SAVINGS-PLAN.md) records the v3 retrieval overhead,
+the next packet-assembly change, model assignments and the proposed separate
+ordinary-tools / Context / Graphify comparison. It leaves locked D5 protocols
+and the active Heartwood session unchanged.
+
+The original [dependency snapshot helper](DEPENDENCY-SNAPSHOTS.md) is now
+available for explicitly selected Heartwood ecosystem manifests. Its local
+capture distinguishes locked package artifacts from source paths and checks
+worktree/tooling freshness. Use it on the next real task; monetary savings and
+release provenance remain open.
 
 These D goals are the internal adoption sequence. [G0–G4](../GOALS.md) remain the
 public release gates. A passed D goal does not automatically close a G gate.
@@ -50,18 +186,21 @@ need no model. Use a model only for the judgement or implementation it adds.
 
 | Short name | Exact model | Initial effort / thinking | Use |
 | --- | --- | --- | --- |
-| Qwen | `qwen3.8:latest`, local M4 | `think=false` | Bounded extraction, evidence tables, summaries and small mechanical edits |
-| Flash | `deepseek-v4.1-flash:cloud` | `think=false` | Ordinary coding, debugging and tests against a supplied contract |
+| Flash | `deepseek-v4.1-flash:cloud` | `think=false` | Default worker for useful extraction, summaries, coding, debugging and tests |
+| GLM | `glm-5.3-flash:cloud` | `low`, subject to runtime verification | Candidate alternative for bounded coding/tests and visual work; qualify on a useful task before wider use |
 | Pro | `deepseek-v4-pro:cloud` | `think=false` initially; validate supported thinking before increasing | Difficult implementation after a bounded Flash failure; only on a reconciled, eligible endpoint |
 | Luna | `gpt-5.6-luna` | `medium` | Small Codex maintenance/check packets if the local route is unavailable or unsuitable |
 | Terra | `gpt-5.6-terra` | `medium` | Contained integration review or implementation fallback where cheaper workers fail |
 | Sol | `gpt-5.6-sol` | `high` | Trust boundaries, consequential design, difficult lifecycle review and measurement decisions |
 
-These assignments apply the current local Ollama-workers routing guidance:
-Qwen for narrow extraction, Flash first for ordinary code. A failed Qwen coding
-attempt is not a prerequisite. Local Qwen has no provider token charge, but its
-latency, machine use and review overhead still count. Cloud and subscription
-usage must be recorded on their actual charging basis.
+Operator decision, 21 September 2026: remove Qwen from the default workflow.
+Use DeepSeek Flash first, evaluate GLM on useful bounded work, and retain
+qualified frontier models for difficult design, consequential review and tasks
+where they reduce total completion cost. This project policy supersedes the
+worker skill's older Qwen assignments. The objective is frontier-quality
+development at lower total cost per accepted result, including host preparation,
+repairs, review and escalation. Deterministic extraction needs no model. Cloud
+and subscription usage must be recorded on their actual charging basis.
 
 Allow one focused repair after a terminal inadequate draft, then resize the
 packet or escalate with the compiler/test evidence. A timeout or unknown outcome
@@ -77,8 +216,8 @@ model references confirm the proposed Codex effort levels for
 [Luna](https://developers.openai.com/api/docs/models/gpt-5.6-luna),
 [Terra](https://developers.openai.com/api/docs/models/gpt-5.6-terra) and
 [Sol](https://developers.openai.com/api/docs/models/gpt-5.6-sol).
-Provider references: [Qwen](https://ollama.com/library/qwen3.8) and
-[Flash](https://ollama.com/library/deepseek-v4.1-flash).
+The previously qualified Flash route is recorded in the recovery evidence above.
+GLM is a candidate assignment, not a newly accepted lane or a demonstrated saving.
 The assignments are our task-fit choices, not vendor guarantees or price quotes.
 Reserve Astra/high for a specific unresolved decision after Sol review; no goal
 needs max/ultra by default. Selecting a model in this document does not change
@@ -88,14 +227,14 @@ the model powering an already-running session.
 
 | Goal | Priority / dependency | Implementation model and effort | Review model and effort | Done when |
 | --- | --- | --- | --- | --- |
-| **D0 — Make the existing pilot reproducible** | Now | Qwen / thinking off for evidence; Flash / thinking off for any required repair | Terra / medium; Sol / high for a discovered boundary defect | Freshness work has a named reviewed commit, matching CI and a repeatable local launch |
-| **D1 — Use it on everyday Context tasks** | Start now; close after D0 | Qwen / thinking off for the short runbook; deterministic MCP setup | Terra / medium | Three normal tasks across two fresh client sessions finish with source-backed accepted outcomes and receipts |
+| **D0 — Make the existing pilot reproducible** | Now | Deterministic evidence collection; Flash / thinking off for synthesis or repair | Terra / medium; Sol / high for a discovered boundary defect | Freshness work has a named reviewed commit, matching CI and a repeatable local launch |
+| **D1 — Use it on everyday Context tasks** | Start now; close after D0 | Flash / thinking off for the short runbook; deterministic MCP setup | Terra / medium | Three normal tasks across two fresh client sessions finish with source-backed accepted outcomes and receipts |
 | **D2 — Control what each repository exposes** | Before expanding roots; depends on D0 | Flash / thinking off | Sol / high for exclusion and root-boundary contract | Configured exclusions and Git ignore behaviour are tested, visible and shared by refresh/freshness inspection |
-| **D3 — Extend the pilot to KithMoot and Oathrun** | After D1–D2 | Qwen / thinking off for inventory; Flash / thinking off for reusable setup | Terra / medium; Sol / high for cross-project authority | Two additional explicit roots work in isolated sessions, each with one accepted real task and a tested disable path |
-| **D4 — Feed small, sufficient packets to cheaper workers** | After D1; use only qualified roots | Flash / thinking off; Qwen / thinking off for packet summaries | Terra / medium | Two ordinary coding tasks complete using retrieved source packets, with all repairs and host work recorded |
-| **D5 — Prove useful whole-task savings** | Instrument from D1; compare after D4 | Flash / thinking off for receipt/report tooling; Qwen / thinking off for extraction | Sol / high for experiment design and acceptance | Eight paired tasks meet the predeclared quality and cost decision rule below |
+| **D3 — Extend the pilot to KithMoot and Oathrun** | After D1–D2 | Deterministic inventory; Flash / thinking off for reusable setup | Terra / medium; Sol / high for cross-project authority | Two additional explicit roots work in isolated sessions, each with one accepted real task and a tested disable path |
+| **D4 — Feed small, sufficient packets to cheaper workers** | After D1; use only qualified roots | Flash / thinking off for coding and useful packet summaries | Terra / medium | Two ordinary coding tasks complete using retrieved source packets, with all repairs and host work recorded |
+| **D5 — Prove useful whole-task savings** | Instrument from D1; compare after D4 | Flash / thinking off for receipt/report tooling; deterministic extraction | Sol / high for experiment design and acceptance | Eight paired tasks meet the predeclared quality and cost decision rule below |
 | **D6 — Connect the normal ForgeSworn consumer workflow** | After D3–D4 and relevant consumer gates | Flash / thinking off; Pro / thinking off only for a bounded harder packet | Sol / high | An authorised Oathrun/KithMoot task retrieves scoped Context evidence, returns a cited result, and survives the required lifecycle checks |
-| **D7 — Make installation and release dependable** | After D0–D2; public release also needs G0–G4 | Flash / thinking off for packaging; Qwen / thinking off for docs | Terra / medium for packaging; Sol / high for unresolved release boundaries | Another isolated environment runs the pinned pilot; later, published exact versions pass registry smoke and consumer compatibility |
+| **D7 — Make installation and release dependable** | After D0–D2; public release also needs G0–G4 | Flash / thinking off for packaging and docs | Terra / medium for packaging; Sol / high for unresolved release boundaries | Another isolated environment runs the pinned pilot; later, published exact versions pass registry smoke and consumer compatibility |
 
 ### D0: Finish the work already present
 
@@ -162,7 +301,7 @@ Provide a reusable packet format or small helper around the existing worker
 workflow. Include task, acceptance checks, allowed files, repository/revision,
 source hashes, exact relevant interfaces/fixtures, bounded excerpts, exclusions
 and unresolved questions. Reject or rebuild a packet if relevant source changes.
-Do not mistake a navigation pointer or Qwen summary for sufficient source.
+Do not mistake a navigation pointer or model summary for sufficient source.
 
 Scanning and excerpt assembly stay deterministic where possible. The host
 reviews the packet's sufficiency once, sends ordinary implementation to Flash,
@@ -176,6 +315,10 @@ consumer/worker layer; do not introduce a provider dependency into Core.
 Use the developer-only [whole-task cost report](TASK-COST-REPORT.md) to validate
 declared controls and retain incomplete accounting explicitly. Its unlocked
 template is preparation, not an executed or accepted eight-pair trial.
+The concrete [Context/KithMoot experiment pack](D5-RESULTS.md)
+is summarised publicly; the machine-specific definitions and checks remain private. Its protocol lock and
+actual trial results remain separate evidence; Heartwood's ongoing session is
+ordinary dogfooding outside that comparison.
 
 Predeclare eight paired tasks: two each for orientation, bug diagnosis, change
 impact and accepted code changes, distributed across at least two qualified

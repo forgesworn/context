@@ -104,7 +104,7 @@ async function main() {
     await writeFile(join(fixture, 'source.ts'), 'navToken first\nnavToken second\nnavToken third\n', { mode: 0o600 });
     active = await connect(cli, fixture);
     const names = (await active.client.listTools()).tools.map((tool) => tool.name).sort();
-    assert(JSON.stringify(names) === JSON.stringify(['repository_refresh', 'repository_search', 'repository_status']), 'unexpected MCP tool set');
+    assert(JSON.stringify(names) === JSON.stringify(['repository_packet', 'repository_refresh', 'repository_search', 'repository_status']), 'unexpected MCP tool set');
 
     const unavailable = await call(active.client, 'repository_status', {});
     assert(unavailable.freshness === 'unavailable' && unavailable.generation === null, 'session 1 did not start unavailable');

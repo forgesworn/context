@@ -5,6 +5,16 @@ receipts. It is a local developer tool, outside Core. It reads one JSON file,
 prints JSON, and makes no provider requests. It does not collect usage, look up
 prices, run the tasks or authenticate the supplied evidence.
 
+For ongoing ecosystem work, follow the
+[FS0–FS5 savings goals](FORGESWORN-DOGFOOD-GOALS.md#immediate-savings-goals-fs0fs5).
+The [daily receipt](examples/daily-use-receipt.json) and
+[monthly review](examples/monthly-savings-review.md) are separate manual drafts;
+this strict paired-task reporter does **not** accept them or collect client
+usage. The separate [daily usage importer](DAILY-USAGE.md) now handles explicit
+Codex request exports and fixture-qualified Claude transcripts, with offline
+summaries. It has its own specification/schema; billing remains separate. Routine adoption
+can record useful partial evidence before a controlled experiment is complete.
+
 Use Node from `.nvmrc`:
 
 ```sh
@@ -16,6 +26,12 @@ unlocked [draft template](examples/task-cost-draft.json). Its hashes, revisions
 and qualification references are placeholders, not evidence. Copy it to private
 storage and replace them before locking a real experiment. Keep prompts, source,
 provider receipts and billing evidence private; publish a reviewed aggregate.
+
+The concrete Context/KithMoot comparison is in
+[the D5 experiment pack](D5-RESULTS.md). Its protocol,
+frozen task definitions, preparation helper and acceptance checks remain private
+and separate from the generic draft template. Heartwood's concurrent daily-use session is
+outside this comparison; do not turn its ongoing task into a retrospective pair.
 
 ## Lock the comparison before running it
 
@@ -91,3 +107,9 @@ The report is preparation for D5, not evidence that D5 has passed. Ordinary dail
 work can start accumulating receipts while the protocol and attribution remain
 incomplete. Complete host usage and attributable billing are still required to
 claim whole-task monetary savings.
+
+The separate [v3 harness qualification](D5-RESULTS.md)
+now has one accepted baseline and one rejected assisted answer. Including review,
+assisted input and review time increased. Those raw qualification receipts have
+not been relabelled as completed arms in the eight-pair reporter; billing and
+setup/host attribution remain unknown.

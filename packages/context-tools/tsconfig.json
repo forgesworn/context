@@ -8,6 +8,7 @@
       "DOM"
     ],
     "strict": true,
+    "allowJs": true,
     "declaration": true,
     "outDir": "dist",
     "rootDir": "src",
@@ -15,7 +16,8 @@
     "verbatimModuleSyntax": true
   },
   "include": [
-    "src/**/*.ts"
+    "src/**/*.ts",
+    "src/source-packet.mjs"
   ],
   "exclude": [
     "src/**/*.test.ts"

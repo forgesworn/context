@@ -1,0 +1,22 @@
+{
+  "version": 1,
+  "taskId": "replace-task-id",
+  "developerId": "replace-developer-id",
+  "accountId": null,
+  "repositoryId": "replace-repository-id",
+  "category": "ecosystem-task",
+  "client": "codex",
+  "sessionId": "replace-exact-export-session-id",
+  "from": "2026-09-22T09:00:00.000Z",
+  "to": "2026-09-22T10:00:00.000Z",
+  "phase": "host",
+  "contextUsed": null,
+  "accepted": null,
+  "reviewSeconds": null,
+  "coverage": {
+    "allAttempts": null,
+    "hostPreparation": null,
+    "workers": null,
+    "review": null
+  }
+}
