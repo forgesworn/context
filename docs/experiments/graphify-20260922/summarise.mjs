@@ -16,7 +16,7 @@ for (const task of readdirSync(evidence, { withFileTypes: true }).filter(d => d.
     const r = JSON.parse(readFileSync(path, 'utf8'))
     const e = r.executorRun ?? {}, v = r.reviewerRun ?? {}
     rows.push({
-      task, arm, order: r.orderIndex, accepted: r.accepted, checker: r.checker?.passed ?? null, reviewer: v.verdict?.accepted ?? null,
+      task, arm, order: r.orderIndex, accepted: r.accepted, checker: r.checker?.passed ?? null, reviewer: v.verdict?.accepted ?? null, scope: r.scope ? r.scope.passed : null,
       subtype: e.subtype, turns: e.numTurns, toolCalls: e.toolCallsTotal, toolCallsByName: e.toolCalls,
       inputTotal: e.inputTotal, inputUncached: e.inputUncached, cacheRead: e.usage?.cache_read_input_tokens ?? null, output: e.output,
       costUsd: e.totalCostUsd, executorSeconds: e.seconds, reviewerInput: v.inputTotal, reviewerOutput: v.output, reviewerSeconds: v.seconds,
@@ -26,7 +26,7 @@ for (const task of readdirSync(evidence, { withFileTypes: true }).filter(d => d.
 }
 const fmt = (n) => n === null || n === undefined ? '?' : typeof n === 'number' ? (Number.isInteger(n) ? n.toLocaleString('en-GB') : n.toFixed(1)) : String(n)
 const lines = ['| Task | Arm | Order | Accepted | Checker | Reviewer | Turns | Tool calls | Input total | Uncached input | Output | Cost est. USD | Executor s | Reviewer in/out | Arm s |', '| --- | --- | ---: | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |']
-for (const r of rows) lines.push(`| ${r.task} | ${r.arm} | ${r.order} | ${r.accepted ? 'yes' : 'no'} | ${r.checker ? 'pass' : 'fail'} | ${r.reviewer === null ? '?' : r.reviewer ? 'accept' : 'reject'} | ${fmt(r.turns)} | ${fmt(r.toolCalls)} | ${fmt(r.inputTotal)} | ${fmt(r.inputUncached)} | ${fmt(r.output)} | ${r.costUsd === null ? '?' : r.costUsd.toFixed(2)} | ${fmt(r.executorSeconds)} | ${fmt(r.reviewerInput)}/${fmt(r.reviewerOutput)} | ${fmt(r.armSeconds)} |`)
+for (const r of rows) lines.push(`| ${r.task} | ${r.arm} | ${r.order} | ${r.accepted ? 'yes' : 'no'} | ${r.checker ? 'pass' : 'fail'} | ${r.scope !== null ? (r.scope ? 'scope ok' : 'scope fail') : r.reviewer === null ? '?' : r.reviewer ? 'accept' : 'reject'} | ${fmt(r.turns)} | ${fmt(r.toolCalls)} | ${fmt(r.inputTotal)} | ${fmt(r.inputUncached)} | ${fmt(r.output)} | ${r.costUsd === null ? '?' : r.costUsd.toFixed(2)} | ${fmt(r.executorSeconds)} | ${fmt(r.reviewerInput)}/${fmt(r.reviewerOutput)} | ${fmt(r.armSeconds)} |`)
 const agg = {}
 for (const arm of arms) {
   const set = rows.filter(r => r.arm === arm)

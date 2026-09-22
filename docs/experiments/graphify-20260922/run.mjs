@@ -2,12 +2,14 @@
 // Three-way retrieval comparison runner: plain tools, Graphify, Context.
 // Usage: node run.mjs --local /private/local.json [--protocol DIR] [--task ID | --all] [--arms plain,graphify,context] [--skip-review]
 // --protocol selects a directory holding protocol.json and context-instructions.txt (default: this directory).
+// protocol.json may set "codeAcceptance": "checker-and-scope" to accept code tasks without the model reviewer.
 // local.json (private, machine-specific): { evidence, roots: { context, kithmoot }, node, contextCli, graphifyBin, graphifyAlwaysOn }
 import { spawn, spawnSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { checkScope } from '../code-acceptance-20260923/scope.mjs'
 
 const here = dirname(fileURLToPath(import.meta.url))
 const packDir = join(here, '..', 'd5-20260921')
@@ -310,7 +312,14 @@ async function runArm({ taskId, arm, orderIndex, local, evidence, skipReview }) 
   log(evidence, `${taskId}/${arm}: checker ${checker.passed ? 'passed' : 'failed'}`)
   write()
 
-  if (!skipReview) {
+  // protocol.codeAcceptance 'checker-and-scope' (optional) accepts code tasks on the behaviour checker plus a
+  // deterministic scope check, with no model reviewer; protocols without it keep the reviewer.
+  const deterministicCode = acceptance.kind === 'code' && protocol.codeAcceptance === 'checker-and-scope'
+  if (deterministicCode) {
+    receipt.scope = checkScope({ workspace, include: task.selectionPolicy.include, env: { ...cleanEnv(), ...gitEnv } })
+    log(evidence, `${taskId}/${arm}: scope ${receipt.scope.passed ? 'passed' : `failed (${receipt.scope.reasons.join('; ')})`}`)
+  }
+  if (!skipReview && !deterministicCode) {
     const rprompt = reviewerPrompt({ task, acceptance, workspace, answer, checker, diff })
     const attempts = []
     for (let attempt = 1; attempt <= 2; attempt += 1) {
@@ -326,7 +335,8 @@ async function runArm({ taskId, arm, orderIndex, local, evidence, skipReview }) 
     const last = attempts[attempts.length - 1]
     receipt.reviewerRun = { ...last, attempts: attempts.length, seconds: attempts.reduce((a, r) => a + r.seconds, 0), inputTotal: attempts.reduce((a, r) => a + (r.inputTotal ?? 0), 0), output: attempts.reduce((a, r) => a + (r.output ?? 0), 0), allAttempts: attempts.map(r => ({ subtype: r.subtype, inputTotal: r.inputTotal, output: r.output, seconds: r.seconds, parsed: Boolean(r.verdict) })) }
   }
-  receipt.accepted = checker.passed && receipt.reviewerRun?.verdict?.accepted === true && (receipt.reviewerRun?.verdict?.materialIssues?.length ?? 1) === 0
+  receipt.acceptanceRule = deterministicCode ? 'checker-and-scope' : 'checker-and-reviewer'
+  receipt.accepted = deterministicCode ? checker.passed && receipt.scope.passed : checker.passed && receipt.reviewerRun?.verdict?.accepted === true && (receipt.reviewerRun?.verdict?.materialIssues?.length ?? 1) === 0
   receipt.armSeconds = (receipt.setup.graphify?.seconds ?? 0) + exec.seconds + checker.seconds + (receipt.reviewerRun?.seconds ?? 0)
   receipt.finishedAt = now()
   writeFileSync(receiptPath, JSON.stringify(receipt, null, 2))
