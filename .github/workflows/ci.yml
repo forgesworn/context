@@ -18,6 +18,7 @@ jobs:
       - run: npm ci --ignore-scripts
       - run: npm run build
       - run: npm test
+      - run: node scripts/navigation-smoke.mjs
       - run: npm run benchmark:tokens:check
       - run: npm run benchmark:tokens:parity
       - run: node --test benchmarks/scale/sqlite.test.mjs benchmarks/scale/postings.test.mjs

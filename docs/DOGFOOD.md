@@ -109,6 +109,22 @@ This signed snapshot remains a separate tool from the newer
 [local repository navigation bridge](LOCAL-NAVIGATION.md). The bridge does not
 enlarge the signed v1 format or automatically sign repository source.
 
+## Repository-navigation freshness acceptance — 21 September 2026
+
+The local navigation bridge now exposes an explicit manifest freshness signal
+through its existing `repository_status` tool: `unavailable`, `current`,
+`stale`, or `unknown`. It compares only the bounded, allowlisted indexed-file
+manifest, so `current` is not whole-repository coverage proof. A source-stale
+index with currently validated policy remains searchable, and each result
+carries its start-of-search freshness;
+clients must explicitly refresh when status is stale or unknown. The package
+suite covers unavailable/current/stale/unknown states, manifest additions and
+deletions, excluded paths, cursor retention, UTF-8 byte accounting and MCP JSON
+responses. The full workspace and benchmark gates passed. Existing Codex/Claude
+processes must be restarted and explicitly refreshed before this new status
+field is visible to them; this is protocol/package acceptance, not renewed
+interactive client acceptance or a measured billing saving.
+
 The [first paired diagnostic trial](PAIRED-TRIAL.md) now records the scanner
 truncation diagnosis, actual fixture checks and worker usage including repairs.
 It is a host-assisted context-selection experiment, not end-to-end billing proof.

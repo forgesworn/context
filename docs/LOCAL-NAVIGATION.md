@@ -14,7 +14,12 @@ a replacement for signed evidence. Results must say `local-source-unsigned`.
 The engine retains source lines and their file hashes from an explicit refresh.
 It does not mix old index positions with live source reads. A successful refresh
 replaces the generation and invalidates prior cursors; a failed refresh retains
-the old generation. Neither result proves that the filesystem is still current.
+the old generation. `repository_status` hashes the same bounded indexed-file
+manifest and reports `freshness`: `unavailable` before refresh, `current` when
+the manifest matches, `stale` when it differs, and `unknown` when inspection
+cannot complete. It does not refresh, mutate the index or invalidate cursors.
+Neither result proves whole-repository coverage because exclusions and bounds
+remain outside the manifest.
 
 Build limits cover source bytes, files, indexed lines and postings. Query limits
 cover visited postings, returned records and encoded response bytes. They do
@@ -43,6 +48,16 @@ no arbitrary path arguments on tools, and no network transport. Existing signed
 This bridge is not encrypted persistent indexing, incremental refresh,
 enterprise readiness or evidence of lower inference bills.
 
+The [daily workflow](DAILY-USE.md) covers normal agent use. Run the
+[repeatable stdio smoke](NAVIGATION-SMOKE.md) to verify refresh, stale source,
+cursor recovery and restart in two fresh processes.
+
+Cancellation propagates through freshness inspection and source reads. An
+aborted status/search does not consume a continuation cursor. Refresh returns
+the generation built by its single read pass; it does not rescan after
+publication. A concurrent refresh during status inspection yields consistent
+new-generation metadata with `unknown` freshness instead of an unbounded retry.
+
 ## Local use
 
 Build with `npm run build`, then configure an MCP stdio client to run:
@@ -53,8 +68,20 @@ node packages/context-tools/bin/encrypted-context.mjs navigate /absolute/reposit
 
 There is no identity or encrypted-cache argument. Each process owns its own
 index. Call `repository_refresh` before searching and again after source edits;
-`repository_status` reports the generation and exclusion counts. Search for one
+`repository_status` reports the generation, revision, exclusion counts and
+freshness. Refresh explicitly whenever freshness is `stale` or `unknown`.
+Search for one
 identifier with `repository_search`, for example `RepositoryNavigation`.
+
+Search remains available on a source-stale generation when its selection policy
+can still be validated as current. Changed or unverifiable policy blocks search
+until successful refresh, preventing retrieval of newly excluded source. Status
+exposes the indexed policy digest, summary and freshness separately. Each search
+response carries the
+source-freshness snapshot observed before that search began (and a bounded error
+when it is `unknown`). Root identity and policy are checked again before the
+result is committed; a detected change blocks the result. Search never silently
+replaces the generation.
 
 Responses default to 32,768 bytes and 40 lines. Requests may choose up to
 262,144 bytes and 100 lines; the byte count covers the JSON result body, not MCP
@@ -76,10 +103,13 @@ promise that every repository of that size fits process memory.
 Supported suffixes: `.ts`, `.tsx`, `.js`, `.jsx`, `.mts`, `.cts`, `.mjs`, `.cjs`,
 `.py`, `.rs`, `.go`, `.java`, `.kt`, `.swift`, `.c`, `.cpp`, `.h`, `.cs`, `.rb`,
 `.php`, `.md`. This is lexical navigation, not language-aware parsing. Hidden
-entries and `node_modules`, `dist`, `build`, `coverage`, `out`, `vendor` are
+entries and `node_modules`, `dist`, `build`, `coverage`, `out`, `vendor`, `target` are
 excluded. Lines over 2,048 UTF-8 bytes are excluded and counted. Files without
-an allowed suffix are excluded. There is no `.gitignore` or secret-detection
-policy: choose a root whose source the client is authorised to read.
+an allowed suffix are excluded. Root and nested `.gitignore` files and optional
+`.z1p-navigation.json` prefix selection narrow this scope. See
+[repository policy](NAVIGATION-POLICY.md) for precedence, bounds and policy-change
+behaviour. These exclusions are not secret detection: choose a root whose source
+the client is authorised to read.
 
 Symlink entries and a symlink root are rejected or excluded, and reads check
 regular-file metadata and use `O_NOFOLLOW`. This is not a filesystem sandbox

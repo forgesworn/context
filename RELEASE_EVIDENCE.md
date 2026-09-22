@@ -1,5 +1,33 @@
 # Z1P Core release candidate evidence ledger
 
+Latest implementation and adoption results are in the
+[dogfood execution ledger](docs/DOGFOOD-EXECUTION.md). The dated snapshots below
+remain historical evidence; internal pilot acceptance is separate from G0–G4.
+
+## Current internal adoption review, 21 September 2026
+
+The [ForgeSworn dogfooding plan](docs/FORGESWORN-DOGFOOD-GOALS.md) now tracks
+remaining internal adoption work separately from public release gates.
+On `dda2284` plus the six existing freshness code/test/doc modifications,
+`npm run check` passed 33 core tests, 77 tools tests and independent tarball
+smoke under Node 24.21.0 on macOS. Both built benchmark runners passed with
+`--check` and declared-source recall 1.0. No benchmark threshold was changed.
+
+Actual Codex MCP refresh/search returned `freshness: current`: 60 files,
+8,033 indexed locations, and a 12-result / 2,844-byte first search page with a
+continuation. This snapshot preceded the new planning documentation. Freshness
+work remains uncommitted, so these are working-tree results.
+[Main CI](https://github.com/forgesworn/context/actions/runs/35588618564) passed
+for `dda22841b9cc38735b67f84e04dc5e07e2d048c2`, independently of those local changes.
+Exact `0.3.0` registry lookups for both packages returned E404.
+
+The dated baseline and blocker lists below are historical. Local navigation now
+provides a separate route beyond 128 locations, refresh and Codex tool use are
+implemented, and a [paired diagnostic trial](docs/PAIRED-TRIAL.md) has run.
+Signed v1 still has a 128-record ceiling; complete-task monetary savings,
+Claude tool-use acceptance, public release qualification and broader ecosystem
+adoption remain open. No G0–G4 gate is closed by this review.
+
 ## Source shipment verification, 21 September 2026
 
 The scale-foundations shipment passes 33 core tests, 28 tools tests, independent packed-package smoke, both token benchmark gates, 22 synthetic scale tests and the 10k posting-index runner. The memory blob fixture now copies Node Buffer inputs independently and rejects non-string digests before coercion. CI includes navigation recall, both scale suites and the 10k probe. These are source-shipment checks, not closure of G0-G4 or an npm publication. PR and main CI provide commit-specific remote evidence; earlier entries below remain historical snapshots.

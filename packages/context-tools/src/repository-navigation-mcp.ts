@@ -18,7 +18,9 @@ export function createRepositoryNavigationServer(root: string): RepositoryNaviga
       instructions:
         'Unsigned local repository navigation. Call repository_refresh explicitly ' +
         'before first use and after source changes; repository_status reports the ' +
-        'indexed generation. repository_search performs exact case-insensitive ASCII ' +
+        'index freshness, indexed generation, and local policy state. Refresh explicitly ' +
+        'when freshness is stale or unknown. Policy changes or validation failures block ' +
+        'search until refresh. repository_search performs exact case-insensitive ASCII ' +
         'token line navigation — it is not semantic search and not a signed context ' +
         'room. Use nextCursor to page for more results, increasing the response ' +
         'budget as needed. Exclusions mean results are not whole-repository ' +
@@ -34,14 +36,14 @@ export function createRepositoryNavigationServer(root: string): RepositoryNaviga
     {
       description:
         'Return the current in-memory index status for the configured repository ' +
-        'root, including indexed generation and exclusion metadata. No refresh is ' +
-        'performed.',
+        'root, including indexed generation, freshness, policy, and exclusion metadata. ' +
+        'No refresh is performed.',
       inputSchema: z.object({}).strict(),
       annotations: { readOnlyHint: true, openWorldHint: false },
     },
-    async () => {
+    async (_input, extra) => {
       try {
-        const status: NavigationStatus = navigation.status()
+        const status: NavigationStatus = await navigation.status(extra.signal)
         return { content: [{ type: 'text' as const, text: JSON.stringify(status) }] }
       } catch (error) {
         return {
@@ -57,8 +59,9 @@ export function createRepositoryNavigationServer(root: string): RepositoryNaviga
     {
       description:
         'Explicitly (re)build the in-memory repository index for the configured ' +
-        'root. Call before first use and after source changes. Only in-memory state ' +
-        'is updated; no filesystem writes, uploads, or network calls occur.',
+        'root. Call before first use and after source changes, or when status says ' +
+        'freshness is stale or unknown. Only in-memory state is updated; no ' +
+        'filesystem writes, uploads, or network calls occur.',
       inputSchema: z.object({}).strict(),
       annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
     },

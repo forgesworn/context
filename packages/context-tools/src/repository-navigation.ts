@@ -1,6 +1,11 @@
 import { createHash, randomUUID } from 'node:crypto';
 import { constants as fsConstants, promises as fsp } from 'node:fs';
 import * as path from 'node:path';
+import {
+  NavigationPolicy,
+  type NavigationPolicySummary,
+  type NavigationPolicyScope,
+} from './repository-navigation-policy.js';
 
 export interface NavigationLimits {
   maxFiles: number;
@@ -14,6 +19,7 @@ export interface NavigationLimits {
 export interface NavigationExclusions {
   symlinks: number;
   ignored: number;
+  policy: number;
   unsupported: number;
   oversizedFiles: number;
   oversizedLines: number;
@@ -25,7 +31,10 @@ export interface NavigationStatus {
   root: string;
   generation: string | null;
   trust: 'local-source-unsigned';
-  freshness: 'explicit-refresh';
+  freshness: NavigationFreshness;
+  freshnessError?: string;
+  revision: string | null;
+  policy: NavigationPolicyState;
   completeness: string;
   builtAt: number | null;
   counts: {
@@ -37,6 +46,15 @@ export interface NavigationStatus {
   exclusions: NavigationExclusions;
   limits: NavigationLimits;
   cursors: number;
+}
+
+export type NavigationFreshness = 'unavailable' | 'current' | 'stale' | 'unknown';
+
+export interface NavigationPolicyState {
+  freshness: NavigationFreshness;
+  digest: string | null;
+  summary?: NavigationPolicySummary;
+  error?: string;
 }
 
 export interface NavigationResultRecord {
@@ -55,6 +73,9 @@ export type NavigationStopReason =
 export interface NavigationResult {
   trust: 'local-source-unsigned';
   generation: string;
+  freshness: NavigationFreshness;
+  freshnessError?: string;
+  policy: NavigationPolicyState;
   term: string;
   results: NavigationResultRecord[];
   bytesUsed: number;
@@ -89,7 +110,7 @@ const EXTENSIONS = new Set([
 ]);
 
 const EXCLUDED_DIRS = new Set([
-  'node_modules', 'dist', 'build', 'coverage', 'out', 'vendor',
+  'node_modules', 'dist', 'build', 'coverage', 'out', 'vendor', 'target',
 ]);
 
 const TOKEN_RE = /[a-zA-Z_][a-zA-Z0-9_]*/g;
@@ -135,6 +156,11 @@ interface IndexedFile {
 interface Generation {
   id: string;
   builtAt: number;
+  rootIdentity: RootIdentity;
+  revision: string;
+  policyRevision: string;
+  policySummary: NavigationPolicySummary;
+  policyDirectories: string[];
   files: IndexedFile[];
   byToken: Map<string, number[]>;
   // Flat list of locations sorted by path then line, indexable by number.
@@ -147,6 +173,45 @@ interface Generation {
   };
   exclusions: NavigationExclusions;
   limits: NavigationLimits;
+}
+
+interface ManifestFile {
+  path: string;
+  sha256: string;
+  bytes: number;
+}
+
+interface Manifest {
+  files: ManifestFile[];
+  revision: string;
+}
+
+interface RootIdentity {
+  path: string;
+  dev: number;
+  ino: number;
+}
+
+interface DiscoveredFile {
+  abs: string;
+  rel: string;
+  dev: number;
+  ino: number;
+}
+
+interface Discovery {
+  files: DiscoveredFile[];
+  exclusions: NavigationExclusions;
+  policy: NavigationPolicy;
+  policyRevision: string;
+  policySummary: NavigationPolicySummary;
+  policyDirectories: string[];
+}
+
+interface FreshnessInspection {
+  freshness: Exclude<NavigationFreshness, 'unavailable'>;
+  error?: string;
+  policy: NavigationPolicyState;
 }
 
 interface Cursor {
@@ -203,11 +268,32 @@ function isInsideRoot(root: string, candidate: string): boolean {
   return candidate.startsWith(rootWithSep);
 }
 
+function sameRootIdentity(a: RootIdentity, b: RootIdentity): boolean {
+  return a.path === b.path && a.dev === b.dev && a.ino === b.ino;
+}
+
 const yieldNow = (): Promise<void> =>
   new Promise((resolve) => setImmediate(resolve));
 
 function utf8Len(s: string): number {
   return Buffer.byteLength(s, 'utf8');
+}
+
+function manifestRevision(files: readonly ManifestFile[]): string {
+  return createHash('sha256')
+    .update(JSON.stringify(files.map(({ path, sha256, bytes }) => ({ path, sha256, bytes }))))
+    .digest('hex');
+}
+
+function boundedError(error: unknown): string {
+  const message = error instanceof Error ? error.message : String(error);
+  return message.slice(0, 500) || 'RepositoryNavigation: freshness inspection failed';
+}
+
+function throwIfAborted(signal?: AbortSignal): void {
+  if (signal?.aborted) {
+    throw new Error('RepositoryNavigation: aborted');
+  }
 }
 
 function makeFrozen<T>(value: T): T {
@@ -276,13 +362,43 @@ export class RepositoryNavigation {
     this.rootInput = root;
   }
 
-  status(): NavigationStatus {
+  async status(signal?: AbortSignal): Promise<NavigationStatus> {
+    throwIfAborted(signal);
     const gen = this.generation;
+    if (!gen) {
+      return this.makeStatus(null, 'unavailable', undefined, { freshness: 'unavailable', digest: null });
+    }
+    const freshness = await this.inspectFreshness(gen, signal);
+    // A refresh may have published while the bounded inspection was running.
+    // Report a self-consistent snapshot rather than attaching an old revision
+    // to the new generation.
+    if (this.generation !== gen) {
+      const current = this.generation;
+      if (!current) return this.makeStatus(null, 'unavailable', undefined, { freshness: 'unavailable', digest: null });
+      return this.makeStatus(
+        current,
+        'unknown',
+        'RepositoryNavigation: generation changed during freshness inspection',
+        { freshness: 'unknown', digest: current.policyRevision, summary: current.policySummary, error: 'RepositoryNavigation: generation changed during freshness inspection' },
+      );
+    }
+    return this.makeStatus(gen, freshness.freshness, freshness.error, freshness.policy);
+  }
+
+  private makeStatus(
+    gen: Generation | null,
+    freshness: NavigationFreshness,
+    freshnessError?: string,
+    policy: NavigationPolicyState = gen
+      ? { freshness: 'current', digest: gen.policyRevision, summary: gen.policySummary }
+      : { freshness: 'unavailable', digest: null },
+  ): NavigationStatus {
     const exclusions: NavigationExclusions = gen
       ? gen.exclusions
       : {
           symlinks: 0,
           ignored: 0,
+          policy: 0,
           unsupported: 0,
           oversizedFiles: 0,
           oversizedLines: 0,
@@ -296,7 +412,10 @@ export class RepositoryNavigation {
       root: this.canonicalRoot ?? this.rootInput,
       generation: gen ? gen.id : null,
       trust: 'local-source-unsigned' as const,
-      freshness: 'explicit-refresh' as const,
+      freshness,
+      ...(freshnessError ? { freshnessError } : {}),
+      revision: gen ? gen.revision : null,
+      policy: { ...policy, ...(policy.summary ? { summary: { ...policy.summary } } : {}) },
       completeness:
         'scoped to allowlisted extensions under explicit root; excludes listed dirs and hidden entries; not exhaustive coverage of repository',
       builtAt: gen ? gen.builtAt : null,
@@ -311,26 +430,32 @@ export class RepositoryNavigation {
     if (this.refreshInFlight) {
       throw new Error('RepositoryNavigation: refresh already in progress');
     }
-    if (signal?.aborted) {
-      throw new Error('RepositoryNavigation: aborted');
-    }
+    throwIfAborted(signal);
     this.refreshInFlight = true;
     try {
-      const canonical = await this.resolveRoot();
-      if (signal?.aborted) {
-        throw new Error('RepositoryNavigation: aborted');
-      }
+      const rootIdentity = await this.resolveRoot(signal);
+      throwIfAborted(signal);
 
-      const gen = await this.buildGeneration(canonical, signal);
-      if (signal?.aborted) {
-        throw new Error('RepositoryNavigation: aborted');
+      const gen = await this.buildGeneration(rootIdentity, signal);
+      throwIfAborted(signal);
+
+      const policyRevision = await this.reinspectPolicy(
+        rootIdentity,
+        gen.policyDirectories,
+        signal,
+      );
+      if (policyRevision !== gen.policyRevision) {
+        throw new Error('RepositoryNavigation: policy changed during refresh');
       }
+      throwIfAborted(signal);
 
       // Publish atomically. Successful refresh invalidates all cursors.
-      this.canonicalRoot = canonical;
+      this.canonicalRoot = rootIdentity.path;
       this.generation = gen;
       this.cursors.clear();
-      return this.status();
+      return this.makeStatus(gen, 'current', undefined, {
+        freshness: 'current', digest: gen.policyRevision, summary: gen.policySummary,
+      });
     } finally {
       this.refreshInFlight = false;
     }
@@ -340,9 +465,7 @@ export class RepositoryNavigation {
     options: NavigationSearchOptions,
     signal?: AbortSignal,
   ): Promise<NavigationResult> {
-    if (signal?.aborted) {
-      throw new Error('RepositoryNavigation: aborted');
-    }
+    throwIfAborted(signal);
     const gen = this.generation;
     if (!gen) {
       throw new Error('RepositoryNavigation: no active generation; call refresh()');
@@ -368,6 +491,18 @@ export class RepositoryNavigation {
     }
     if (!Number.isSafeInteger(maxVisited) || maxVisited < 1 || maxVisited > 10000) {
       throw new Error('RepositoryNavigation: maxVisited must be integer in [1, 10000]');
+    }
+    // Capture freshness once, before cursor consumption or result traversal.
+    // The response then describes precisely the generation the caller searched.
+    const freshnessAtStart = await this.inspectFreshness(gen, signal);
+    if (freshnessAtStart.policy.freshness !== 'current') {
+      throw new Error(
+        `RepositoryNavigation: search blocked because policy is ${freshnessAtStart.policy.freshness}` +
+        (freshnessAtStart.policy.error ? `: ${freshnessAtStart.policy.error}` : ''),
+      );
+    }
+    if (this.generation === null || this.generation.id !== gen.id) {
+      throw new Error('RepositoryNavigation: generation changed during search');
     }
 
     let position = 0;
@@ -408,6 +543,9 @@ export class RepositoryNavigation {
     ): NavigationResult => ({
       trust: 'local-source-unsigned',
       generation: gen.id,
+      freshness: freshnessAtStart.freshness,
+      ...(freshnessAtStart.error ? { freshnessError: freshnessAtStart.error } : {}),
+      policy: { freshness: freshnessAtStart.policy.freshness, digest: freshnessAtStart.policy.digest },
       term: token,
       results,
       bytesUsed: 0,
@@ -514,6 +652,27 @@ export class RepositoryNavigation {
       throw new Error('RepositoryNavigation: result exceeds maxBytes; increase maxBytes');
     }
 
+    let commitPolicyRevision: string;
+    try {
+      commitPolicyRevision = await this.reinspectPolicy(
+        gen.rootIdentity,
+        gen.policyDirectories,
+        signal,
+      );
+    } catch (error) {
+      if (signal?.aborted) throw error;
+      throw new Error(
+        `RepositoryNavigation: search blocked because policy is unknown: ${boundedError(error)}`,
+      );
+    }
+    throwIfAborted(signal);
+    if (commitPolicyRevision !== gen.policyRevision) {
+      throw new Error('RepositoryNavigation: search blocked because policy is stale');
+    }
+    if (this.generation === null || this.generation.id !== generationAtStart) {
+      throw new Error('RepositoryNavigation: generation changed during search');
+    }
+
     // Commit phase: single-use semantics. Recheck that the input cursor is
     // still the registered one immediately before committing so that a
     // concurrent replay of the same cursor cannot double-consume; the loser
@@ -576,9 +735,11 @@ export class RepositoryNavigation {
     }
   }
 
-  private async resolveRoot(): Promise<string> {
+  private async resolveRoot(signal?: AbortSignal): Promise<RootIdentity> {
+    throwIfAborted(signal);
     const absInput = path.resolve(this.rootInput);
     const lstat = await fsp.lstat(absInput);
+    throwIfAborted(signal);
     if (lstat.isSymbolicLink()) {
       throw new Error('RepositoryNavigation: root must not be a symlink');
     }
@@ -586,162 +747,241 @@ export class RepositoryNavigation {
       throw new Error('RepositoryNavigation: root must be a directory');
     }
     const real = await fsp.realpath(absInput);
-    const realStat = await fsp.stat(real);
+    throwIfAborted(signal);
+    const realStat = await fsp.lstat(real);
+    throwIfAborted(signal);
     if (!realStat.isDirectory()) {
       throw new Error('RepositoryNavigation: root must be a directory');
     }
-    return real;
+    if (realStat.dev !== lstat.dev || realStat.ino !== lstat.ino) {
+      throw new Error('RepositoryNavigation: root changed while resolving');
+    }
+    return { path: real, dev: realStat.dev, ino: realStat.ino };
   }
 
-  private async buildGeneration(
-    root: string,
+  private async inspectFreshness(
+    generation: Generation,
     signal?: AbortSignal,
-  ): Promise<Generation> {
-    const limits = this.limits;
-    const exclusions: NavigationExclusions = {
-      symlinks: 0,
-      ignored: 0,
-      unsupported: 0,
-      oversizedFiles: 0,
-      oversizedLines: 0,
-      maxDepth: 0,
-      visitedCap: 0,
+  ): Promise<FreshnessInspection> {
+    let discovery: Discovery;
+    try {
+      throwIfAborted(signal);
+      const rootIdentity = await this.resolveRoot(signal);
+      if (!sameRootIdentity(rootIdentity, generation.rootIdentity)) {
+        throw new Error('RepositoryNavigation: root identity changed; explicit refresh required');
+      }
+      discovery = await this.discoverEligible(rootIdentity.path, signal);
+    } catch (error) {
+      if (signal?.aborted) throw error;
+      const message = boundedError(error);
+      return {
+        freshness: 'unknown',
+        error: message,
+        policy: {
+          freshness: 'unknown',
+          digest: generation.policyRevision,
+          summary: generation.policySummary,
+          error: message,
+        },
+      };
+    }
+    const policy: NavigationPolicyState = {
+      freshness: discovery.policyRevision === generation.policyRevision ? 'current' : 'stale',
+      digest: generation.policyRevision,
+      summary: generation.policySummary,
     };
+    if (policy.freshness !== 'current') return { freshness: 'stale', policy };
+    let manifest: Manifest | undefined;
+    let manifestError: unknown;
+    try {
+      manifest = await this.buildManifest(discovery, signal);
+      throwIfAborted(signal);
+    } catch (error) {
+      if (signal?.aborted) throw error;
+      manifestError = error;
+    }
+    let confirmedPolicyRevision: string;
+    try {
+      confirmedPolicyRevision = await this.reinspectPolicy(
+        generation.rootIdentity,
+        discovery.policyDirectories,
+        signal,
+      );
+    } catch (error) {
+      if (signal?.aborted) throw error;
+      const message = boundedError(error);
+      return {
+        freshness: 'unknown',
+        error: message,
+        policy: {
+          freshness: 'unknown',
+          digest: generation.policyRevision,
+          summary: generation.policySummary,
+          error: message,
+        },
+      };
+    }
+    if (confirmedPolicyRevision !== generation.policyRevision) {
+      return {
+        freshness: 'stale',
+        policy: {
+          freshness: 'stale',
+          digest: generation.policyRevision,
+          summary: generation.policySummary,
+        },
+      };
+    }
+    if (manifestError !== undefined) {
+      return { freshness: 'unknown', error: boundedError(manifestError), policy };
+    }
+    return {
+      freshness: manifest!.revision === generation.revision ? 'current' : 'stale',
+      policy,
+    };
+  }
 
-    const discovered: { abs: string; rel: string }[] = [];
+  private async buildManifest(discovery: Discovery, signal?: AbortSignal): Promise<Manifest> {
+    const { files } = discovery;
+    const manifestFiles: ManifestFile[] = [];
+    let totalBytes = 0;
+    for (const entry of files) {
+      throwIfAborted(signal);
+      await yieldNow();
+      throwIfAborted(signal);
+      const { raw } = await this.readSource(entry, this.limits.maxFileBytes, signal);
+      throwIfAborted(signal);
+      if (totalBytes + raw.byteLength > this.limits.maxBytes) {
+        throw new Error(`RepositoryNavigation: maxBytes quota exceeded (${this.limits.maxBytes})`);
+      }
+      totalBytes += raw.byteLength;
+      manifestFiles.push({
+        path: entry.rel,
+        bytes: raw.byteLength,
+        sha256: createHash('sha256').update(raw).digest('hex'),
+      });
+    }
+    const allFiles = [...discovery.policy.manifest(), ...manifestFiles];
+    return { files: allFiles, revision: manifestRevision(allFiles) };
+  }
+
+  private async discoverEligible(root: string, signal?: AbortSignal): Promise<Discovery> {
+    const exclusions: NavigationExclusions = {
+      symlinks: 0, ignored: 0, policy: 0, unsupported: 0, oversizedFiles: 0,
+      oversizedLines: 0, maxDepth: 0, visitedCap: 0,
+    };
+    const files: DiscoveredFile[] = [];
+    const policyDirectories: string[] = [''];
     let visitedEntries = 0;
-    const stack: { dir: string; depth: number }[] = [{ dir: root, depth: 0 }];
-
+    const policy = await NavigationPolicy.load(root, signal);
+    const stack: { dir: string; rel: string; depth: number; scope: NavigationPolicyScope }[] = [
+      { dir: root, rel: '', depth: 0, scope: policy.rootDirectoryScope() },
+    ];
     while (stack.length > 0) {
-      if (signal?.aborted) {
-        throw new Error('RepositoryNavigation: aborted');
-      }
+      throwIfAborted(signal);
       const frame = stack.pop()!;
-      if (frame.depth > limits.maxDepth) {
-        exclusions.maxDepth++;
-        continue;
+      let directory: import('node:fs').Stats;
+      try { directory = await fsp.lstat(frame.dir); } catch (error) {
+        throw new Error(`RepositoryNavigation: failed to lstat directory ${frame.dir}: ${String(error)}`);
       }
-      let popStat: import('node:fs').Stats;
-      try {
-        popStat = await fsp.lstat(frame.dir);
-      } catch (err) {
-        throw new Error(
-          `RepositoryNavigation: failed to lstat directory ${frame.dir}: ${String(err)}`,
-        );
+      throwIfAborted(signal);
+      if (!directory.isDirectory()) {
+        throw new Error(`RepositoryNavigation: directory changed between check and open: ${frame.dir}`);
       }
-      if (!popStat.isDirectory()) {
-        throw new Error(
-          `RepositoryNavigation: directory changed between check and open: ${frame.dir}`,
-        );
-      }
-
-      let dirHandle: import('node:fs').Dir;
-      try {
-        dirHandle = await fsp.opendir(frame.dir);
-      } catch (err) {
-        throw new Error(
-          `RepositoryNavigation: failed to opendir ${frame.dir}: ${String(err)}`,
-        );
+      let handle: import('node:fs').Dir;
+      try { handle = await fsp.opendir(frame.dir); } catch (error) {
+        throw new Error(`RepositoryNavigation: failed to opendir ${frame.dir}: ${String(error)}`);
       }
       const names: string[] = [];
       try {
+        throwIfAborted(signal);
         for (;;) {
-          const ent = await dirHandle.read();
-          if (ent === null) break;
-          visitedEntries++;
-          if (visitedEntries > VISITED_ENTRIES_CAP) {
-            throw new Error(
-              `RepositoryNavigation: visited entries cap exceeded (${VISITED_ENTRIES_CAP})`,
-            );
+          const entry = await handle.read();
+          throwIfAborted(signal);
+          if (entry === null) break;
+          if (++visitedEntries > VISITED_ENTRIES_CAP) {
+            throw new Error(`RepositoryNavigation: visited entries cap exceeded (${VISITED_ENTRIES_CAP})`);
           }
-          names.push(ent.name);
+          names.push(entry.name);
           if (names.length % YIELD_CHUNK === 0) {
             await yieldNow();
-            if (signal?.aborted) {
-              throw new Error('RepositoryNavigation: aborted');
-            }
+            throwIfAborted(signal);
           }
         }
-      } finally {
-        await dirHandle.close();
-      }
-
+      } finally { await handle.close(); }
       names.sort();
-      const subdirs: { dir: string; depth: number }[] = [];
+      const subdirs: { dir: string; rel: string; depth: number; scope: NavigationPolicyScope }[] = [];
       for (const name of names) {
-        if (isHiddenName(name)) {
-          exclusions.ignored++;
-          continue;
-        }
+        throwIfAborted(signal);
+        if (isHiddenName(name)) { exclusions.ignored++; continue; }
         const full = path.join(frame.dir, name);
-        let lst: import('node:fs').Stats;
-        try {
-          lst = await fsp.lstat(full);
-        } catch (err) {
-          throw new Error(
-            `RepositoryNavigation: failed to lstat ${full}: ${String(err)}`,
-          );
+        let stat: import('node:fs').Stats;
+        try { stat = await fsp.lstat(full); } catch (error) {
+          throw new Error(`RepositoryNavigation: failed to lstat ${full}: ${String(error)}`);
         }
-        if (lst.isSymbolicLink()) {
-          exclusions.symlinks++;
-          continue;
-        }
-        if (lst.isDirectory()) {
-          if (EXCLUDED_DIRS.has(name)) {
-            exclusions.ignored++;
-            continue;
+        throwIfAborted(signal);
+        if (stat.isSymbolicLink()) { exclusions.symlinks++; continue; }
+        const rel = toPosix(path.relative(root, full));
+        if (stat.isDirectory()) {
+          if (EXCLUDED_DIRS.has(name)) { exclusions.ignored++; continue; }
+          if (!policy.allows(rel, true, frame.scope)) { exclusions.policy++; continue; }
+          if (frame.depth + 1 > this.limits.maxDepth) { exclusions.maxDepth++; continue; }
+          const real = await fsp.realpath(full);
+          throwIfAborted(signal);
+          if (!isInsideRoot(root, real)) { exclusions.symlinks++; continue; }
+          const realStat = await fsp.lstat(real);
+          throwIfAborted(signal);
+          if (!realStat.isDirectory() || realStat.dev !== stat.dev || realStat.ino !== stat.ino) {
+            throw new Error(`RepositoryNavigation: directory changed during discovery: ${full}`);
           }
-          if (frame.depth + 1 > limits.maxDepth) {
-            exclusions.maxDepth++;
-            continue;
-          }
-          let real: string;
-          try {
-            real = await fsp.realpath(full);
-          } catch (err) {
-            throw new Error(
-              `RepositoryNavigation: failed to realpath ${full}: ${String(err)}`,
-            );
-          }
-          if (!isInsideRoot(root, real)) {
-            exclusions.symlinks++;
-            continue;
-          }
-          subdirs.push({ dir: real, depth: frame.depth + 1 });
+          const scope = await policy.enterDirectory(rel, frame.scope, signal);
+          throwIfAborted(signal);
+          policyDirectories.push(rel);
+          subdirs.push({ dir: real, rel, depth: frame.depth + 1, scope });
           continue;
         }
-        if (!lst.isFile()) {
-          exclusions.unsupported++;
-          continue;
+        if (!stat.isFile()) { exclusions.unsupported++; continue; }
+        if (!policy.allows(rel, false, frame.scope)) { exclusions.policy++; continue; }
+        if (!isSupportedPath(full)) { exclusions.unsupported++; continue; }
+        const real = await fsp.realpath(full);
+        throwIfAborted(signal);
+        if (!isInsideRoot(root, real)) { exclusions.symlinks++; continue; }
+        const realStat = await fsp.lstat(real);
+        throwIfAborted(signal);
+        if (!realStat.isFile() || realStat.dev !== stat.dev || realStat.ino !== stat.ino) {
+          throw new Error(`RepositoryNavigation: file changed during discovery: ${full}`);
         }
-        if (!isSupportedPath(full)) {
-          exclusions.unsupported++;
-          continue;
+        if (files.length >= this.limits.maxFiles) {
+          throw new Error(`RepositoryNavigation: maxFiles quota exceeded (${this.limits.maxFiles})`);
         }
-        let real: string;
-        try {
-          real = await fsp.realpath(full);
-        } catch (err) {
-          throw new Error(
-            `RepositoryNavigation: failed to realpath ${full}: ${String(err)}`,
-          );
-        }
-        if (!isInsideRoot(root, real)) {
-          exclusions.symlinks++;
-          continue;
-        }
-        if (discovered.length >= limits.maxFiles) {
-          throw new Error(
-            `RepositoryNavigation: maxFiles quota exceeded (${limits.maxFiles})`,
-          );
-        }
-        discovered.push({ abs: real, rel: toPosix(path.relative(root, real)) });
+        files.push({
+          abs: real,
+          rel: toPosix(path.relative(root, real)),
+          dev: realStat.dev,
+          ino: realStat.ino,
+        });
       }
       subdirs.reverse();
-      for (const s of subdirs) stack.push(s);
+      for (const subdir of subdirs) stack.push(subdir);
     }
+    files.sort((a, b) => (a.rel < b.rel ? -1 : a.rel > b.rel ? 1 : 0));
+    const policyFiles = policy.manifest();
+    return {
+      files,
+      exclusions,
+      policy,
+      policyRevision: manifestRevision(policyFiles),
+      policySummary: policy.summary(),
+      policyDirectories,
+    };
+  }
 
-    discovered.sort((a, b) => (a.rel < b.rel ? -1 : a.rel > b.rel ? 1 : 0));
+  private async buildGeneration(
+    rootIdentity: RootIdentity,
+    signal?: AbortSignal,
+  ): Promise<Generation> {
+    const limits = this.limits;
+    const discovery = await this.discoverEligible(rootIdentity.path, signal);
+    const { files: discovered, exclusions } = discovery;
 
     const indexedFiles: IndexedFile[] = [];
     const locations: IndexedLocation[] = [];
@@ -757,7 +997,8 @@ export class RepositoryNavigation {
       if (signal?.aborted) {
         throw new Error('RepositoryNavigation: aborted');
       }
-      const { content, raw } = await this.readSource(entry.abs, limits.maxFileBytes);
+      const { content, raw } = await this.readSource(entry, limits.maxFileBytes, signal);
+      throwIfAborted(signal);
       const rawBytes = raw.byteLength;
       if (totalBytes + rawBytes > limits.maxBytes) {
         throw new Error(
@@ -831,6 +1072,11 @@ export class RepositoryNavigation {
     return {
       id: randomUUID(),
       builtAt: Date.now(),
+      rootIdentity,
+      revision: manifestRevision([...discovery.policy.manifest(), ...indexedFiles]),
+      policyRevision: discovery.policyRevision,
+      policySummary: discovery.policySummary,
+      policyDirectories: discovery.policyDirectories,
       files: indexedFiles,
       byToken,
       locations,
@@ -846,23 +1092,30 @@ export class RepositoryNavigation {
   }
 
   private async readSource(
-    filePath: string,
+    file: DiscoveredFile,
     maxFileBytes: number,
+    signal?: AbortSignal,
   ): Promise<{ content: string; raw: Buffer }> {
+    throwIfAborted(signal);
     const handle = await fsp.open(
-      filePath,
-      fsConstants.O_RDONLY | fsConstants.O_NOFOLLOW,
+      file.abs,
+      fsConstants.O_RDONLY | fsConstants.O_NONBLOCK | fsConstants.O_NOFOLLOW,
     );
     try {
+      throwIfAborted(signal);
       const before = await handle.stat();
+      throwIfAborted(signal);
       if (!before.isFile()) {
         throw new Error(
-          `RepositoryNavigation: not a regular file: ${filePath}`,
+          `RepositoryNavigation: not a regular file: ${file.abs}`,
         );
+      }
+      if (before.dev !== file.dev || before.ino !== file.ino) {
+        throw new Error(`RepositoryNavigation: file changed before open: ${file.abs}`);
       }
       if (before.size > maxFileBytes) {
         throw new Error(
-          `RepositoryNavigation: file exceeds maxFileBytes quota (${maxFileBytes}): ${filePath}`,
+          `RepositoryNavigation: file exceeds maxFileBytes quota (${maxFileBytes}): ${file.abs}`,
         );
       }
       const cap = maxFileBytes;
@@ -870,6 +1123,7 @@ export class RepositoryNavigation {
       let pos = 0;
       while (pos < buf.length) {
         const { bytesRead } = await handle.read(buf, pos, buf.length - pos, pos);
+        throwIfAborted(signal);
         if (bytesRead === 0) {
           break;
         }
@@ -877,10 +1131,11 @@ export class RepositoryNavigation {
       }
       if (pos > cap) {
         throw new Error(
-          `RepositoryNavigation: file exceeds maxFileBytes quota (${maxFileBytes}): ${filePath}`,
+          `RepositoryNavigation: file exceeds maxFileBytes quota (${maxFileBytes}): ${file.abs}`,
         );
       }
       const after = await handle.stat();
+      throwIfAborted(signal);
       if (
         pos !== before.size ||
         after.size !== before.size ||
@@ -888,7 +1143,7 @@ export class RepositoryNavigation {
         after.ctimeMs !== before.ctimeMs
       ) {
         throw new Error(
-          `RepositoryNavigation: file observed changed during read: ${filePath}`,
+          `RepositoryNavigation: file observed changed during read: ${file.abs}`,
         );
       }
       const raw = buf.subarray(0, pos);
@@ -898,6 +1153,42 @@ export class RepositoryNavigation {
     } finally {
       await handle.close();
     }
+  }
+
+  private async reinspectPolicy(
+    expectedRoot: RootIdentity,
+    directories: readonly string[],
+    signal?: AbortSignal,
+  ): Promise<string> {
+    const before = await this.resolveRoot(signal);
+    if (!sameRootIdentity(before, expectedRoot)) {
+      throw new Error('RepositoryNavigation: root identity changed; explicit refresh required');
+    }
+    const policy = await NavigationPolicy.load(before.path, signal);
+    const scopes = new Map<string, NavigationPolicyScope>([
+      ['', policy.rootDirectoryScope()],
+    ]);
+    const ordered = [...new Set(directories)]
+      .filter(directory => directory !== '')
+      .sort((a, b) => {
+        const depth = a.split('/').length - b.split('/').length;
+        return depth !== 0 ? depth : a < b ? -1 : a > b ? 1 : 0;
+      });
+    for (const directory of ordered) {
+      throwIfAborted(signal);
+      const parentPath = path.posix.dirname(directory);
+      const parent = scopes.get(parentPath === '.' ? '' : parentPath);
+      if (!parent) {
+        throw new Error(`RepositoryNavigation: missing policy parent for ${directory}`);
+      }
+      scopes.set(directory, await policy.enterDirectory(directory, parent, signal));
+    }
+    const revision = manifestRevision(policy.manifest());
+    const after = await this.resolveRoot(signal);
+    if (!sameRootIdentity(after, expectedRoot)) {
+      throw new Error('RepositoryNavigation: root identity changed; explicit refresh required');
+    }
+    return revision;
   }
 }
 

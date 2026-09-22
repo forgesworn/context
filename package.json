@@ -17,7 +17,9 @@
     "benchmark:tokens:check": "npm run build && node benchmarks/token-reduction.mjs --check",
     "benchmark:tokens:parity": "npm run build && node benchmarks/source-navigation.mjs --check",
     "benchmark:navigation": "npm run build && node benchmarks/source-navigation.mjs",
-    "test": "npm run test --workspace @forgesworn/context && npm run test --workspace @forgesworn/context-tools",
+    "test": "npm run test --workspace @forgesworn/context && npm run test --workspace @forgesworn/context-tools && npm run test:worker-packets && npm run test:task-costs",
+    "test:worker-packets": "node --test test/worker-packet.test.mjs",
+    "test:task-costs": "node --test test/task-cost-report.test.mjs",
     "test:packages": "node test/context-package-smoke.mjs",
     "check": "npm run build && npm test && npm run test:packages"
   },

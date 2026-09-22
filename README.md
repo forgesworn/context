@@ -50,6 +50,12 @@ To try a disposable local scan → signed cache → MCP retrieval workflow from
 this checkout, see [the dogfood walkthrough](docs/DOGFOOD.md). It reports scan
 omissions and checks restart persistence; it does not measure inference savings.
 
+For the remaining work to use this across ForgeSworn, see the
+[dogfooding goals and model assignments](docs/FORGESWORN-DOGFOOD-GOALS.md).
+The immediate path uses the local MCP bridge while measuring complete tasks.
+For coding handoffs from this checkout, the [worker packet helper](docs/WORKER-PACKETS.md)
+assembles bounded source excerpts and rejects stale packets before reuse.
+
 For repository navigation beyond the signed collection's 128-record limit,
 see [local repository navigation](docs/LOCAL-NAVIGATION.md): a separate unsigned,
 in-memory MCP index with explicit refresh, larger response budgets and pagination.
