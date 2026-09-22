@@ -1,15 +1,13 @@
 import assert from 'node:assert/strict';
-import { execFile } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { mkdtemp, mkdir, readFile, rm, stat, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { basename, dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { promisify } from 'node:util';
 import test, { after } from 'node:test';
 import { buildPacket, verifyPacket } from '../scripts/worker-packet.mjs';
 
-const exec = promisify(execFile);
+import { fixtureExec as exec } from './git-fixture.mjs';
 const fixtures = [];
 const SCRIPT = fileURLToPath(new URL('../scripts/worker-packet.mjs', import.meta.url));
 
@@ -251,4 +249,23 @@ test('rejects tampered, invalid UTF-8 and oversized packets', async () => {
   const oversized = join(root, 'oversized.json');
   await writeFile(oversized, 'x'.repeat(64 * 1024 + 1));
   await assert.rejects(verifyPacket({ root, packet: oversized }), /exceeds/);
+});
+
+test('fixture Git operations cannot inherit another repository from a hook', async () => {
+  const root = await fixture();
+  const decoy = await fixture();
+  const head = async path => (await exec('git', ['-C', path, 'rev-parse', 'HEAD'])).stdout;
+  const beforeRoot = await head(root);
+  const beforeDecoy = await head(decoy);
+  await exec('git', ['-C', root, 'commit', '--allow-empty', '-qm', 'fixture isolation'], {
+    env: {
+      ...process.env,
+      GIT_DIR: join(decoy, '.git'), GIT_WORK_TREE: decoy,
+      GIT_INDEX_FILE: join(decoy, '.git', 'index'), GIT_COMMON_DIR: join(decoy, '.git'),
+      GIT_CONFIG_COUNT: '1', GIT_CONFIG_KEY_0: 'user.name', GIT_CONFIG_VALUE_0: 'Wrong identity',
+    },
+  });
+  assert.notEqual(await head(root), beforeRoot);
+  assert.equal(await head(decoy), beforeDecoy);
+  assert.equal((await exec('git', ['-C', root, 'show', '-s', '--format=%an'])).stdout.trim(), 'Test');
 });
