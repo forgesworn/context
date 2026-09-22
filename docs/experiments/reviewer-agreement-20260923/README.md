@@ -39,4 +39,4 @@ The client's cost is an API-price estimate; on a subscription the reviews draw
 on the Sonnet weekly quota instead. The pipeline was exercised end to end
 against a stub reviewer (no model calls) before this was committed.
 
-Results, when present, are in `RESULTS.md`.
+Results, when present, are in `RESULTS.md`. `../reviewer-evidence-20260923/RESULTS.md` already shows, without model calls, that at least three of the five v1 to v2 flips on unchanged arms came from the reviewer.
