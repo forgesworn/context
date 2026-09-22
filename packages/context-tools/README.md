@@ -63,7 +63,8 @@ true.
 over an unsigned in-memory index of that root: `repository_status`,
 `repository_refresh`, `repository_explore` (one call for a symbol: declaration,
 references with enclosing declarations, importing files and tests),
-`repository_coverage` (which explored files a draft answer leaves uncited),
+`repository_coverage` (which explored files a draft answer leaves uncited,
+and whether each cited token is quoted exactly),
 `repository_search` (exact identifier lines grouped by file, with `pathPrefix`)
 and `repository_packet` (verbatim ranges or complete TypeScript/JavaScript
 blocks). Search, explore and packet responses are compact text by default and

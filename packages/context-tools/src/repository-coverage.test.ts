@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { analyseCoverage, coverageStatus, renderCoverage, type CoverageResult } from './repository-coverage.js'
+import { analyseCoverage, checkQuotes, coverageStatus, renderCoverage, type CoverageResult } from './repository-coverage.js'
 import type { ExploreResult } from './repository-explore.js'
 
 function explored(symbol: string, parts: Partial<Pick<ExploreResult, 'definitions' | 'references' | 'tests' | 'imports' | 'scanTruncated'>>): ExploreResult {
@@ -69,5 +69,39 @@ describe('analyseCoverage', () => {
     expect(text).toContain('cited: a.ts')
     expect(text).not.toContain('next:')
     expect(analysis.files[0].scopes).toEqual(['top level'])
+  })
+})
+
+describe('checkQuotes', () => {
+  const doc = 'no arbitrary path arguments on tools, and no network transport. Existing signed\n`context_*` tools and their cache remain unchanged.\nMatches (a+b) literally.\n'
+  const files = new Map([['docs/NAV.md', { text: doc }], ['src/empty.ts', { text: '' }]])
+
+  it('separates verbatim, whitespace-only, missing and unindexed tokens', () => {
+    const checks = checkQuotes([
+      { path: 'docs/NAV.md', token: 'no network transport' },
+      { path: 'docs/NAV.md', token: 'Existing signed `context_*` tools and their cache remain unchanged.' },
+      { path: 'docs/NAV.md', token: 'Matches (a+b) literally.' },
+      { path: 'docs/NAV.md', token: 'Matches (a+b)   literally' },
+      { path: 'docs/NAV.md', token: 'Existing unsigned tools' },
+      { path: 'src/other.ts', token: 'anything' },
+    ], files)
+    expect(checks.map((check) => check.status)).toEqual(['verbatim', 'whitespace', 'verbatim', 'whitespace', 'not-found', 'unindexed'])
+    expect(checks[0].line).toBe(1)
+    expect(checks[1]).toMatchObject({ line: 1, exact: 'Existing signed\n`context_*` tools and their cache remain unchanged.' })
+    expect(checks[2].line).toBe(3)
+    expect(checks[3].exact).toBe('Matches (a+b) literally')
+  })
+
+  it('renders only the quotes that need fixing, with the exact replacement', () => {
+    const quotes = checkQuotes([
+      { path: 'docs/NAV.md', token: 'no network transport' },
+      { path: 'docs/NAV.md', token: 'Existing signed `context_*` tools' },
+    ], files)
+    const text = renderCoverage({ trust: 'local-source-unsigned', generation: 'g', revision: 'r', freshness: 'current', ...analyseCoverage('', []), quotes })
+    expect(text.split('\n')[0]).toBe('coverage (no symbols)  0 files: 0 missing, 0 named, 0 cited  generation g  revision r  freshness current')
+    expect(text).toContain('quotes 2: 1 verbatim, 1 whitespace, 0 not found, 0 unindexed')
+    expect(text).toContain('whitespace docs/NAV.md:1  "Existing signed `context_*` tools"  exact "Existing signed\\n`context_*` tools"')
+    expect(text).not.toContain('verbatim docs/NAV.md')
+    expect(text).toMatch(/next: replace each whitespace token/)
   })
 })
