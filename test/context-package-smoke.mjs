@@ -1,6 +1,6 @@
 // Install real tarballs outside the workspace. No symlink or source-tree fallback.
 import { execFileSync } from 'node:child_process'
-import { mkdtempSync, writeFileSync, readFileSync, mkdirSync, rmSync } from 'node:fs'
+import { mkdtempSync, writeFileSync, readFileSync, realpathSync, mkdirSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import assert from 'node:assert/strict'
@@ -79,6 +79,15 @@ export const view = await vault.create({ title: 'Independent consumer', scope: '
   git(['init', '--quiet'])
   git(['add', 'example.ts'])
   git(['-c', 'user.name=Context package test', '-c', 'user.email=package-test@example.invalid', '-c', 'commit.gpgsign=false', '-c', 'core.hooksPath=/dev/null', 'commit', '--quiet', '-m', 'Fixture'])
+  const doctor = JSON.parse(execFileSync(process.execPath, [cli, 'doctor', packetRoot, '--term', 'example'], { encoding: 'utf8', timeout: 30000 }))
+  assert.equal(doctor.ok, true)
+  assert.equal(doctor.clientAcceptance, 'not-tested')
+  assert.equal(doctor.binding.command, process.execPath)
+  assert.deepEqual(doctor.binding.args, [realpathSync(cli), 'navigate', doctor.root])
+  assert.deepEqual(doctor.tools.slice().sort(), ['repository_packet', 'repository_refresh', 'repository_search', 'repository_status'])
+  assert.equal(doctor.evidence.path, 'example.ts')
+  assert.equal(doctor.evidence.line, 1)
+  assert.ok(!JSON.stringify(doctor).includes('export function'))
   execFileSync(process.execPath, ['--input-type=module', '-e', `
     import assert from 'node:assert/strict'
     import { writeFile } from 'node:fs/promises'
