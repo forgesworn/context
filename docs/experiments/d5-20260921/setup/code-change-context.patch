@@ -1,0 +1,10 @@
+diff --git a/packages/context-tools/src/repository-navigation.ts b/packages/context-tools/src/repository-navigation.ts
+--- a/packages/context-tools/src/repository-navigation.ts
++++ b/packages/context-tools/src/repository-navigation.ts
+@@ -531,4 +531,6 @@ export class RepositoryNavigation {
+       }
+       position = cursor.position;
+       inputCursorKey = options.cursor;
++      // Seeded defect: consumes before the continuation has committed.
++      this.cursors.delete(options.cursor);
+     }

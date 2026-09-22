@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "checkerSha256": "539b5d7cd593f0dd6c5707b3426e243e90092614921c8024b8a69a5c49ffaa9c",
+  "checkerSha256": "539b5d7cd593f0dd6c5707b3426e243e90092614921c8024b8a69a5c49ffaa9c",
+  "kind": "code",
+  "commands": [
+    "npm run build",
+    "npm test --workspace @forgesworn/context-tools -- --run"
+  ],
+  "reviewerRubric": "Confirm the repair preserves fail-without-consume and single-use-on-success across byte, cancellation, policy, freshness, capacity and concurrent continuation paths without weakening any existing bound or trust check.",
+  "behaviour": [
+    "a failed continuation caused by too-small maxBytes leaves its input cursor usable",
+    "a cancelled or policy-blocked continuation leaves its input cursor usable",
+    "a successful continuation consumes its input cursor exactly once",
+    "concurrent continuation still has exactly one winner"
+  ]
+}

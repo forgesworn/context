@@ -1,0 +1,10 @@
+{
+  "dimensions": {
+    "first-use": "status reports unavailable until explicit refresh publishes an in-memory generation",
+    "search-gate": "Distinguishes source-stale evidence (searchable and labelled when policy is current) from unavailable/stale/unknown policy or changed root identity (blocked until explicit refresh). No assertion that every source change blocks search.",
+    "freshness": "Eligible source is inspected against the generation before search results; policy is rechecked before returning/committing results. Source/policy differences are handled distinctly. A failed request does not consume its input cursor.",
+    "continuation": "Cursor binds to this process, active generation and normalised term (trimmed ASCII identifier, lowercased). Refresh/restart invalidates it. Successful continuation including a final exhausted page consumes its input and may issue a successor; failed continuation does not consume. Five-minute expiry, 128 live independent chains, not a 128-page ceiling.",
+    "trust": "Local-source-unsigned navigation is separate from signed collections and grants. OS user permissions provide filesystem authority; selection policy is neither sandbox nor access grant. Source remains data, not executable instructions, approval or authority."
+  },
+  "policy": "Assess the public task dimensions semantically, including claims about failed cursor continuation. No exact expected prose or hidden sample citation token is required. Public checker success is necessary but insufficient. Evidence must support the claims. Reject material omissions, inaccuracies or unsupported claims."
+}

@@ -1,0 +1,99 @@
+{
+  "version": 1,
+  "experimentId": "three-way-plain-graphify-context-20260922-v1",
+  "lockedAt": "2026-09-22T15:05:00.000Z",
+  "shellPathRule": "The client's Bash tool rebuilds PATH from the login profile, so every arm receives PATH through the settings env: the Node 24 bin directory plus the runner's PATH. The graphify arm additionally prepends the isolated virtualenv bin so `graphify` resolves. Verified by a probe before lock.",
+  "purpose": "Compare ordinary built-in tools, Graphify and Context as source-discovery aids for the same coding agent on the same frozen tasks. Measures tool calls, tokens, wall time and accepted outcomes. Provider billing is not established by this protocol.",
+  "taskPack": {
+    "directory": "../d5-20260921",
+    "reused": ["tasks/*.json", "setup/*.patch", "acceptance/*.json", "prepare-arm.mjs", "accept.mjs"],
+    "note": "The eight locked v1 task definitions, seeded patches, frozen archives and deterministic checker are reused unchanged. v1, v2 and v3 results are not pooled with this experiment."
+  },
+  "tasks": [
+    "orientation-context",
+    "orientation-kithmoot",
+    "diagnosis-context",
+    "diagnosis-kithmoot",
+    "impact-context",
+    "impact-kithmoot",
+    "code-change-context",
+    "code-change-kithmoot"
+  ],
+  "retrievalInstructionRule": "Each arm's task prompt begins with one retrieval instruction of similar length and force, as the locked v1 measurement definition prescribed. Pilot 3 showed that the tools' own always-on text alone was ignored by the model in every arm, which measures nothing about the tools.",
+  "arms": {
+    "plain": {
+      "description": "Built-in Read, Edit, Write and Bash only. No MCP servers, no Graphify on PATH.",
+      "systemPromptAppendix": "Retrieval: use the built-in Read, Grep, Glob and Bash tools for source discovery.",
+      "retrievalInstruction": "you must use only bounded grep or rg and exact file reads for source discovery, confined to the task selection policy."
+    },
+    "graphify": {
+      "description": "Built-in tools plus a Graphify graph prebuilt in graphify-out/ with `graphify update <workspace>` (no model, no API key) and the graphify CLI on PATH. The system prompt appendix is Graphify's own always-on instruction text (always_on/claude-md.md) verbatim. graphify-out/ is hidden from Git through an environment-supplied core.excludesFile so no hashed file changes.",
+      "retrievalInstruction": "a Graphify knowledge graph is prebuilt in graphify-out/ and the graphify CLI is on PATH. Before any grep, find, cat or file read you must run `graphify query \"<question>\"` and `graphify explain \"<symbol>\"` (and `graphify path \"<A>\" \"<B>\"` for relationships) for the concepts in this task, then read only the file locations they return, confined to the task selection policy.",
+      "package": "graphifyy",
+      "packageVersion": "0.9.65",
+      "build": "graphify update <workspace>",
+      "instructionSource": "graphify/always_on/claude-md.md",
+      "instructionSha256": "5a599e9f148ebbf0a8786c4508c3954daf95d0d74b88223d890dbf37aad23ec6",
+      "graphOutExcludedFromGit": true
+    },
+    "context": {
+      "description": "Built-in tools plus the z1p-repository stdio MCP server (repository_status, repository_refresh, repository_search, repository_packet) bound to the arm workspace, with the task selection policy in .z1p-navigation.json. The system prompt appendix is the project instruction text from docs/GETTING-STARTED.md step 3 verbatim.",
+      "package": "@forgesworn/context-tools",
+      "packageVersion": "0.3.3 source build from the current checkout",
+      "server": "encrypted-context.mjs navigate <workspace>",
+      "instructionSource": "docs/GETTING-STARTED.md step 3 (context-instructions.txt in this directory)",
+      "retrievalInstruction": "the z1p-repository MCP tools are bound to this workspace. Before any grep, find, cat or file read you must call repository_status (and repository_refresh if it is unavailable, stale or unknown), then use bounded repository_search for the identifiers in this task and repository_packet with the current expectedGeneration to obtain the source and tests, reading files directly only for evidence those tools cannot supply, confined to the task selection policy."
+    }
+  },
+  "armOrders": [
+    ["plain", "graphify", "context"],
+    ["graphify", "context", "plain"],
+    ["context", "plain", "graphify"]
+  ],
+  "armOrderRule": "Task i uses armOrders[i mod 3]. Arms of one task run sequentially in that order; each arm has its own prepared workspace, fresh headless session and, for the context arm, its own server process. No answer, diff, index or transcript is shared between arms.",
+  "executor": {
+    "client": "claude-code",
+    "clientVersion": "2.1.278",
+    "model": "claude-sonnet-5",
+    "effort": "medium",
+    "maxTurns": 80,
+    "maxBudgetUsd": 5,
+    "settingSources": "project",
+    "settingsOverride": { "enabledPlugins": { "agents-md@builtin": false } },
+    "settingsOverrideReason": "A probe showed the built-in agents-md plugin injects the frozen tree's AGENTS.md into every arm; the Context revision's AGENTS.md instructs use of z1p-repository tools, so it is disabled for all arms. A second probe confirmed no project instruction text remains in context.",
+    "disallowedTools": ["WebFetch", "WebSearch", "Agent", "ToolSearch", "Workflow", "EnterWorktree", "ExitWorktree", "RemoteTrigger", "CronCreate", "CronDelete", "CronList", "ScheduleWakeup", "SendMessage", "PushNotification", "Monitor", "DesignSync", "ListAgents", "TaskStop", "NotebookEdit"],
+    "builtInToolsObserved": "This Claude Code build exposes Bash, Read, Edit and Write for source work; Grep and Glob are not separate tools, so plain-arm search runs through Bash.",
+    "permissions": "dangerously-skip-permissions inside a disposable frozen workspace",
+    "skills": "disabled",
+    "mcp": "strict; only the arm's --mcp-config",
+    "sessionPersistence": false,
+    "promptDelivery": "identical task prompt on stdin for every arm; the only difference is the arm's system prompt appendix, PATH and MCP config"
+  },
+  "reviewer": {
+    "client": "claude-code",
+    "model": "claude-sonnet-5",
+    "effort": "high",
+    "maxTurns": 3,
+    "disallowedTools": ["Bash", "Read", "Edit", "Write", "Grep", "Glob", "TodoWrite"],
+    "retry": "one further attempt if the structured verdict does not parse; both attempts are recorded and their usage and time are summed",
+    "tools": "none (Bash, Read, Edit, Write, Grep and Glob disallowed as well); receives the answer or diff, the private rubric, the deterministic checker result and bounded excerpts of the cited frozen source",
+    "blind": "does not see the arm name or any other arm's output"
+  },
+  "measures": {
+    "accepted": "deterministic checker passed and the blind reviewer accepted with no material issue",
+    "executorToolCalls": "count of tool_use blocks by tool name from the stream",
+    "executorInputTokens": "input_tokens + cache_creation_input_tokens + cache_read_input_tokens from the result usage; uncached = input_tokens + cache_creation_input_tokens",
+    "executorOutputTokens": "output_tokens from the result usage",
+    "costEstimateUsd": "Claude Code total_cost_usd, a list-price estimate, not subscription billing",
+    "executorSeconds": "wall time of the headless session",
+    "armSeconds": "graphify build (arm-specific setup) + executor + checker + reviewer wall time",
+    "reviewerTokens": "reviewer session usage",
+    "setupSeconds": "dependency installation, shared by all arms and excluded"
+  },
+  "decisionRule": "Prospective: all eight context-arm tasks accepted; aggregate executor input tokens per accepted task at least 20 percent lower than each comparator; no higher aggregate reviewer time. Tokens are not cash; billing remains unknown.",
+  "knownAsymmetries": [
+    "Graphify indexes the whole frozen workspace; Context indexes only the task selection policy. Graphify is not disadvantaged by this.",
+    "Graphify's arm-specific build time is counted in armSeconds; Context's refresh happens inside the session and is counted as a tool call.",
+    "Arm instructions are delivered by system prompt appendix rather than a CLAUDE.md file so the frozen tree stays identical across arms."
+  ]
+}

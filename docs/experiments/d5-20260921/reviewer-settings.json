@@ -1,0 +1,13 @@
+{
+  "client": "codex-cli",
+  "clientVersion": "0.155.1",
+  "provider": "openai",
+  "model": "gpt-5.6-sol",
+  "effort": "high",
+  "context": "task-answer-or-diff-deterministic-evidence-and-bounded-cited-frozen-source",
+  "session": "fresh-per-arm",
+  "network": false,
+  "memory": false,
+  "otherArmEvidence": false,
+  "workers": false
+}

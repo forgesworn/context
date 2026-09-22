@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "checkerSha256": "539b5d7cd593f0dd6c5707b3426e243e90092614921c8024b8a69a5c49ffaa9c",
+  "checkerSha256": "539b5d7cd593f0dd6c5707b3426e243e90092614921c8024b8a69a5c49ffaa9c",
+  "kind": "structured",
+  "requiredFindingIds": ["adapter", "ownership", "storage", "writes", "caller-boundary"],
+  "reviewerRubric": {
+    "adapter": "ContextVault wraps the portable vault and always supplies KithMoot verifyDelegation",
+    "ownership": "verifyDelegation checks the proof agent and then calls verifyAgentOwnership",
+    "storage": "ContextFileStore wraps the portable file store with kithmootContextOptions",
+    "writes": "context_create, context_append, context_import, context_upload, and context_set_grants enter store.run with the write flag",
+    "caller-boundary": "ContextVaultOptions omits verifyDelegation so callers cannot select the room trust policy"
+  },
+  "requiredEvidence": [
+    { "path": "src/context.ts", "token": "Omit<PortableOptions, 'verifyDelegation'>" },
+    { "path": "src/context.ts", "token": "return { ...options, verifyDelegation }" },
+    { "path": "src/node/context-store.ts", "token": "kithmootContextOptions(options)" },
+    { "path": "packages/context-tools/src/context-mcp.ts", "token": "store.run(v => v.append" },
+    { "path": "src/context.test.ts", "token": "rejects forged ownership" }
+  ]
+}

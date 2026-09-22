@@ -1055,3 +1055,153 @@ The product/client plans and language docs distinguish this unreleased change
 from the published 0.3.2 artefacts. No client configuration, consumer pin, registry
 release or deployment was changed. Next: explicit project resolution and useful
 bounded symbol/reference/test evidence queries.
+
+## 22 September 2026 — Three-way retrieval comparison: plain tools, Graphify, Context
+
+The first comparison that includes Graphify ran under the locked protocol in
+[docs/experiments/graphify-20260922](experiments/graphify-20260922/README.md).
+Eight v1 tasks, three arms each, one fresh headless Claude Code 2.1.278 session
+per arm with `claude-sonnet-5`/medium, the v1 deterministic checker and a blind
+Sonnet 5/high reviewer with no tools. Graphify 0.9.65 was installed in an
+isolated virtual environment and built its graph without a model; no Graphify
+code was copied.
+
+| Arm | Accepted | Tool calls | Executor input | Uncached input | Cost estimate | Input per accepted task |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| plain | 4 of 8 | 143 | 6,526,527 | 355,135 | USD 3.72 | 1,631,632 |
+| graphify | 2 of 8 | 141 | 5,260,690 | 331,277 | USD 3.35 | 2,630,345 |
+| context | 4 of 8 | 166 | 7,433,566 | 450,000 | USD 4.31 | 1,858,392 |
+
+Context matched plain tools on acceptance, used 13.9 percent more executor
+input and 8.1 percent more reviewer time, and did not meet the prospective
+20 percent rule. Graphify was cheapest on input and accepted least. Context's
+cost driver is search volume: 58 of its 82 tool calls were searches returning
+about 423 KB in total. The two code-change tasks, where the model used one
+search and one packet, were its leanest runs. Full per-task tables and the
+tool-use breakdown are in [RESULTS.md](experiments/graphify-20260922/RESULTS.md).
+
+Usage: 24 executor sessions reported 19,220,783 input and 321,252 output
+tokens (list-price estimate USD 11.37); 24 reviewer sessions 668,631 input and
+162,957 output (USD 3.19). Four discarded pilots before lock cost a further
+9 arm runs, about USD 4.16 at list price; they are archived privately with the reasons
+(agents-md plugin injection, missing permission bypass, tools ignored without a
+retrieval instruction, PATH rebuilt from the login profile). These are usage
+counters on a subscription with no overage, not cash. Heartwood and locked
+D5 v1/v2/v3 files were not touched. No CI, registry or consumer acceptance is
+claimed. Next: cut the search page cost and add a one-call explore tool, then
+rerun the same locked protocol.
+
+## 22 September 2026 — One-call explore and compact payloads (local, unreleased)
+
+Implementation slice from the three-way result above, done inline by the host
+session without workers. `repository_explore` answers one symbol per call with
+its declaration source, references labelled by enclosing declaration or test
+title, importing files and tests, resolved with the TypeScript parser for TS/JS
+and listed lexically elsewhere; it requires current navigation and re-verifies
+every parsed file's hash. `repository_search` and `repository_packet` now
+render compact text by default (path and a 16-hex digest once per file, then
+`line: text`), keep `format: "json"`, and search gained `pathPrefix` with
+cursor binding. Server instructions, tool descriptions, the step 3 project
+snippet and the doctor (which now probes five tools) were updated. The
+context-tools suite passes: 11 files, 169 tests, including new explore,
+rendering, budget and prefix cases. Version stays 0.3.3; nothing is published.
+
+Replaying run one's recorded Context calls against the frozen arm workspaces
+with this build (`replay-payloads.mjs`, no model) measured, in o200k tokens:
+
+| Payload | Recorded JSON | Compact text | Change |
+| --- | ---: | ---: | ---: |
+| 58 search pages | 83,287 | 28,448 | 65.8 percent fewer |
+| 8 packets | 35,598 | 22,468 | 36.9 percent fewer |
+
+One `repository_explore` per searched identifier (57 calls) cost 68,296 tokens
+in total. Real symbols were cheap: `kithmootContextOptions` returned its
+declaration and all three call sites, including the KithMoot store binding the
+first run's reviewer wanted, for 310 tokens; `verifyDelegation` 485. Generic
+words the model had searched (`async`, `context.test`) cost up to 8.6k tokens
+at the 32 KiB ceiling. Payload tokens are not session tokens: each result is
+re-read on every later turn, so fewer calls matter more than smaller pages.
+
+Second run launched the same day: [v2 protocol](experiments/graphify-20260922-v2/README.md),
+same tasks, arms, model and reviewer, Claude Code 2.1.280 for all arms, only
+the Context arm changed. Results follow in a separate entry; nothing here is a
+savings claim.
+
+## 22 September 2026 — Three-way comparison, second run (v2)
+
+Same locked design and tasks as the first run, Claude Code 2.1.280 for all
+arms, `claude-sonnet-5`/medium executors and Sonnet 5/high reviewers, one
+repetition; only the Context arm changed, to the explore build above. All
+twenty-four arms completed; every checker passed and every reviewer verdict
+parsed first time. Results: [RESULTS.md](experiments/graphify-20260922-v2/RESULTS.md).
+
+| Arm | Accepted | Tool calls | Executor input | Uncached input | Cost estimate | Input per accepted task |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| plain | 3 of 8 | 116 | 3,881,788 | 233,583 | USD 2.09 | 1,293,929 |
+| graphify | 4 of 8 | 111 | 4,547,313 | 336,988 | USD 3.07 | 1,136,828 |
+| context | 5 of 8 | 128 | 3,619,073 | 289,888 | USD 2.32 | 723,815 |
+
+Context accepted the most and used the least executor input: 44.1 percent
+less per accepted task than plain and 36.3 percent less than Graphify, with
+its own input halved from v1 on identical prompts. The decision rule is still
+not met: three rejections (all rubric omissions, two on the impact tasks no
+arm has passed) and reviewer time 9.8 percent above plain. Uncached input per
+session is 24.1 percent above plain because of tool schemas and the
+instruction appendix, so the per-session cost estimate is higher while the
+per-accepted-task estimate is lower (USD 0.46 against 0.70 and 0.77). The
+margin over Graphify rests on one task where Graphify spent 2.0M; excluding
+it, Graphify is cheaper per accepted task than Context. The model used the
+intended path: 25 explores, 22 searches, 32 packets, 9 direct reads, against
+58 searches, 8 packets and 37 reads in v1.
+
+Usage: 24 executor sessions 12,048,174 input and 180,167 output tokens
+(list-price estimate USD 7.48); 24 reviewer sessions 730,406 input and
+170,190 output (USD 3.28), no retries. No DeepSeek or other provider was
+called; everything ran on the Claude subscription. These are usage counters
+with no overage, not cash. Locked v1 files were not touched and the two runs
+are not pooled. Nothing is published; version stays 0.3.3. Next: acceptance
+on orientation and impact tasks, per-session uncached input, then the
+separate cheaper-executor routing run (S5) on the same protocol.
+
+## 22 September 2026 — Three-way comparison on a DeepSeek V4 Pro executor (S5)
+
+The cheaper-executor routing measurement from the savings plan:
+[protocol](experiments/graphify-20260922-s5-deepseek/README.md) identical to
+v2 except that every executor ran on `deepseek-v4-pro:cloud` at medium effort
+through the local Ollama daemon's Anthropic-compatible endpoint (Claude Code
+2.1.280, `ANTHROPIC_BASE_URL` in `protocol.executor.env`, which `run.mjs`
+now honours); reviewers unchanged on Sonnet 5/high on the subscription. All
+twenty-four arms completed, every checker passed, every verdict parsed first
+time; every executor message in the transcripts reports `deepseek-v4-pro`.
+Results: [RESULTS.md](experiments/graphify-20260922-s5-deepseek/RESULTS.md).
+
+| Arm | Accepted | Tool calls | Executor input | Output | Executor s | Reviewer s | Input per accepted task |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| plain | 3 of 8 | 206 | 6,738,378 | 236,606 | 2,894 | 424 | 2,246,126 |
+| graphify | 3 of 8 | 152 | 3,174,075 | 97,844 | 1,165 | 589 | 1,058,025 |
+| context | 3 of 8 | 179 | 3,215,962 | 109,186 | 986 | 550 | 1,071,987 |
+
+Each arm accepted three of eight (nine of twenty-four against twelve in v2 on
+Sonnet 5 with the same reviewer). Context used 52.3 percent less executor
+input than plain tools and 1.3 percent more than Graphify, in total and per
+accepted task; its reviewer time was 29.8 percent above plain. Decision rule
+not met. The margin over plain tools widened from v2 (44.1 to 52.3 percent
+per accepted task) because plain spent 6.74M here against 3.88M; the margin
+over Graphify disappeared. The Context-repo diagnosis was the outlier in every
+arm (plain 3.09M over 61 turns and 31 minutes to pass it); excluding it,
+input per accepted task is 0.68M Context, 0.93M Graphify, 1.83M plain. One
+reviewer error was found and recorded: a "fabricated citation" verdict on the
+Context diagnosis answer quotes a sentence that is present verbatim in the
+frozen `docs/NAVIGATION-POLICY.md`; the rejection stands on its other failed
+dimension. DeepSeek used the Context tools differently from Sonnet: 33
+explores, 6 searches, 54 packets and 35 direct reads (v2: 25, 22, 32, 9).
+
+Uncached-input and cost columns are omitted: the route's cache accounting is
+provider-reported and inconsistent between arms (every Context session
+credited with cache reads, most plain and Graphify sessions with none) and the
+client's cost estimate is meaningless for an unrecognised model. Usage: 24
+executor sessions 13,128,415 input and 443,636 output tokens on Ollama Cloud
+credits (rate not read for this run); 24 reviewer sessions 679,064 input and
+165,239 output on the subscription, no retries. Wall time 116 minutes against
+66 for v2; no arm reached the 80-turn cap. Not pooled with v1 or v2. Nothing
+is published; version stays 0.3.3.

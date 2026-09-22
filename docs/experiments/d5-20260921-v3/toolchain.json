@@ -1,0 +1,45 @@
+{
+  "node": {
+    "path": "~/.nvm/versions/node/v24.21.0/bin/node",
+    "sha256": "e4b5a3af0e05c75de2eae013904145f40fe7fc2a6e6f17510128bf45cca4e79b",
+    "version": "v24.21.0"
+  },
+  "codex": {
+    "path": "~/.codex/packages/standalone/releases/0.155.1-aarch64-apple-darwin/bin/codex",
+    "sha256": "8eaf1ad12fe6bf89b1710330f58900014322c7c5af677e43be116d8ac5fc0a9e",
+    "version": "codex-cli 0.155.1"
+  },
+  "navigation": {
+    "path": "~/.local/share/z1p/releases/2dd3fc7ab1f202e94b8fcba4b336773b675b9d1b/node_modules/@forgesworn/context-tools/bin/encrypted-context.mjs",
+    "sha256": "3d4e39d7d45a9d0e7b537bfd3799c93bc3ac15d4062925cbffdf8978ef7af71a",
+    "runtimeFiles": {
+      "~/.local/share/z1p/releases/2dd3fc7ab1f202e94b8fcba4b336773b675b9d1b/node_modules/@forgesworn/context/dist/blossom.js": "d8b3f4c419e5e1770240ed35bd76e6aa2fe6169895eb3eb2e390ccb8e58581b1",
+      "~/.local/share/z1p/releases/2dd3fc7ab1f202e94b8fcba4b336773b675b9d1b/node_modules/@forgesworn/context/dist/graph.js": "9e8c3346fede8a891ab175d4e283dffe54ea88b30a2c91440a63c0df4e9e1bae",
+      "~/.local/share/z1p/releases/2dd3fc7ab1f202e94b8fcba4b336773b675b9d1b/node_modules/@forgesworn/context/dist/index.js": "d33dd6f0bb991919157ccbc5e96fcc92ccc1b9b3ebb129cd1e6fd986a3917687",
+      "~/.local/share/z1p/releases/2dd3fc7ab1f202e94b8fcba4b336773b675b9d1b/node_modules/@forgesworn/context/dist/nostr.js": "4d62aea153c45128f58df2b76dcb754b01da6abc06f746b83602a83518de416c",
+      "~/.local/share/z1p/releases/2dd3fc7ab1f202e94b8fcba4b336773b675b9d1b/node_modules/@forgesworn/context/dist/paging/store.js": "9be5eac1414af3d3e20547c76a1daca46e9913268b58f0498c4261343f675f29",
+      "~/.local/share/z1p/releases/2dd3fc7ab1f202e94b8fcba4b336773b675b9d1b/node_modules/@forgesworn/context/dist/retrieval.js": "3320a73b4a009572def3fd58a3e0f949fe30b6bba5fd8dd2c11cdbb37750e812",
+      "~/.local/share/z1p/releases/2dd3fc7ab1f202e94b8fcba4b336773b675b9d1b/node_modules/@forgesworn/context/dist/verify.js": "afde2b9c40f217c8c8037551949af70c80805b7dd3ff459fcc70df4d31483ef3",
+      "~/.local/share/z1p/releases/2dd3fc7ab1f202e94b8fcba4b336773b675b9d1b/node_modules/@forgesworn/context/package.json": "a2a7d24b4a59b2958136fabc73628abd195f4cf7c2d104df2feec107127823ca",
+      "~/.local/share/z1p/releases/2dd3fc7ab1f202e94b8fcba4b336773b675b9d1b/node_modules/@forgesworn/context-tools/bin/encrypted-context.mjs": "3d4e39d7d45a9d0e7b537bfd3799c93bc3ac15d4062925cbffdf8978ef7af71a",
+      "~/.local/share/z1p/releases/2dd3fc7ab1f202e94b8fcba4b336773b675b9d1b/node_modules/@forgesworn/context-tools/dist/broad-source-scan.js": "215e6467fa9f769dd862599f67e3eaf82141e3b519e3dc33cc7b0b4c1bcad863",
+      "~/.local/share/z1p/releases/2dd3fc7ab1f202e94b8fcba4b336773b675b9d1b/node_modules/@forgesworn/context-tools/dist/context-cli.js": "b5789631bc301cab1403a21f3553480aa4ee20197a6ec348989ba4a28c22ccb7",
+      "~/.local/share/z1p/releases/2dd3fc7ab1f202e94b8fcba4b336773b675b9d1b/node_modules/@forgesworn/context-tools/dist/context-mcp.js": "853ec1934b20572c8e914a124deb0ec18929069951303d3659e351d1d9717070",
+      "~/.local/share/z1p/releases/2dd3fc7ab1f202e94b8fcba4b336773b675b9d1b/node_modules/@forgesworn/context-tools/dist/context-store.js": "fdd8de890f88008d6c32e378b9cf1e6536d993a34b1facaced773bace9bcf2ec",
+      "~/.local/share/z1p/releases/2dd3fc7ab1f202e94b8fcba4b336773b675b9d1b/node_modules/@forgesworn/context-tools/dist/ecosystem-scan.js": "ac31a8d161efc444afe9b692607e74e5bafe3240d4d839a76e796ad8da9e804e",
+      "~/.local/share/z1p/releases/2dd3fc7ab1f202e94b8fcba4b336773b675b9d1b/node_modules/@forgesworn/context-tools/dist/index.js": "c74851f7765240dec32060395a7b97ec20a76d0ac53c54d02f9d5add14e26e96",
+      "~/.local/share/z1p/releases/2dd3fc7ab1f202e94b8fcba4b336773b675b9d1b/node_modules/@forgesworn/context-tools/dist/repository-navigation-mcp.js": "78d42f0d344e15c6dd1c41bd5da56c813daafd71785835a5fb9807c2559b858f",
+      "~/.local/share/z1p/releases/2dd3fc7ab1f202e94b8fcba4b336773b675b9d1b/node_modules/@forgesworn/context-tools/dist/repository-navigation-policy.js": "ff1d1f514ff3be0f39a382808a47755d51fd2b6f8fc968b25d660e63a2149451",
+      "~/.local/share/z1p/releases/2dd3fc7ab1f202e94b8fcba4b336773b675b9d1b/node_modules/@forgesworn/context-tools/dist/repository-navigation.js": "f5f3f0ac78ef6ebf323a317190edbc29e15b9e101d3ed39f11a7d2e8d0743988",
+      "~/.local/share/z1p/releases/2dd3fc7ab1f202e94b8fcba4b336773b675b9d1b/node_modules/@forgesworn/context-tools/dist/repository-scan.js": "fb227285f301230b47c73fe32802571809622ca8564792a98e136a3eadb324c6",
+      "~/.local/share/z1p/releases/2dd3fc7ab1f202e94b8fcba4b336773b675b9d1b/node_modules/@forgesworn/context-tools/dist/source-scan.js": "466692c3e80efce15f00ae33415af5e7b43912cb3a97c3cb6e7080413990edf6",
+      "~/.local/share/z1p/releases/2dd3fc7ab1f202e94b8fcba4b336773b675b9d1b/node_modules/@forgesworn/context-tools/package.json": "5e8515bf4b5e2760ad81b8487a6f160f51b5ead515099b65a813c67dc3006ebf"
+    },
+    "version": "installed release 2dd3fc7ab1f202e94b8fcba4b336773b675b9d1b",
+    "runtimeTree": {
+      "root": "~/.local/share/z1p/releases/2dd3fc7ab1f202e94b8fcba4b336773b675b9d1b",
+      "sha256": "aeec7a9c5d5722642074816ca20497405afc87cd7c55754ac2c2923be60fe836",
+      "files": 4978
+    }
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "version": 1,
+  "checkerSha256": "539b5d7cd593f0dd6c5707b3426e243e90092614921c8024b8a69a5c49ffaa9c",
+  "checkerSha256": "539b5d7cd593f0dd6c5707b3426e243e90092614921c8024b8a69a5c49ffaa9c",
+  "kind": "structured",
+  "requiredFindingIds": ["request-surface", "default", "filter", "cursor", "response", "coverage"],
+  "reviewerRubric": {
+    "request-surface": "add optional caseSensitive to NavigationSearchRequest and the repository_search MCP schema",
+    "default": "omitted or false preserves the current normalizeTerm and case-insensitive posting lookup",
+    "filter": "case-sensitive mode can reuse lower-case postings but must filter candidate source lines for the exact-case identifier token",
+    "cursor": "store caseSensitive in Cursor and reject continuation when the requested mode differs",
+    "response": "keep the response term and all freshness, policy, byte, result, visit, cancellation, and cursor-consumption semantics stable",
+    "coverage": "test default mixed-case matches, exact-case filtering, MCP validation, pagination, and cross-mode cursor rejection"
+  },
+  "requiredEvidence": [
+    { "path": "packages/context-tools/src/repository-navigation.ts", "token": "export interface NavigationSearchOptions" },
+    { "path": "packages/context-tools/src/repository-navigation.ts", "token": "interface Cursor" },
+    { "path": "packages/context-tools/src/repository-navigation-mcp.ts", "token": "repository_search" },
+    { "path": "packages/context-tools/src/repository-navigation.test.ts", "token": "wrong-term, stale, and unknown cursors" },
+    { "path": "docs/LOCAL-NAVIGATION.md", "token": "case-insensitive" }
+  ]
+}

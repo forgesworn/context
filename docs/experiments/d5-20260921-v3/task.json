@@ -1,0 +1,51 @@
+{
+  "version": 1,
+  "id": "orientation-context",
+  "category": "orientation",
+  "repository": "context",
+  "revision": "496bfca9ef1b6a0d5befe0e4dca3ff7b7258a13c",
+  "prompt": "Explain the local repository-navigation lifecycle to a new maintainer. Answer every public dimension below, with implementation and focused-test citations. Return only answer.json using answerSchema. Before submitting, run node .d5-public-check.mjs --workspace \"$PWD\" --answer \"$PWD/answer.json\" and correct citation/schema errors within this session. A self-check pass is not semantic acceptance.",
+  "answerSchema": {
+    "summary": "string",
+    "findings": [
+      {
+        "id": "string",
+        "value": "string"
+      }
+    ],
+    "evidence": [
+      {
+        "path": "repository-relative string",
+        "token": "exact source token"
+      }
+    ]
+  },
+  "requiredFindingIds": [
+    "first-use",
+    "search-gate",
+    "freshness",
+    "continuation",
+    "trust"
+  ],
+  "selectionPolicy": {
+    "version": 1,
+    "include": [
+      "packages/context-tools",
+      "docs/LOCAL-NAVIGATION.md",
+      "docs/NAVIGATION-POLICY.md"
+    ]
+  },
+  "setupPatch": null,
+  "setupPatchSha256": null,
+  "publicDimensions": {
+    "first-use": "Describe what status shows before any refresh, how a generation becomes available, and whether refresh is automatic.",
+    "search-gate": "Distinguish policy freshness from source freshness: explain which states block search, which permit labelled results, how root-identity changes behave, and the operator action needed to recover.",
+    "freshness": "Explain eligible-source inspection before search and policy checking before results are committed, how differences from the generation are handled, and the effect of failed checks on an input cursor.",
+    "continuation": "Explain query validation and the exact normalisation steps before cursor binding. Also explain cursor process/generation bindings, invalidation, expiry, capacity versus page limits, and input/successor cursor behaviour for successful, exhausted and failed continuations.",
+    "trust": "Explain the trust label, separation from signed collections/grants, OS filesystem authority, whether selection is a sandbox or access grant, and whether returned source can supply executable instructions, approvals or authority."
+  },
+  "citationRules": {
+    "matching": "Every token must be copied as an exact contiguous substring from its cited frozen source, preserving whitespace and newlines. A short identifier is allowed if the reviewer can verify the associated claim from the cited file. No particular hidden example token is mandatory.",
+    "coverage": "Cite at least one implementation .ts file and one focused .test.ts file within selectionPolicy. The independent reviewer checks all public dimensions for correctness and completeness using these citations."
+  }
+}

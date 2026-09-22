@@ -1,0 +1,28 @@
+diff --git a/src/log-redact.test.ts b/src/log-redact.test.ts
+--- a/src/log-redact.test.ts
++++ b/src/log-redact.test.ts
+@@ -8,8 +8,10 @@ describe('shortId', () => {
+     expect(shortId(roomId)).toHaveLength(8)
+   })
+ 
+-  it('never returns more than it was given', () => {
+-    expect(shortId('abcd')).toBe('abcd')
+-    expect(shortId('')).toBe('')
++  it('returns a fixed marker without echoing invalid input', () => {
++    const valid = 'a'.repeat(64)
++    for (const value of ['', 'abcd', valid + 'a', valid + '\n', valid + '\r\n', valid.toUpperCase(), 'g'.repeat(64), '💥'.repeat(32)]) {
++      expect(shortId(value)).toBe('[invalid-id]')
++    }
+   })
+ })
+diff --git a/src/log-redact.ts b/src/log-redact.ts
+--- a/src/log-redact.ts
++++ b/src/log-redact.ts
+@@ -14,5 +14,6 @@
+  * nowhere near enough to reconstruct the rest.
+  */
+ export function shortId(hex: string): string {
+-  return hex.slice(0, 8)
++  if (hex.length !== 64 || !/^[0-9a-f]{64}$/.test(hex)) return '[invalid-id]'
++  return hex.slice(0, 8)
+ }
