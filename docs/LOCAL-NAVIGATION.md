@@ -111,6 +111,14 @@ or unsupported sources) are not listed, so an empty missing list is not proof
 of completeness. `pathPrefix`, `expectedGeneration` and `format` behave as for
 explore.
 
+Optional `evidence` (up to 64 `{path, token}` pairs) checks each cited token
+against the hash-verified indexed file: `verbatim` when it is an exact
+substring, `whitespace` when it matches only once runs of spaces and line
+breaks are treated as equal (the response gives the exact text to quote, the
+usual case being a wrapped Markdown line quoted with a space), `not-found`, or
+`unindexed` for paths outside the current index. `symbols` may be omitted for
+a quote-only check; at least one of `symbols` and `evidence` is required.
+
 Search remains available on a source-stale generation when its selection policy
 can still be validated as current. Changed or unverifiable policy blocks search
 until successful refresh, preventing retrieval of newly excluded source. Status

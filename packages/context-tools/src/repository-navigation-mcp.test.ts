@@ -444,6 +444,20 @@ describe('repository navigation MCP compact rendering and explore', () => {
       expect(mismatch.isError).toBe(true)
       expect(mismatch.content[0].text).toMatch(/expectedGeneration/)
 
+      const quoted = (await client.callTool({ name: 'repository_coverage', arguments: { answer: draft, evidence: [
+        { path: 'alpha.ts', token: 'export function ownerOptions(input: string): string {' },
+        { path: 'alpha.ts', token: 'export class Store { write(value: string)' },
+        { path: 'alpha.ts', token: 'not in the file' },
+        { path: 'missing.ts', token: 'x' },
+      ], format: 'json' } })) as { content: Array<{ text: string }>; isError?: boolean }
+      expect(quoted.isError).not.toBe(true)
+      const quotes = (JSON.parse(textOf(quoted)) as { quotes: Array<{ status: string; line?: number; exact?: string }> }).quotes
+      expect(quotes.map((quote) => quote.status)).toEqual(['verbatim', 'whitespace', 'not-found', 'unindexed'])
+      expect(quotes[1]).toMatchObject({ line: 5, exact: 'export class Store {\n  write(value: string)' })
+      const neither = (await client.callTool({ name: 'repository_coverage', arguments: { answer: draft } })) as { isError?: boolean; content: Array<{ text: string }> }
+      expect(neither.isError).toBe(true)
+      expect(neither.content[0].text).toMatch(/needs symbols, evidence or both/)
+
       let tooMany: unknown
       try { tooMany = await client.callTool({ name: 'repository_coverage', arguments: { symbols: Array.from({ length: 9 }, (_, i) => `s${i}`), answer: draft } }) } catch (error) { tooMany = error }
       expect((tooMany as { code?: number }).code === -32602 || (tooMany as { isError?: boolean }).isError === true).toBe(true)

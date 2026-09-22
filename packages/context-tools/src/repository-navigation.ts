@@ -869,6 +869,35 @@ export class RepositoryNavigation {
     });
   }
 
+  /** Hash-verified text of indexed files under current navigation, for exact
+   * quote checks. Paths outside the current index map to undefined. */
+  async verifiedText(
+    paths: readonly string[],
+    signal?: AbortSignal,
+  ): Promise<{ generation: string; revision: string; files: Map<string, { sha256: string; text: string } | undefined> }> {
+    throwIfAborted(signal);
+    const gen = this.generation;
+    if (!gen) {
+      throw new Error('RepositoryNavigation: no active generation; call refresh()');
+    }
+    const freshness = await this.inspectFreshness(gen, signal);
+    if (freshness.freshness !== 'current' || freshness.policy.freshness !== 'current') {
+      throw new Error(
+        `RepositoryNavigation: quote check requires current navigation (source ${freshness.freshness}, policy ${freshness.policy.freshness}); call refresh()`,
+      );
+    }
+    const indexed = new Map(gen.files.map((file) => [file.path, file.sha256]));
+    const files = new Map<string, { sha256: string; text: string } | undefined>();
+    for (const rel of new Set(paths)) {
+      const sha256 = indexed.get(rel);
+      files.set(rel, sha256 === undefined ? undefined : { sha256, text: await this.readVerified(rel, sha256, signal) });
+      if (this.generation !== gen) {
+        throw new Error('RepositoryNavigation: generation changed during quote check');
+      }
+    }
+    return { generation: gen.id, revision: gen.revision, files };
+  }
+
   private async readVerified(rel: string, expectedSha256: string, signal?: AbortSignal): Promise<string> {
     throwIfAborted(signal);
     const root = this.canonicalRoot;
