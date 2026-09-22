@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "checkerSha256": "539b5d7cd593f0dd6c5707b3426e243e90092614921c8024b8a69a5c49ffaa9c",
+  "checkerSha256": "539b5d7cd593f0dd6c5707b3426e243e90092614921c8024b8a69a5c49ffaa9c",
+  "kind": "code",
+  "commands": [
+    "npm run build:lib",
+    "npx vitest run src/log-redact.test.ts test/log-redaction-scan.test.ts"
+  ],
+  "reviewerRubric": "Confirm invalid identifiers are replaced by one constant without echo, canonical identifiers retain their existing abbreviation, and server callers plus the log-redaction guard remain intact.",
+  "behaviour": [
+    "a 64-character lower-case hex identifier returns its first eight characters",
+    "empty, short, long, line-terminated, upper-case, non-hex, and Unicode input each return [invalid-id]",
+    "invalid output contains no input substring",
+    "forwarder startup logs continue to call shortId for roomId and pubkey"
+  ]
+}

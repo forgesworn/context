@@ -1,0 +1,38 @@
+diff --git a/packages/context-tools/src/repository-navigation.ts b/packages/context-tools/src/repository-navigation.ts
+--- a/packages/context-tools/src/repository-navigation.ts
++++ b/packages/context-tools/src/repository-navigation.ts
+@@ -800,34 +800,3 @@ export class RepositoryNavigation {
+-    let confirmedPolicyRevision: string;
+-    try {
+-      confirmedPolicyRevision = await this.reinspectPolicy(
+-        generation.rootIdentity,
+-        discovery.policyDirectories,
+-        signal,
+-      );
+-    } catch (error) {
+-      if (signal?.aborted) throw error;
+-      const message = boundedError(error);
+-      return {
+-        freshness: 'unknown',
+-        error: message,
+-        policy: {
+-          freshness: 'unknown',
+-          digest: generation.policyRevision,
+-          summary: generation.policySummary,
+-          error: message,
+-        },
+-      };
+-    }
+-    if (confirmedPolicyRevision !== generation.policyRevision) {
+-      return {
+-        freshness: 'stale',
+-        policy: {
+-          freshness: 'stale',
+-          digest: generation.policyRevision,
+-          summary: generation.policySummary,
+-        },
+-      };
+-    }
+     if (manifestError !== undefined) {
+       return { freshness: 'unknown', error: boundedError(manifestError), policy };
+     }

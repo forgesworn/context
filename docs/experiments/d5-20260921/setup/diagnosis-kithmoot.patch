@@ -1,0 +1,16 @@
+diff --git a/src/context.ts b/src/context.ts
+--- a/src/context.ts
++++ b/src/context.ts
+@@ -11,5 +11,5 @@ export type { ContextScope, ContextRole, ContextIdentity, ContextRecord,
+ export interface ContextGrant extends Omit<PortableGrant, 'agent'> { agent?: AgentOwnership }
+ export interface ContextPolicy extends Omit<PortablePolicy, 'grants'> { grants: ContextGrant[] }
+-export type ContextVaultOptions = Omit<PortableOptions, 'verifyDelegation'>
++export type ContextVaultOptions = PortableOptions
+ 
+ const verifyDelegation: VerifyDelegation = (proof, options) => {
+@@ -20,4 +20,4 @@ const verifyDelegation: VerifyDelegation = (proof, options) => {
+ /** Always install the KithMoot verifier; callers cannot replace the room's trust policy. */
+ export function kithmootContextOptions(options: ContextVaultOptions): PortableOptions {
+-  return { ...options, verifyDelegation }
++  return { verifyDelegation, ...options }
+ }

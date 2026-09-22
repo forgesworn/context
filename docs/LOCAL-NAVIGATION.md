@@ -70,8 +70,46 @@ There is no identity or encrypted-cache argument. Each process owns its own
 index. Call `repository_refresh` before searching and again after source edits;
 `repository_status` reports the generation, revision, exclusion counts and
 freshness. Refresh explicitly whenever freshness is `stale` or `unknown`.
-Search for one
-identifier with `repository_search`, for example `RepositoryNavigation`.
+Explore one symbol with `repository_explore`, for example `RepositoryNavigation`
+or `RepositoryNavigation.search`, or search for one identifier with
+`repository_search`.
+
+## Explore one symbol
+
+`repository_explore` takes one ASCII identifier, optionally qualified as
+`Owner.member`, and answers in a single call with the declaration source, the
+references labelled with their enclosing declaration or test title, the files
+that import the symbol and the tests that mention it, grouped by file. Matching
+is exact-token and case-sensitive on the indexed lines. Declarations, enclosing
+scopes and import lines are resolved with the TypeScript parser for TypeScript
+and JavaScript files; every other indexed file is listed lexically without
+scopes. Nothing is type-checked and no module resolution runs, so a name shared
+by unrelated declarations lists all of them, and the result is not a dependency
+closure. The call requires current navigation and re-verifies the hash of every
+file it parses; a changed file or policy is rejected until refresh.
+
+Optional `pathPrefix` limits the result to one repository-relative prefix.
+`maxBytes` (32,768 by default, at most 131,072) bounds the response: references
+are trimmed first, then tests, then extra declarations, then declaration lines,
+and the response says what was omitted. Long classes and namespaces are shown
+as an outline of member lines; long functions are cut at 200 lines with the
+range to request from `repository_packet`. `expectedGeneration` is optional and
+rejects a mismatch. `format: "json"` returns the same result as one JSON
+object.
+
+## Check a draft answer's coverage
+
+`repository_coverage` is a deterministic pre-submit check. It takes up to eight
+`symbols` and the draft `answer` (at most 128 KiB), explores each symbol as
+above and lists every definition, test, reference and importing file as
+`cited` (the repository-relative path appears in the answer), `named` (only its
+basename does) or `missing`, missing files first with their enclosing
+declarations or test titles. Address each missing file or state why it does not
+bear on the task. It checks mention, not correctness: a cited file may still be
+described wrongly, and files that explore never surfaced (other names, excluded
+or unsupported sources) are not listed, so an empty missing list is not proof
+of completeness. `pathPrefix`, `expectedGeneration` and `format` behave as for
+explore.
 
 Search remains available on a source-stale generation when its selection policy
 can still be validated as current. Changed or unverifiable policy blocks search
@@ -87,6 +125,18 @@ Responses default to 32,768 bytes and 40 lines. Requests may choose up to
 262,144 bytes and 100 lines; the byte count covers the JSON result body, not MCP
 framing or the client model's context limits. More output is available by paging,
 not by silently dropping matches. This does not alter signed `context_retrieve`.
+
+By default the MCP tool renders the page as compact text: one header line with
+the term, counts, completeness, generation and freshness, then each file once
+with the first sixteen hex digits of its digest, then `line: text` rows, and a
+final `next:` line when a cursor exists. The text is always smaller than the
+JSON it is rendered from, so the byte budget still holds. `format: "json"`
+returns the full `NavigationResult` with the 64-hex digest on every record.
+Optional `pathPrefix` limits a search to one repository-relative prefix; a
+continuation cursor is bound to the same term and prefix and is rejected with
+either changed. Postings outside the prefix are skipped without counting as
+visited. `repository_packet` renders numbered source lines as text by default
+and also accepts `format: "json"` for the full packet envelope.
 
 Continuation cursors are single-use and expire after five minutes. Use the new
 `nextCursor` from each successful page; an unsuccessful search leaves its input

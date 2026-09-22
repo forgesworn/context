@@ -138,5 +138,17 @@ installed/release provenance and shared company operation remain incomplete.
 
 The latest controlled qualification rejected the assisted answer and did not
 show savings. See the [results](docs/experiments/d5-20260921-v3/RESULTS.md) and
-[execution ledger](docs/DOGFOOD-EXECUTION.md). Prioritise a useful accepted task
-and a reproducible independent install before claiming a Graphify replacement.
+[execution ledger](docs/DOGFOOD-EXECUTION.md). The first
+[three-way comparison](docs/experiments/graphify-20260922/RESULTS.md) against
+plain tools and Graphify (22 September 2026) found Context level with plain
+tools on accepted answers, 13.9 percent higher on executor input, and Graphify
+cheapest on input with the fewest accepted answers. The
+[second run](docs/experiments/graphify-20260922-v2/RESULTS.md) the same day,
+after adding `repository_explore` and compact payloads, had Context accept five
+of eight (plain three, Graphify four) with the lowest executor input, 44 percent
+less per accepted task than plain, but three rejections and higher reviewer time
+kept the decision rule unmet. On a
+[DeepSeek V4 Pro executor](docs/experiments/graphify-20260922-s5-deepseek/RESULTS.md)
+the same evening every arm accepted three of eight; Context used 52 percent
+less input than plain tools and level with Graphify. Prioritise a useful accepted task and a
+reproducible independent install before claiming a Graphify replacement.

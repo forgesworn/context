@@ -6,6 +6,25 @@ import {
   type NavigationPolicySummary,
   type NavigationPolicyScope,
 } from './repository-navigation-policy.js';
+import {
+  EXPLORE_MAX_HITS,
+  EXPLORE_MAX_PARSED_FILES,
+  analyseExplore,
+  declarationLikely,
+  exploreMatcher,
+  isScriptPath,
+  parseExploreSymbol,
+  type ExploreFileInput,
+  type ExploreHit,
+  type ExploreResult,
+} from './repository-explore.js';
+
+export type { ExploreResult } from './repository-explore.js';
+
+export interface NavigationExploreOptions {
+  symbol: string;
+  pathPrefix?: string;
+}
 
 export interface NavigationLimits {
   maxFiles: number;
@@ -77,6 +96,7 @@ export interface NavigationResult {
   freshnessError?: string;
   policy: NavigationPolicyState;
   term: string;
+  pathPrefix?: string;
   results: NavigationResultRecord[];
   bytesUsed: number;
   maxBytes: number;
@@ -88,6 +108,7 @@ export interface NavigationResult {
 
 export interface NavigationSearchOptions {
   term: string;
+  pathPrefix?: string;
   maxBytes?: number;
   maxResults?: number;
   maxVisited?: number;
@@ -218,6 +239,7 @@ interface FreshnessInspection {
 interface Cursor {
   generation: string;
   term: string;
+  pathPrefix?: string;
   position: number;
   createdAt: number;
 }
@@ -334,6 +356,19 @@ function tokenizeLine(text: string): string[] {
     }
   }
   return tokens;
+}
+
+function normalizePathPrefix(value: unknown): string | undefined {
+  if (value === undefined) return undefined;
+  if (typeof value !== 'string' || value.length === 0 || value.length > 512) {
+    throw new Error('RepositoryNavigation: pathPrefix must be a repository-relative path prefix of at most 512 characters');
+  }
+  let prefix = value.replace(/\\/g, '/');
+  while (prefix.startsWith('./')) prefix = prefix.slice(2);
+  if (prefix.length === 0 || prefix.startsWith('/') || /(^|\/)\.\.(\/|$)/.test(prefix) || /[\u0000-\u001f]/.test(prefix)) {
+    throw new Error('RepositoryNavigation: pathPrefix must be relative and contain no .. segments');
+  }
+  return prefix;
 }
 
 function normalizeTerm(term: string): string | null {
@@ -493,6 +528,7 @@ export class RepositoryNavigation {
     if (!Number.isSafeInteger(maxVisited) || maxVisited < 1 || maxVisited > 10000) {
       throw new Error('RepositoryNavigation: maxVisited must be integer in [1, 10000]');
     }
+    const pathPrefix = normalizePathPrefix(options.pathPrefix);
     // Capture freshness once, before cursor consumption or result traversal.
     // The response then describes precisely the generation the caller searched.
     const freshnessAtStart = await this.inspectFreshness(gen, signal);
@@ -527,6 +563,9 @@ export class RepositoryNavigation {
       if (cursor.term !== token) {
         throw new Error('RepositoryNavigation: cursor bound to different term');
       }
+      if (cursor.pathPrefix !== pathPrefix) {
+        throw new Error('RepositoryNavigation: cursor bound to different pathPrefix');
+      }
       position = cursor.position;
       inputCursorKey = options.cursor;
     }
@@ -548,6 +587,7 @@ export class RepositoryNavigation {
       ...(freshnessAtStart.error ? { freshnessError: freshnessAtStart.error } : {}),
       policy: { freshness: freshnessAtStart.policy.freshness, digest: freshnessAtStart.policy.digest },
       term: token,
+      ...(pathPrefix !== undefined ? { pathPrefix } : {}),
       results,
       bytesUsed: 0,
       maxBytes,
@@ -599,8 +639,13 @@ export class RepositoryNavigation {
         }
       }
       examined++;
-      visited++;
       const loc = gen.locations[postings[idx]];
+      if (pathPrefix !== undefined && !loc.path.startsWith(pathPrefix)) {
+        // Outside the requested prefix: skipped without counting as visited.
+        idx++;
+        continue;
+      }
+      visited++;
       results.push({
         path: loc.path,
         line: loc.line,
@@ -685,6 +730,7 @@ export class RepositoryNavigation {
         !cur ||
         cur.generation !== gen.id ||
         cur.term !== token ||
+        cur.pathPrefix !== pathPrefix ||
         cur.position !== position
       ) {
         throw new Error(
@@ -718,12 +764,140 @@ export class RepositoryNavigation {
       this.cursors.set(nextCursorToken, {
         generation: gen.id,
         term: token,
+        ...(pathPrefix !== undefined ? { pathPrefix } : {}),
         position: idx,
         createdAt: Date.now(),
       });
     }
 
     return makeFrozen(result);
+  }
+
+  /** One call for a symbol: declaration blocks, references resolved to their
+   * enclosing declarations or test titles, importing files and tests. Requires
+   * current navigation and re-verifies every parsed file's hash. */
+  async explore(
+    options: NavigationExploreOptions,
+    signal?: AbortSignal,
+  ): Promise<ExploreResult> {
+    throwIfAborted(signal);
+    const gen = this.generation;
+    if (!gen) {
+      throw new Error('RepositoryNavigation: no active generation; call refresh()');
+    }
+    if (!options || typeof options.symbol !== 'string') {
+      throw new Error('RepositoryNavigation: symbol is required');
+    }
+    const symbol = parseExploreSymbol(options.symbol);
+    const pathPrefix = normalizePathPrefix(options.pathPrefix);
+    const freshness = await this.inspectFreshness(gen, signal);
+    if (freshness.freshness !== 'current' || freshness.policy.freshness !== 'current') {
+      throw new Error(
+        `RepositoryNavigation: explore requires current navigation (source ${freshness.freshness}, policy ${freshness.policy.freshness}); call refresh()`,
+      );
+    }
+    if (this.generation !== gen) {
+      throw new Error('RepositoryNavigation: generation changed during explore');
+    }
+    const matches = exploreMatcher(symbol);
+    const postings = gen.byToken.get(symbol.member.toLowerCase()) ?? [];
+    const byFile = new Map<string, { sha256: string; hits: ExploreHit[]; likely: boolean }>();
+    let visited = 0;
+    let otherCaseLines = 0;
+    let scanTruncated = false;
+    for (let i = 0; i < postings.length; i++) {
+      if (i % YIELD_CHUNK === 0) {
+        await yieldNow();
+        throwIfAborted(signal);
+        if (this.generation !== gen) {
+          throw new Error('RepositoryNavigation: generation changed during explore');
+        }
+      }
+      const loc = gen.locations[postings[i]];
+      if (pathPrefix !== undefined && !loc.path.startsWith(pathPrefix)) continue;
+      if (visited >= EXPLORE_MAX_HITS) {
+        scanTruncated = true;
+        break;
+      }
+      visited++;
+      if (!matches(loc.text)) {
+        otherCaseLines++;
+        continue;
+      }
+      let entry = byFile.get(loc.path);
+      if (!entry) {
+        entry = { sha256: loc.sha256, hits: [], likely: false };
+        byFile.set(loc.path, entry);
+      }
+      entry.hits.push({ line: loc.line, text: loc.text });
+      if (!entry.likely && declarationLikely(symbol, loc.text)) entry.likely = true;
+    }
+    const ordered = [...byFile.entries()].sort(
+      (a, b) =>
+        Number(b[1].likely) - Number(a[1].likely) ||
+        b[1].hits.length - a[1].hits.length ||
+        (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0),
+    );
+    const files: ExploreFileInput[] = [];
+    let parsed = 0;
+    for (const [rel, entry] of ordered) {
+      let text: string | undefined;
+      if (parsed < EXPLORE_MAX_PARSED_FILES && isScriptPath(rel)) {
+        text = await this.readVerified(rel, entry.sha256, signal);
+        parsed++;
+        if (this.generation !== gen) {
+          throw new Error('RepositoryNavigation: generation changed during explore');
+        }
+      }
+      files.push({ path: rel, sha256: entry.sha256, hits: entry.hits, ...(text !== undefined ? { text } : {}) });
+    }
+    const analysis = analyseExplore(symbol, files);
+    return makeFrozen({
+      trust: 'local-source-unsigned' as const,
+      generation: gen.id,
+      revision: gen.revision,
+      freshness: 'current' as const,
+      policy: { freshness: 'current' as const, digest: gen.policyRevision },
+      symbol: symbol.raw,
+      ...(pathPrefix !== undefined ? { pathPrefix } : {}),
+      files: files.length,
+      matchedLines: files.reduce((sum, file) => sum + file.hits.length, 0),
+      otherCaseLines,
+      scanTruncated,
+      ...analysis,
+      omitted: { definitions: 0, references: 0, tests: 0 },
+    });
+  }
+
+  private async readVerified(rel: string, expectedSha256: string, signal?: AbortSignal): Promise<string> {
+    throwIfAborted(signal);
+    const root = this.canonicalRoot;
+    if (!root) {
+      throw new Error('RepositoryNavigation: no active generation; call refresh()');
+    }
+    const abs = path.join(root, ...rel.split('/'));
+    if (!isInsideRoot(root, abs)) {
+      throw new Error('RepositoryNavigation: indexed path escapes root');
+    }
+    const handle = await fsp.open(
+      abs,
+      fsConstants.O_RDONLY | fsConstants.O_NONBLOCK | fsConstants.O_NOFOLLOW,
+    );
+    try {
+      const info = await handle.stat();
+      throwIfAborted(signal);
+      if (!info.isFile() || info.size > this.limits.maxFileBytes) {
+        throw new Error(`RepositoryNavigation: source changed since refresh: ${rel}; call refresh()`);
+      }
+      const raw = await handle.readFile();
+      throwIfAborted(signal);
+      if (createHash('sha256').update(raw).digest('hex') !== expectedSha256) {
+        throw new Error(`RepositoryNavigation: source changed since refresh: ${rel}; call refresh()`);
+      }
+      return new TextDecoder('utf8', { fatal: true, ignoreBOM: true }).decode(raw);
+    } finally {
+      await handle.close();
+    }
   }
 
 

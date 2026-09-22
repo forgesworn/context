@@ -57,6 +57,19 @@ records. These read-only tools preserve provenance and edge direction, never
 cross collection boundaries and do not claim that a signed relationship is
 true.
 
+## Navigate a repository
+
+`encrypted-context navigate /absolute/repository` serves six stdio MCP tools
+over an unsigned in-memory index of that root: `repository_status`,
+`repository_refresh`, `repository_explore` (one call for a symbol: declaration,
+references with enclosing declarations, importing files and tests),
+`repository_coverage` (which explored files a draft answer leaves uncited),
+`repository_search` (exact identifier lines grouped by file, with `pathPrefix`)
+and `repository_packet` (verbatim ranges or complete TypeScript/JavaScript
+blocks). Search, explore and packet responses are compact text by default and
+JSON with `format: "json"`. See the
+[navigation guide](https://github.com/forgesworn/context/blob/main/docs/LOCAL-NAVIGATION.md).
+
 ## Check a repository installation
 
 ```sh
@@ -65,8 +78,8 @@ encrypted-context doctor /absolute/path/to/repository --term knownIdentifier
 
 Use the exact Git checkout/worktree root with an existing commit and an identifier
 in an indexed source file. This read-only command starts the installed stdio
-server, verifies all four repository tools and checks a source packet against the
-search result and Git provenance. The JSON report contains binding details,
+server, verifies all five repository tools, explores the identifier and checks a
+source packet against the search result and Git provenance. The JSON report contains binding details,
 exclusions and a source location/hash, without source text. It makes no model
 calls and writes no repository files or client settings.
 

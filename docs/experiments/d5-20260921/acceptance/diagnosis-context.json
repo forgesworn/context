@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "checkerSha256": "539b5d7cd593f0dd6c5707b3426e243e90092614921c8024b8a69a5c49ffaa9c",
+  "checkerSha256": "539b5d7cd593f0dd6c5707b3426e243e90092614921c8024b8a69a5c49ffaa9c",
+  "kind": "structured",
+  "requiredFindingIds": ["root-cause", "lost-invariant", "why-first-check-fails", "repair", "regression"],
+  "reviewerRubric": {
+    "root-cause": "inspectFreshness no longer re-inspects policy after reading eligible source bytes",
+    "lost-invariant": "a policy that changes during manifest construction must make the generation stale before search can return old indexed results",
+    "why-first-check-fails": "the discovery policy comparison occurs before source reads and cannot observe a concurrent later policy change",
+    "repair": "reinspect the same policy directories after manifest construction and return stale or unknown before using the manifest",
+    "regression": "restore the test that tightens .gitignore while the eligible source handle is opened and proves the cursor is not consumed"
+  },
+  "requiredEvidence": [
+    { "path": "packages/context-tools/src/repository-navigation.ts", "token": "buildManifest(discovery, signal)" },
+    { "path": "packages/context-tools/src/repository-navigation.ts", "token": "reinspectPolicy" },
+    { "path": "packages/context-tools/src/repository-navigation.test.ts", "token": "blocks a policy change made during freshness source reads" }
+  ]
+}

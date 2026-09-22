@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "id": "impact-kithmoot",
+  "category": "impact",
+  "repository": "kithmoot",
+  "revision": "35fbdbed3d70a574499e84ba6b08817222110df3",
+  "prompt": "Assess tightening shortId so only a canonical 64-character lower-case hex identifier is abbreviated and every other input returns [invalid-id]. Identify direct callers, tests, logging/privacy behaviour and compatibility implications. Do not edit source. Return only answer.json using answerSchema.",
+  "answerSchema": { "summary": "string", "findings": [{ "id": "string", "value": "string" }], "evidence": [{ "path": "repository-relative string", "token": "exact source token" }] },
+  "requiredFindingIds": ["contract", "callers", "privacy", "tests", "guard", "compatibility"],
+  "selectionPolicy": { "version": 1, "include": ["src/log-redact.ts", "src/log-redact.test.ts", "server/forwarder.mjs", "server/forwarder.test.mjs", "test/log-redaction-scan.test.ts"] },
+  "setupPatch": null,
+  "setupPatchSha256": null
+}

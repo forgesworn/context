@@ -87,7 +87,7 @@ export const view = await vault.create({ title: 'Independent consumer', scope: '
   assert.equal(doctor.clientAcceptance, 'not-tested')
   assert.equal(doctor.binding.command, process.execPath)
   assert.deepEqual(doctor.binding.args, [realpathSync(cli), 'navigate', doctor.root])
-  assert.deepEqual(doctor.tools.slice().sort(), ['repository_packet', 'repository_refresh', 'repository_search', 'repository_status'])
+  assert.deepEqual(doctor.tools.slice().sort(), ['repository_coverage', 'repository_explore', 'repository_packet', 'repository_refresh', 'repository_search', 'repository_status'])
   assert.equal(doctor.evidence.path, 'example.ts')
   assert.equal(doctor.evidence.line, 1)
   assert.ok(!JSON.stringify(doctor).includes('export function'))
@@ -109,13 +109,13 @@ export const view = await vault.create({ title: 'Independent consumer', scope: '
       const packetTool = (await client.listTools()).tools.find(tool => tool.name === 'repository_packet')
       assert.ok(packetTool)
       assert.equal(packetTool.inputSchema.type, 'object')
-      assert.deepEqual(Object.keys(packetTool.inputSchema.properties).sort(), ['expectedGeneration', 'maxBytes', 'mode', 'spec'])
+      assert.deepEqual(Object.keys(packetTool.inputSchema.properties).sort(), ['expectedGeneration', 'format', 'maxBytes', 'mode', 'spec'])
       assert.deepEqual([...packetTool.inputSchema.required].sort(), ['expectedGeneration', 'mode', 'spec'])
       assert.equal(packetTool.inputSchema.additionalProperties, false)
       const early = await client.callTool({ name: 'repository_packet', arguments: { mode: 'plan', expectedGeneration: 'unrefreshed', spec } })
       assert.equal(early.isError, true)
       let status = JSON.parse(text(await client.callTool({ name: 'repository_refresh', arguments: {} })))
-      const get = generation => client.callTool({ name: 'repository_packet', arguments: { mode: 'plan', expectedGeneration: generation, spec, maxBytes: 65536 } })
+      const get = generation => client.callTool({ name: 'repository_packet', arguments: { mode: 'plan', expectedGeneration: generation, spec, maxBytes: 65536, format: 'json' } })
       const result = await get(status.generation)
       assert.notEqual(result.isError, true, text(result))
       assert.ok(Buffer.byteLength(text(result), 'utf8') <= 65536)
@@ -124,18 +124,24 @@ export const view = await vault.create({ title: 'Independent consumer', scope: '
       assert.equal(value.packet.sources.length, 1)
       assert.equal(value.packet.sources[0].startLine, 1)
       assert.equal(value.packet.sources[0].endLine, 3)
-      const found = await client.callTool({ name: 'repository_search', arguments: { term: 'InstalledSuffixMarker' } })
+      const found = await client.callTool({ name: 'repository_search', arguments: { term: 'InstalledSuffixMarker', format: 'json' } })
       assert.notEqual(found.isError, true, text(found))
       assert.deepEqual(JSON.parse(text(found)).results.map(item => item.path).sort(), ['cc', 'cxx', 'hh', 'hpp', 'hxx', 'kts'].map(extension => 'example.' + extension))
       for (const extension of ['kts', 'cc', 'cxx', 'hh', 'hpp', 'hxx']) {
         const path = 'example.' + extension
         const result = await client.callTool({ name: 'repository_packet', arguments: {
           mode: 'build', expectedGeneration: status.generation,
-          spec: { ...spec, allowedFiles: [path], sources: [{ path, startLine: 1, endLine: 1 }] },
+          spec: { ...spec, allowedFiles: [path], sources: [{ path, startLine: 1, endLine: 1 }] }, format: 'json',
         } })
         assert.notEqual(result.isError, true, text(result))
         assert.deepEqual(JSON.parse(text(result)).packet.sources[0].lines, [{ line: 1, content: 'class InstalledSuffixMarker {}' }])
       }
+      const explored = await client.callTool({ name: 'repository_explore', arguments: { symbol: 'example' } })
+      assert.notEqual(explored.isError, true, text(explored))
+      assert.match(text(explored), /^explore example  /)
+      const covered = await client.callTool({ name: 'repository_coverage', arguments: { symbols: ['example'], answer: 'See example.ts.', format: 'json' } })
+      assert.notEqual(covered.isError, true, text(covered))
+      assert.ok(JSON.parse(text(covered)).files.some(file => file.path === 'example.ts' && file.status === 'cited'))
       await writeFile(root + '/example.ts', 'export function example() {\\n  return 22\\n}\\n')
       assert.equal((await get(status.generation)).isError, true)
       const oldGeneration = status.generation

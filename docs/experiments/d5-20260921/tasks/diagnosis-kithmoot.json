@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "id": "diagnosis-kithmoot",
+  "category": "diagnosis",
+  "repository": "kithmoot",
+  "revision": "35fbdbed3d70a574499e84ba6b08817222110df3",
+  "prompt": "A seeded regression lets a caller-supplied delegation verifier replace KithMoot's ownership verifier. Diagnose the exact option-merge and type-boundary fault, explain the trust consequence, and name the smallest implementation and regression-test repair. Do not edit source. Return only answer.json using answerSchema.",
+  "answerSchema": { "summary": "string", "findings": [{ "id": "string", "value": "string" }], "evidence": [{ "path": "repository-relative string", "token": "exact source token" }] },
+  "requiredFindingIds": ["root-cause", "trust-impact", "repair-type", "repair-merge", "regression"],
+  "selectionPolicy": { "version": 1, "include": ["src", "packages", "README.md"] },
+  "setupPatch": "setup/diagnosis-kithmoot.patch",
+  "setupPatchSha256": "dd32e585389214d97e5240c2592f98eb3abaf5bdf1ea63932dde4f1de50920eb"
+}

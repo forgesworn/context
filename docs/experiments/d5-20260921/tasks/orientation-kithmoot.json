@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "id": "orientation-kithmoot",
+  "category": "orientation",
+  "repository": "kithmoot",
+  "revision": "35fbdbed3d70a574499e84ba6b08817222110df3",
+  "prompt": "Trace how KithMoot binds portable Context storage to its ownership policy and how an MCP write reaches durable local state. Identify the adapter boundary, the explicit write operations, and the checks that stop a caller replacing KithMoot's verifier. Cite implementation and focused tests. Return only answer.json using answerSchema.",
+  "answerSchema": { "summary": "string", "findings": [{ "id": "string", "value": "string" }], "evidence": [{ "path": "repository-relative string", "token": "exact source token" }] },
+  "requiredFindingIds": ["adapter", "ownership", "storage", "writes", "caller-boundary"],
+  "selectionPolicy": { "version": 1, "include": ["src", "packages", "README.md"] },
+  "setupPatch": null,
+  "setupPatchSha256": null
+}

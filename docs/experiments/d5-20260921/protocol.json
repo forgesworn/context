@@ -1,0 +1,67 @@
+{
+  "protocol": {
+  "version": 1,
+  "experimentId": "d5-context-kithmoot-20260921-v1",
+  "lockedAt": "2026-09-21T14:44:42.000Z",
+  "measurementDefinitionSha256": "3a893e673521e95336ba3a46c76a7c440d59900eb3171407364eef0894e1fb6b",
+  "pairs": [
+    {
+      "id": "orientation-context", "category": "orientation", "baselineOrder": 1, "assistedOrder": 2,
+      "repository": { "name": "context", "revision": "496bfca9ef1b6a0d5befe0e4dca3ff7b7258a13c", "qualificationEvidence": "docs/DOGFOOD-EXECUTION.md; private D3 receipts 20260921-d3-client-w6qs0oay" },
+      "taskDefinitionSha256": "9c34095c4958b32c0939de70cb07817a12f3880483fe384f982eb2efaad30116", "acceptanceDefinitionSha256": "b7a6657e9b745626dc2c52bb17e2648c800625e0f4bf598d8ac712eb5f09d1e6",
+      "acceptanceCheckIds": ["structured-schema", "frozen-source-provenance", "blind-sol-rubric"],
+      "roles": [{ "role": "executor", "provider": "openai", "model": "gpt-5.6-luna", "effort": "medium", "settingsSha256": "96471dc4a0d0f3d9a261f83e82b4912cec80f6381090849f4058ec26052d9aa5" }, { "role": "reviewer", "provider": "openai", "model": "gpt-5.6-sol", "effort": "high", "settingsSha256": "57d18d47badc907a41c28ef1f865c7392538497416e409777eccd1bf7e6f9a0a" }]
+    },
+    {
+      "id": "orientation-kithmoot", "category": "orientation", "baselineOrder": 2, "assistedOrder": 1,
+      "repository": { "name": "kithmoot", "revision": "35fbdbed3d70a574499e84ba6b08817222110df3", "qualificationEvidence": "docs/DOGFOOD-EXECUTION.md; private D3 receipts 20260921-d3-client-w6qs0oay" },
+      "taskDefinitionSha256": "1a3dd81ae9f6bc3350116f4b2734b276ede27d2a0e104f130982e2bbfbb5314e", "acceptanceDefinitionSha256": "4db7ab5422c2ed6ce3f04098e3e9ab5e66d9fa43d13617b4a652bdcc8e5dd18b",
+      "acceptanceCheckIds": ["structured-schema", "frozen-source-provenance", "blind-sol-rubric"],
+      "roles": [{ "role": "executor", "provider": "openai", "model": "gpt-5.6-luna", "effort": "medium", "settingsSha256": "96471dc4a0d0f3d9a261f83e82b4912cec80f6381090849f4058ec26052d9aa5" }, { "role": "reviewer", "provider": "openai", "model": "gpt-5.6-sol", "effort": "high", "settingsSha256": "57d18d47badc907a41c28ef1f865c7392538497416e409777eccd1bf7e6f9a0a" }]
+    },
+    {
+      "id": "diagnosis-context", "category": "diagnosis", "baselineOrder": 1, "assistedOrder": 2,
+      "repository": { "name": "context", "revision": "496bfca9ef1b6a0d5befe0e4dca3ff7b7258a13c", "qualificationEvidence": "docs/DOGFOOD-EXECUTION.md; private D3 receipts 20260921-d3-client-w6qs0oay" },
+      "taskDefinitionSha256": "88e253e9c3ed62eccea89b82029e86e916bba7576449a6bb3ebee6d86e78d20c", "acceptanceDefinitionSha256": "24b1b66cc7ceb7016d1b45c4941bebf4041c592a907d68b9d9c53013603a2f51",
+      "acceptanceCheckIds": ["structured-schema", "frozen-source-provenance", "blind-sol-rubric"],
+      "roles": [{ "role": "executor", "provider": "openai", "model": "gpt-5.6-luna", "effort": "medium", "settingsSha256": "96471dc4a0d0f3d9a261f83e82b4912cec80f6381090849f4058ec26052d9aa5" }, { "role": "reviewer", "provider": "openai", "model": "gpt-5.6-sol", "effort": "high", "settingsSha256": "57d18d47badc907a41c28ef1f865c7392538497416e409777eccd1bf7e6f9a0a" }]
+    },
+    {
+      "id": "diagnosis-kithmoot", "category": "diagnosis", "baselineOrder": 2, "assistedOrder": 1,
+      "repository": { "name": "kithmoot", "revision": "35fbdbed3d70a574499e84ba6b08817222110df3", "qualificationEvidence": "docs/DOGFOOD-EXECUTION.md; private D3 receipts 20260921-d3-client-w6qs0oay" },
+      "taskDefinitionSha256": "1b4d63614bb1d48e64bb813ac55c9f74cf7f363f7fc20516b16b5accde812096", "acceptanceDefinitionSha256": "6256da4126897999fa6dbecf3e63d60f890b218edcf9108a25970c18b4ee9075",
+      "acceptanceCheckIds": ["structured-schema", "frozen-source-provenance", "blind-sol-rubric"],
+      "roles": [{ "role": "executor", "provider": "openai", "model": "gpt-5.6-luna", "effort": "medium", "settingsSha256": "96471dc4a0d0f3d9a261f83e82b4912cec80f6381090849f4058ec26052d9aa5" }, { "role": "reviewer", "provider": "openai", "model": "gpt-5.6-sol", "effort": "high", "settingsSha256": "57d18d47badc907a41c28ef1f865c7392538497416e409777eccd1bf7e6f9a0a" }]
+    },
+    {
+      "id": "impact-context", "category": "impact", "baselineOrder": 1, "assistedOrder": 2,
+      "repository": { "name": "context", "revision": "496bfca9ef1b6a0d5befe0e4dca3ff7b7258a13c", "qualificationEvidence": "docs/DOGFOOD-EXECUTION.md; private D3 receipts 20260921-d3-client-w6qs0oay" },
+      "taskDefinitionSha256": "d0f0d30615a593a45a328e42c03c4b6e1a80b5436873c2523677febf340aebee", "acceptanceDefinitionSha256": "5e8c0e5384d66f01ab0fa23f0da836f3ba6d4da394e1632601a45b950a2a816e",
+      "acceptanceCheckIds": ["structured-schema", "frozen-source-provenance", "blind-sol-rubric"],
+      "roles": [{ "role": "executor", "provider": "openai", "model": "gpt-5.6-luna", "effort": "medium", "settingsSha256": "96471dc4a0d0f3d9a261f83e82b4912cec80f6381090849f4058ec26052d9aa5" }, { "role": "reviewer", "provider": "openai", "model": "gpt-5.6-sol", "effort": "high", "settingsSha256": "57d18d47badc907a41c28ef1f865c7392538497416e409777eccd1bf7e6f9a0a" }]
+    },
+    {
+      "id": "impact-kithmoot", "category": "impact", "baselineOrder": 2, "assistedOrder": 1,
+      "repository": { "name": "kithmoot", "revision": "35fbdbed3d70a574499e84ba6b08817222110df3", "qualificationEvidence": "docs/DOGFOOD-EXECUTION.md; private D3 receipts 20260921-d3-client-w6qs0oay" },
+      "taskDefinitionSha256": "1bbaaedf37c39ddc254d58f5ef81c28d61ba3682fe081d02b7100379c0e6f523", "acceptanceDefinitionSha256": "37a0d0c73593a368c684449be09bb32adb411805d4d30f0cb8e85e259a1cdcd2",
+      "acceptanceCheckIds": ["structured-schema", "frozen-source-provenance", "blind-sol-rubric"],
+      "roles": [{ "role": "executor", "provider": "openai", "model": "gpt-5.6-luna", "effort": "medium", "settingsSha256": "96471dc4a0d0f3d9a261f83e82b4912cec80f6381090849f4058ec26052d9aa5" }, { "role": "reviewer", "provider": "openai", "model": "gpt-5.6-sol", "effort": "high", "settingsSha256": "57d18d47badc907a41c28ef1f865c7392538497416e409777eccd1bf7e6f9a0a" }]
+    },
+    {
+      "id": "code-change-context", "category": "code-change", "baselineOrder": 1, "assistedOrder": 2,
+      "repository": { "name": "context", "revision": "496bfca9ef1b6a0d5befe0e4dca3ff7b7258a13c", "qualificationEvidence": "docs/DOGFOOD-EXECUTION.md; private D3 receipts 20260921-d3-client-w6qs0oay" },
+      "taskDefinitionSha256": "56df14ee83e978faf5e213733c8bd10fe795e09b3c988502aefd3a2eb549302c", "acceptanceDefinitionSha256": "d59990cf5d6a0ce22db4c2f29c0fb8bf2cbec7b7eeda825f93a8fc106cd5817a",
+      "acceptanceCheckIds": ["external-code-checker", "blind-sol-rubric"],
+      "roles": [{ "role": "executor", "provider": "openai", "model": "gpt-5.6-luna", "effort": "medium", "settingsSha256": "96471dc4a0d0f3d9a261f83e82b4912cec80f6381090849f4058ec26052d9aa5" }, { "role": "reviewer", "provider": "openai", "model": "gpt-5.6-sol", "effort": "high", "settingsSha256": "57d18d47badc907a41c28ef1f865c7392538497416e409777eccd1bf7e6f9a0a" }]
+    },
+    {
+      "id": "code-change-kithmoot", "category": "code-change", "baselineOrder": 2, "assistedOrder": 1,
+      "repository": { "name": "kithmoot", "revision": "35fbdbed3d70a574499e84ba6b08817222110df3", "qualificationEvidence": "docs/DOGFOOD-EXECUTION.md; private D3 receipts 20260921-d3-client-w6qs0oay" },
+      "taskDefinitionSha256": "660a668d668b7c098fd5ffc35dcfb813a3e558f293f0d66dc243bec9b5fa550d", "acceptanceDefinitionSha256": "fdc1fcd5291a8a86449ff2facae71a7797b35e0267c66654c80c01c072c3a6cd",
+      "acceptanceCheckIds": ["external-code-checker", "blind-sol-rubric"],
+      "roles": [{ "role": "executor", "provider": "openai", "model": "gpt-5.6-luna", "effort": "medium", "settingsSha256": "96471dc4a0d0f3d9a261f83e82b4912cec80f6381090849f4058ec26052d9aa5" }, { "role": "reviewer", "provider": "openai", "model": "gpt-5.6-sol", "effort": "high", "settingsSha256": "57d18d47badc907a41c28ef1f865c7392538497416e409777eccd1bf7e6f9a0a" }]
+    }
+  ]
+  },
+  "receipts": []
+}

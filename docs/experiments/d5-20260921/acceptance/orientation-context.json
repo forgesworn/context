@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "checkerSha256": "539b5d7cd593f0dd6c5707b3426e243e90092614921c8024b8a69a5c49ffaa9c",
+  "checkerSha256": "539b5d7cd593f0dd6c5707b3426e243e90092614921c8024b8a69a5c49ffaa9c",
+  "kind": "structured",
+  "requiredFindingIds": ["first-use", "search-gate", "freshness", "continuation", "trust"],
+  "reviewerRubric": {
+    "first-use": "status reports unavailable until explicit refresh publishes an in-memory generation",
+    "search-gate": "search requires current policy and rejects unavailable, stale, or unknown policy state",
+    "freshness": "eligible source and policy are re-inspected against the generation before results are returned",
+    "continuation": "cursors are generation-and-term bound, single-use after successful completion, expire after five minutes, and are capped at 128 live entries",
+    "trust": "results are local-source-unsigned navigation evidence and do not grant authority or execute instructions"
+  },
+  "requiredEvidence": [
+    { "path": "packages/context-tools/src/repository-navigation.ts", "token": "inspectFreshness" },
+    { "path": "packages/context-tools/src/repository-navigation.ts", "token": "CURSOR_MAX_ENTRIES = 128" },
+    { "path": "packages/context-tools/src/repository-navigation.ts", "token": "local-source-unsigned" },
+    { "path": "packages/context-tools/src/repository-navigation.test.ts", "token": "successfully used cursor is consumed" }
+  ]
+}

@@ -79,6 +79,52 @@ establish a cost advantage. Keep retrieval comparisons on fixed model settings,
 then measure routing separately. These are project instructions, not automatic
 model switching or a change to the active Codex session.
 
+## First three-way run, 22 September 2026
+
+S4 has now run once under a locked protocol with headless Claude Code and
+Sonnet 5: [results](experiments/graphify-20260922/RESULTS.md). Context matched
+plain tools on acceptance (four of eight) but used 13.9 percent more executor
+input; Graphify used 19.4 percent less input than plain tools with two accepted.
+The rule below was not met. The measured cause was search page volume.
+
+The same day, after adding `repository_explore` (one call for a symbol's
+declaration, references, importers and tests), compact text search and packet
+rendering and `pathPrefix`, the protocol was rerun as
+[v2](experiments/graphify-20260922-v2/RESULTS.md) with only the Context arm
+changed. Context accepted five of eight (plain three, Graphify four) with the
+lowest executor input: 3.62M against 3.88M and 4.55M, or 44.1 and 36.3 percent
+less per accepted task. The rule is still not met: three Context rejections,
+all rubric omissions, and reviewer time 9.8 percent above plain. The margin
+over Graphify rests on one task where Graphify spent 2.0M. Next: raise
+acceptance on the orientation and impact tasks, which need complete synthesis
+from evidence the tool already returns, and reduce per-session uncached input
+(tool schemas and instruction appendix) before a third run.
+
+The S5 routing measurement ran the same evening:
+[the v2 protocol with every executor on DeepSeek V4 Pro](experiments/graphify-20260922-s5-deepseek/RESULTS.md)
+through the local Ollama daemon, reviewers unchanged on Sonnet 5. Each arm
+accepted three of eight. Context used 52.3 percent less executor input than
+plain tools and 1.3 percent more than Graphify, per accepted task and in
+total, with reviewer time 29.8 percent above plain; the rule is not met on
+the cheaper executor either. The margin over plain tools widened from v2 and
+the margin over Graphify disappeared; one task dominated every arm. The
+cheaper executor accepted nine of twenty-four against Sonnet's twelve with
+the same reviewer, used 2.5 times the output tokens in extended thinking and
+took 116 minutes against 66. Credit consumption was not read; no saving is
+claimed. Routing decisions stay on the accepted-result basis above.
+
+A single-arm screen followed:
+[v2 with `repository_coverage` added to the Context arm](experiments/graphify-20260922-v3-coverage/RESULTS.md),
+a deterministic pre-submit check listing explored files a draft leaves
+uncited. Context accepted three of eight against five in v2 and used 2.9
+times the executor input, so the screen failed and no three-way run follows.
+None of the rejections traces to the tool, and input rose as much on a task
+with no coverage call, so run-to-run variance exceeded the effect being
+screened. Further comparisons need repeated runs per task. The same work
+replaced presence-only retrieval ranking in `@forgesworn/context` with BM25
+plus a source-label bonus, after the token gate proved sensitive to unrelated
+files; the gate now passes at 36.5x with full evidence recall.
+
 ## Proposed competitive decision rule
 
 Before any three-way trial, pin Graphify's revision/configuration, define tasks

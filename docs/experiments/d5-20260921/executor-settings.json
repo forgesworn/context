@@ -1,0 +1,13 @@
+{
+  "client": "codex-cli",
+  "clientVersion": "0.155.1",
+  "provider": "openai",
+  "model": "gpt-5.6-luna",
+  "effort": "medium",
+  "session": "fresh-per-arm",
+  "network": false,
+  "memory": false,
+  "siblingRepositories": false,
+  "workers": false,
+  "retrievalOnlyDifference": true
+}

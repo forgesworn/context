@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "checkerSha256": "539b5d7cd593f0dd6c5707b3426e243e90092614921c8024b8a69a5c49ffaa9c",
+  "checkerSha256": "539b5d7cd593f0dd6c5707b3426e243e90092614921c8024b8a69a5c49ffaa9c",
+  "kind": "structured",
+  "requiredFindingIds": ["root-cause", "trust-impact", "repair-type", "repair-merge", "regression"],
+  "reviewerRubric": {
+    "root-cause": "the seeded type admits verifyDelegation and the seeded merge order lets caller options overwrite KithMoot's verifier",
+    "trust-impact": "a caller can approve forged or unrelated agent ownership and weaken the room adapter's grant boundary",
+    "repair-type": "restore ContextVaultOptions as PortableOptions without verifyDelegation",
+    "repair-merge": "spread caller options first and install KithMoot verifyDelegation last",
+    "regression": "pass a hostile verifier through an unsafe cast and prove kithmootContextOptions still returns the KithMoot verifier and rejects forged ownership"
+  },
+  "requiredEvidence": [
+    { "path": "src/context.ts", "token": "kithmootContextOptions" },
+    { "path": "src/context.ts", "token": "verifyAgentOwnership" },
+    { "path": "src/context.test.ts", "token": "rejects forged ownership" }
+  ]
+}

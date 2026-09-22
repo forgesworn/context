@@ -1,0 +1,34 @@
+{
+  "experimentId": "d5-orientation-context-20260921-v2",
+  "lockedAt": "2026-09-21T15:38:59.403Z",
+  "reviewAccepted": true,
+  "reviewer": {
+    "model": "gpt-5.6-sol",
+    "effort": "high",
+    "record": "REVIEW.md"
+  },
+  "files": {
+    "README.md": "eaa11dc9208fd10f0b63a5c74ee1e525ca484c753464f72677080a40e5c23924",
+    "task.json": "1dd3c66922a0aded9c3c923d955a5fa4ec4bf22da8bafb7a8e61c2cd50d7f3bb",
+    "review-rubric.json": "4cfc2d06ffa171e9b124dc671120d611d49b6d88ee232676cbbe52f8a35ed398",
+    "prepare.mjs": "6d285dc9c528bbd90a6ef96b376b458544b90efc2072acb9a66435ba82aad94e",
+    "public-check.mjs": "ccb788323f3135b40749dd377c929bd4b9c29894c29ba6c56d227e340cdd2051",
+    "public-check.test.mjs": "d7a3d1ab037a6351139ccb8200ba46c09ed5af02b37f5097de5f72237cbdd33a",
+    "run-pair.py": "c508ccd6a8846533b2b053b2b884a81630c0d29bf3faf19e47fdc5c207c0caad",
+    "run-pair.test.py": "cff1979d500cd2ea1238ab17f61ca68a5a2f20d23ee91567b5a6ba0f4ba32ebc",
+    "verify.mjs": "384c0eb171487c009bdf02ce1244061cb666860fc839a7c3db80397d62d1e1e9",
+    "REVIEW.md": "716f22f7ec2409f232bf826ea8045d76324d0f4be7af06d50f8160504fbf1976",
+    "toolchain.json": "18a005296f19bc0c9df1e1aec14fb9d665f86764451fe9910505f5cfab322123",
+    "../d5-20260921/prepare-arm.mjs": "2395768c4fd854f62674e0b5a707e9f16d7177ef2cc44d53becd1336d56d1c9e",
+    "../d5-20260921/accept.mjs": "539b5d7cd593f0dd6c5707b3426e243e90092614921c8024b8a69a5c49ffaa9c",
+    "../d5-20260921/tasks/orientation-context.json": "9c34095c4958b32c0939de70cb07817a12f3880483fe384f982eb2efaad30116",
+    "../d5-20260921/acceptance/orientation-context.json": "b7a6657e9b745626dc2c52bb17e2648c800625e0f4bf598d8ac712eb5f09d1e6"
+  },
+  "sanitisedForPublication": {
+    "note": "Absolute home-directory paths were replaced with home-relative forms before publication. The run used the files with the original hashes below; behaviour is unchanged on the original machine.",
+    "originalHashes": {
+      "run-pair.py": "737db30309474a86672d48105f53a7a10171ef323bfb48c8203d290f1471d708",
+      "toolchain.json": "fe1448f83adfc2c0e9942e7132cb37966827b930e80a475cbe0a244f2cab462f"
+    }
+  }
+}

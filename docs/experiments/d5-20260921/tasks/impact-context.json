@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "id": "impact-context",
+  "category": "impact",
+  "repository": "context",
+  "revision": "496bfca9ef1b6a0d5befe0e4dca3ff7b7258a13c",
+  "prompt": "Assess adding an optional caseSensitive flag to repository search while preserving today's case-insensitive default. Identify the public request/tool surfaces, index or result filtering consequence, continuation binding needed to prevent mode changes, documentation, and focused regression coverage. Do not edit source. Return only answer.json using answerSchema.",
+  "answerSchema": { "summary": "string", "findings": [{ "id": "string", "value": "string" }], "evidence": [{ "path": "repository-relative string", "token": "exact source token" }] },
+  "requiredFindingIds": ["request-surface", "default", "filter", "cursor", "response", "coverage"],
+  "selectionPolicy": { "version": 1, "include": ["packages/context-tools", "docs/LOCAL-NAVIGATION.md"] },
+  "setupPatch": null,
+  "setupPatchSha256": null
+}

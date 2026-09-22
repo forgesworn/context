@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "id": "code-change-kithmoot",
+  "category": "code-change",
+  "repository": "kithmoot",
+  "revision": "35fbdbed3d70a574499e84ba6b08817222110df3",
+  "prompt": "Harden shortId so it abbreviates only a canonical 64-character lower-case hex identifier. Return the fixed string [invalid-id] for every other input, without echoing invalid data. Update focused tests and retain the existing server log-redaction guard. Do not commit. The trusted harness runs acceptance after your final response.",
+  "selectionPolicy": { "version": 1, "include": ["src/log-redact.ts", "src/log-redact.test.ts", "server/forwarder.mjs", "server/forwarder.test.mjs", "test/log-redaction-scan.test.ts"] },
+  "setupPatch": null,
+  "setupPatchSha256": null
+}

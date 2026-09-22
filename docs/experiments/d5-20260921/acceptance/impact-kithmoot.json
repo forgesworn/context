@@ -1,0 +1,22 @@
+{
+  "version": 1,
+  "checkerSha256": "539b5d7cd593f0dd6c5707b3426e243e90092614921c8024b8a69a5c49ffaa9c",
+  "checkerSha256": "539b5d7cd593f0dd6c5707b3426e243e90092614921c8024b8a69a5c49ffaa9c",
+  "kind": "structured",
+  "requiredFindingIds": ["contract", "callers", "privacy", "tests", "guard", "compatibility"],
+  "reviewerRubric": {
+    "contract": "shortId returns the first eight characters only for exactly 64 lower-case hexadecimal characters and [invalid-id] otherwise",
+    "callers": "the forwarder abbreviates configured roomId and pubkey through shortId before startup logging",
+    "privacy": "the invalid marker must be constant and must not echo any attacker-controlled prefix",
+    "tests": "replace permissive short-input expectations and cover empty, short, long, upper-case, non-hex, and Unicode inputs",
+    "guard": "retain the log-redaction scan and forwarder startup assertion so direct full identifier logging remains rejected",
+    "compatibility": "valid canonical Nostr identifiers keep their existing eight-character display while malformed configuration becomes visibly invalid"
+  },
+  "requiredEvidence": [
+    { "path": "src/log-redact.ts", "token": "export function shortId" },
+    { "path": "server/forwarder.mjs", "token": "shortId(config.roomId)" },
+    { "path": "server/forwarder.mjs", "token": "shortId(config.pubkey)" },
+    { "path": "src/log-redact.test.ts", "token": "never returns more than it was given" },
+    { "path": "test/log-redaction-scan.test.ts", "token": "shortId" }
+  ]
+}

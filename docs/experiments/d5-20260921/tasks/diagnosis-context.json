@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "id": "diagnosis-context",
+  "category": "diagnosis",
+  "repository": "context",
+  "revision": "496bfca9ef1b6a0d5befe0e4dca3ff7b7258a13c",
+  "prompt": "A seeded regression makes a search continue from an old generation when .gitignore is tightened during freshness source reads. Diagnose the exact lost invariant, explain why the initial policy comparison is insufficient, and name the smallest implementation and regression-test repair. Do not edit source. Return only answer.json using answerSchema.",
+  "answerSchema": { "summary": "string", "findings": [{ "id": "string", "value": "string" }], "evidence": [{ "path": "repository-relative string", "token": "exact source token" }] },
+  "requiredFindingIds": ["root-cause", "lost-invariant", "why-first-check-fails", "repair", "regression"],
+  "selectionPolicy": { "version": 1, "include": ["packages/context-tools", "docs/NAVIGATION-POLICY.md"] },
+  "setupPatch": "setup/diagnosis-context.patch",
+  "setupPatchSha256": "0de888eb69fec7008d34bdbe25852ff70e95dd10ef12c4341003fe5d6ecc300e"
+}
