@@ -52,6 +52,21 @@ afterEach(async () => {
 })
 
 describe('repository navigation MCP adapter', () => {
+  it('keeps the per-session instructions and tool listing within a fixed byte budget', async () => {
+    // Every client session carries this text before any work; it was 8207 bytes
+    // before the trim recorded in docs/SAVINGS-PLAN.md.
+    const root = await makeRoot()
+    const { client, serverClose } = await connect(root)
+    try {
+      const { tools } = await client.listTools()
+      const bytes = Buffer.byteLength(client.getInstructions() ?? '') +
+        tools.reduce((sum, tool) => sum + Buffer.byteLength(JSON.stringify(tool)), 0)
+      expect(bytes).toBeLessThanOrEqual(6200)
+    } finally {
+      await serverClose()
+    }
+  })
+
   it('lists the repository navigation and packet tools', async () => {
     const root = await makeRoot()
     const { client, serverClose } = await connect(root)
