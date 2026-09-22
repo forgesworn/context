@@ -26,8 +26,12 @@ The source contracts are
 
 Navigation provides exact-token line lookup. Broad scanning uses regular
 expressions and labels inferred relationships; it is not a language parser.
-The dedicated TS/JS scanner and packet planner use TypeScript syntax trees, but
-do not establish type-checked semantic resolution. Exact build packets copy
+The dedicated TS/JS scanner and packet planner use TypeScript syntax trees. The
+0.3.3 scanner also uses isolated compiler binding for scopes and
+selected local import/re-export aliases; it does not load tsconfig, external
+libraries or establish project-wide type-checked semantic resolution. Nested
+callable bodies are not counted as direct calls of their parents. The packet
+planner still establishes syntax completeness only. Exact build packets copy
 selected lines with provenance; they make no syntax-completeness guarantee.
 Unsupported plan suffixes are explicitly rejected by the planner guard before
 TypeScript parsing; rejection is not a parser failure on those languages.

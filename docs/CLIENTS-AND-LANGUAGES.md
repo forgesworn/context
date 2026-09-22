@@ -11,7 +11,7 @@ selection, extraction, graphs, freshness, bounded retrieval, provenance and
 evidence access checks. Its supported local workflow needs no AI provider login,
 API key, subscription or model invocation.
 
-Claude Code, Codex or another client consumes that evidence over MCP or CLI.
+Claude Code, Codex, OpenCode or another client consumes that evidence over MCP or CLI.
 The client chooses its model/effort and handles provider authentication, billing,
 conversation, tool execution and approval UX. Oathrun owns those execution and
 routing responsibilities when it is the chosen agent host. Using Context from
@@ -55,12 +55,18 @@ restart/disable and consequential task qualification remain open. See
 
 ## OS1 client and retrieval assignments
 
+OpenCode is now a first-class qualification target. Its setup, lifecycle,
+receipt and mixed-model acceptance are **not yet tested**. Follow the
+[deterministic language and developer-results contract](DETERMINISTIC-CODE-INTELLIGENCE.md)
+for OS1e, compiler/resolver boundaries and fair Graphify/OpenCode comparisons.
+
 | Task | Owner / where | Model and effort | Acceptance |
 | --- | --- | --- | --- |
 | **OS1a — Claude Code alongside Codex. Partial: read-only audit accepted** | Context integration owner, Node tools, public setup docs and isolated client fixtures | Flash/thinking off for bounded docs/fixtures; Terra/medium integration; **Claude Sonnet 5/medium** as the first real Claude executor; **Claude Opus 5/high** for one consequential source-backed task after basic acceptance | A pinned package launches in both clients against an explicit root; real tool discovery, status/refresh/search, bounded evidence, edit/stale/refresh, restart and disable work. Record actual client/model/effort and accepted task, not just Connected |
 | **OS1b — Sufficient evidence through MCP. Shipped; first Claude use recorded** | Context implementation owner, shared packet module plus `packages/context-tools` adapters/tests | Terra/medium implementation; Sol/high boundary review; Flash/off for scoped fixtures | `repository_packet` returns bounded exact ranges or complete selected TS/JS blocks with provenance and stale rejection. Installed-tarball stdio retrieval, edit/refresh and restart pass. Reconnect existing clients to discover the new tool; first Claude read-only use is recorded, while lifecycle qualification remains open. No shell helper required by the consuming model; no arbitrary path escape |
 | **OS1c — Graph questions through MCP** | Context graph owner, same tools adapter; follows OS3/OS4 evidence integration | Terra/medium; Sol/high review of scope/provenance | Bounded repository symbol/neighbour/path queries return precise source and derivation metadata in both clients; do not mistake the existing signed-cache graph tools for this capability |
 | **OS1d — Other client surfaces** | Context integration owner, portable examples and clean-client acceptance | Flash/off for docs, Terra/medium review; user's chosen model for the actual client | Claude Desktop is separately qualified after Claude Code; other MCP clients follow demand. Never infer their acceptance from Claude Code or Codex |
+| **OS1e — OpenCode. Planned; first-class target** | Context integration owner; public setup, shared MCP and provider-neutral receipt fixtures | Flash/off bounded fixtures/docs; Terra/medium integration; existing user-selected model for client qualification | Actual pinned-client task, exact root and four tools, edit/stale/refresh, restart/cancellation/disable; preserve existing agents/Graphify and count model handoffs without changing routing policy |
 
 The Anthropic API model IDs for those qualification assignments are
 `claude-sonnet-5` and `claude-opus-5`. Claude Fable 5.1
@@ -95,19 +101,19 @@ do not silently scan the parent workspace.
 
 | Language / surface | Current support | Next useful depth |
 | --- | --- | --- |
-| TypeScript / JavaScript / TSX / JSX | Compiler API syntax trees; selected relative imports and syntactic call hints. No tsconfig loading or type checker; not complete semantic resolution | Aliases, re-exports, symbol identity and references with honest unresolved cases; keep dynamic calls and type-directed evidence distinct |
+| TypeScript / JavaScript / TSX / JSX | 0.3.3: isolated Program/TypeChecker binding over selected trees; scope-aware direct calls and local named default/re-export aliases. No tsconfig, external libraries or project type checking. 0.3.2 has earlier syntax/name hints | Explicit project configuration, references and task-level evidence queries; keep dynamic calls and type-directed evidence distinct |
 | Rust / Cargo | Lexical declarations and simple module-file guesses; manifest path dependencies in separate snapshots; Cargo lock resolution unsupported | Parser-backed modules, use/re-exports, types/traits/impls and call/reference candidates; selected workspace/features/cfg context; preserve unresolved macro/trait dispatch |
 | Kotlin / Java | Lexical declaration inference; no meaningful compiler-resolved import/type/call graph | Parsed declarations/imports; package/module and Gradle dependency evidence, then explicitly qualified references. Do not execute Gradle scripts during indexing |
 | Python | Lexical declarations and conservative relative-import guesses | Parsed scopes/imports and useful references; explicit environment/package assumptions; no import execution |
-| C / C++ | Lexical declarations and quoted-include guesses; broad scanner accepts more suffixes than navigation | Align `.cc/.cxx/.hpp` selection; parse declarations/includes; distinguish build-config/preprocessor-dependent and FFI edges |
+| C / C++ | Lexical declarations and quoted-include guesses; selected suffix gaps aligned in 0.3.2 | Parse declarations/includes; distinguish build-config/preprocessor-dependent and FFI edges |
 | Dart / Flutter | Absent from both the navigation allowlist and broad extractor | Add declared support and fixtures, then parsed imports/exports/parts and declarations with pub package/version evidence; no claim that adding `.dart` is semantic support |
 | Swift | Lexical declarations; no module/type/call resolution | Parsed declarations/imports with selected package/build metadata and explicit unresolved cases |
 | Vue / Svelte, SQL and build/config contracts | Dedicated parsing absent from these source extractors | Confirm use in selected projects; add component/script boundaries or schema/config relationships only against actual tasks |
 | Go, C#, Ruby, PHP | Conservative lexical extraction; some local-import guesses | Retain explicit support level; deepen when an accepted task needs it |
 
 Navigation and extraction must have a tested capability manifest so their suffix
-support cannot silently diverge. Current navigation, for example, omits `.kts`
-and several C++ suffixes which the broad scanner accepts. Source packets currently
+support cannot silently diverge. The `.kts` and selected C++ gaps were fixed in
+0.3.2; that adds source eligibility, not deeper resolution. Source packets currently
 have syntax-aware planning for TS/JS only; add complete-span planning for each
 new parser rather than silently truncating another language's function.
 

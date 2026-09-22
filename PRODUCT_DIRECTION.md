@@ -3,9 +3,12 @@
 Updated: 22 September 2026. Product direction and acceptance plan, not a claim
 that the capabilities below are all shipped.
 
-Context should help any developer understand and change a codebase using less
-model context, while preserving the quality of their development work. The
-target is an independently implemented, MIT-licensed alternative to Graphify
+Context must help developers produce better accepted changes with less complete
+task cost. Smaller model context alone is insufficient: fewer wrong conclusions,
+missed dependencies and repair rounds must be demonstrated against competent
+existing workflows. Deterministic analysis and deeper language resolution are
+near-term product priorities. See the [implementation and benefit contract](docs/DETERMINISTIC-CODE-INTELLIGENCE.md).
+The target is an independently implemented, MIT-licensed alternative to Graphify
 for repository graphs, exploration and coding-agent context. Do not copy or
 integrate Graphify code. Replacement is a product goal; feature parity and
 whole-task savings have not been demonstrated.
@@ -24,8 +27,11 @@ and actual cash savings are separate outcomes.
 
 ## Product boundaries
 
-Claude Code and Codex are first-class target MCP clients. Context already has
-stdio MCP interfaces; both need complete independent developer acceptance.
+Claude Code, Codex and OpenCode are first-class target MCP clients. Context already
+has stdio MCP interfaces; each needs separate complete developer acceptance.
+OpenCode qualification is planned, not delivered. Support developers who already
+combine Graphify and frontier/cheap models; measure the benefit over that workflow
+without requiring them to replace their client or routing policy.
 Provider login, credentials, model selection and execution belong to the client
 or optional Oathrun runtime. Context retains its own source/evidence access
 boundaries. See [client and language goals](docs/CLIENTS-AND-LANGUAGES.md).
