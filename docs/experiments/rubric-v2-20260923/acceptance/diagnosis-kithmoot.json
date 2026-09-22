@@ -1,0 +1,40 @@
+{
+  "version": 2,
+  "checkerSha256": "539b5d7cd593f0dd6c5707b3426e243e90092614921c8024b8a69a5c49ffaa9c",
+  "kind": "structured",
+  "requiredFindingIds": [
+    "root-cause",
+    "trust-impact",
+    "repair-type",
+    "repair-merge",
+    "regression"
+  ],
+  "reviewerRubric": {
+    "root-cause": "Required, both: (a) the seeded ContextVaultOptions is PortableOptions and so admits verifyDelegation; (b) kithmootContextOptions spreads caller options after installing KithMoot's verifier ({ verifyDelegation, ...options }), so a caller-supplied verifier overwrites it.",
+    "trust-impact": "Required: a caller-supplied verifier can approve forged or unrelated agent ownership, so grants that should be refused are accepted and the room adapter's grant boundary is weakened.",
+    "repair-type": "Required: ContextVaultOptions becomes Omit<PortableOptions, 'verifyDelegation'> again.",
+    "repair-merge": "Required: kithmootContextOptions spreads caller options first and installs KithMoot's verifyDelegation last ({ ...options, verifyDelegation }).",
+    "regression": "Required, both: (a) the test passes a hostile verifyDelegation through an unsafe cast (for example `as any` or `as ContextVaultOptions`), which is needed because the repaired type no longer admits it; the cast must be stated; (b) it shows KithMoot's verifier is used rather than the hostile one, either by asserting what kithmootContextOptions returns or by showing that a forged proof the hostile verifier would approve is still rejected."
+  },
+  "requiredEvidence": [
+    {
+      "path": "src/context.ts",
+      "token": "kithmootContextOptions"
+    },
+    {
+      "path": "src/context.ts",
+      "token": "verifyAgentOwnership"
+    },
+    {
+      "path": "src/context.test.ts",
+      "token": "rejects forged ownership"
+    }
+  ],
+  "basedOn": "d5-20260921/acceptance/diagnosis-kithmoot.json",
+  "reviewerRules": [
+    "Judge each dimension against the whole answer: the summary and every finding. A required point stated under a different finding id counts; never fail a dimension for placement alone.",
+    "A required point passes only when the answer states it explicitly, in words a reader could quote. Different wording is fine; a point that is only implied by other statements does not pass.",
+    "Where a dimension lists items, each listed item must be named. A generic phrase such as \"edge cases\" or \"all semantics unchanged\" does not cover named items.",
+    "A dimension passes when every required point is stated, no \"fails if\" condition applies and nothing it states contradicts the frozen source excerpts. Points marked \"not required\" never cause a failure. Accepted alternatives pass equally."
+  ]
+}
