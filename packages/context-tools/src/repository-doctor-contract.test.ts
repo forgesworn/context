@@ -22,7 +22,7 @@ vi.mock('@modelcontextprotocol/sdk/client/index.js', () => ({
     async connect() { if (fake.failure === 'connect') throw new Error('fixture handshake failure') }
     async close() { fake.clientClosed++ }
     async listTools() {
-      return { tools: ['repository_status', 'repository_refresh', 'repository_search', 'repository_packet']
+      return { tools: ['repository_status', 'repository_refresh', 'repository_search', 'repository_explore', 'repository_coverage', 'repository_packet']
         .filter(name => !(fake.failure === 'missing' && name === 'repository_packet'))
         .map(name => ({ name, inputSchema: { type: 'object', properties: { mode: {}, spec: {}, expectedGeneration: {} } } })) }
     }
@@ -37,7 +37,11 @@ vi.mock('@modelcontextprotocol/sdk/client/index.js', () => ({
             startLine: 1, endLine: 1, lines: [{ line: 1, content: hit.text }],
           }] }, navigation: { generation: 'generation', revision: 'revision', policy },
         }
-        : name === 'repository_search'
+        : name === 'repository_explore'
+          ? { generation: 'generation', matchedLines: 1, definitions: [] }
+          : name === 'repository_coverage'
+          ? { generation: 'generation', files: [{ path: hit.path, status: fake.failure === 'coverage' ? 'missing' : 'cited' }] }
+          : name === 'repository_search'
           ? { generation: fake.failure === 'generation' ? 'other' : 'generation', freshness: 'current', policy, results: [hit] }
           : { root: fake.failure === 'root' ? '/wrong/root' : fake.root, generation: 'generation',
             revision: 'revision', freshness: 'current', policy, counts: { files: 1 }, exclusions: { symlinks: 0 } }
@@ -75,6 +79,7 @@ describe('doctor rejects incomplete or inconsistent server evidence', () => {
     ['root', /root/, ['repository_status']],
     ['generation', /generation/, ['repository_status', 'repository_refresh', 'repository_search']],
     ['hash', /sha256/, ['repository_status', 'repository_refresh', 'repository_search', 'repository_packet']],
+    ['coverage', /not report example\.ts as cited/, ['repository_status', 'repository_refresh', 'repository_search', 'repository_packet', 'repository_explore', 'repository_coverage']],
     ['connect', /handshake/, []],
   ] as const)('fails closed on %s and closes its owned transport', async (failure, error, calls) => {
     fake.failure = failure

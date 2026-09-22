@@ -40,7 +40,8 @@ describe('repository doctor using installed stdio entrypoint', () => {
       binding: { command: process.execPath, args: [expect.stringContaining('encrypted-context.mjs'), 'navigate', root] },
       evidence: { path: 'example.ts', line: 1, sha256: expect.stringMatching(/^[a-f0-9]{64}$/) },
     })
-    expect([...result.tools].sort()).toEqual(['repository_packet', 'repository_refresh', 'repository_search', 'repository_status'])
+    expect([...result.tools].sort()).toEqual(['repository_coverage', 'repository_explore', 'repository_packet', 'repository_refresh', 'repository_search', 'repository_status'])
+    expect(result.explore).toEqual({ matchedLines: 1, definitions: 1 })
     expect(result.exclusions).toMatchObject({ symlinks: expect.any(Number), unsupported: expect.any(Number) })
     expect(JSON.stringify(result)).not.toContain('PRIVATE_SOURCE_SENTINEL')
     expect((await git(root, 'status', '--porcelain', '--untracked-files=all')).stdout).toBe(before.stdout)

@@ -66,3 +66,12 @@ suffix count, planner-rejection wording and the incomplete proposed C++ suffix
 set before accepting this document. The original draft is retained privately.
 See [the execution ledger](DOGFOOD-EXECUTION.md) for usage and remaining client
 acceptance limits. This is not a measured savings comparison.
+
+## Explore resolution
+
+`repository_explore` matches exact tokens in every navigated suffix. It resolves
+declarations, enclosing scopes, test titles and import lines only for the
+TypeScript and JavaScript suffixes handled by the `plan` packet column above,
+using the parser without a type checker. Hits in other suffixes are listed
+lexically with their file and line and no scope label; the response counts
+those files so the reader can tell which references were not resolved.

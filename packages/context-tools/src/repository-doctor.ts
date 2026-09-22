@@ -12,6 +12,8 @@ const REQUIRED_TOOLS = [
   'repository_status',
   'repository_refresh',
   'repository_search',
+  'repository_explore',
+  'repository_coverage',
   'repository_packet',
 ] as const;
 
@@ -82,6 +84,10 @@ interface DoctorReport {
     path: string;
     line: number;
     sha256: string;
+  };
+  explore: {
+    matchedLines: number;
+    definitions: number;
   };
   clientAcceptance: 'not-tested';
   nextStep: string;
@@ -406,6 +412,7 @@ export async function diagnoseRepository(
         maxResults: 1,
         maxBytes: 8192,
         maxVisited: 10000,
+        format: 'json',
       }),
       'repository_search',
     );
@@ -463,6 +470,7 @@ export async function diagnoseRepository(
         spec,
         expectedGeneration: refreshGeneration,
         maxBytes: 16384,
+        format: 'json',
       }),
       'repository_packet',
     );
@@ -545,6 +553,45 @@ export async function diagnoseRepository(
       throw new DoctorError('packet line content does not match search hit text');
     }
 
+    const exploreRaw = requireObject(
+      await callTool('repository_explore', {
+        symbol: term,
+        expectedGeneration: refreshGeneration,
+        maxBytes: 16384,
+        format: 'json',
+      }),
+      'repository_explore',
+    );
+    if (exploreRaw.generation !== refreshGeneration) {
+      throw new DoctorError('repository_explore generation does not match refresh generation');
+    }
+    const exploreMatched = requireNumber(exploreRaw.matchedLines, 'explore.matchedLines');
+    if (exploreMatched < 1) {
+      throw new DoctorError(`repository_explore matched no exact-case line for ${term}; check the identifier's case`);
+    }
+    const exploreDefinitions = Array.isArray(exploreRaw.definitions) ? exploreRaw.definitions.length : 0;
+
+    const coverageRaw = requireObject(
+      await callTool('repository_coverage', {
+        symbols: [term],
+        answer: `Evidence: ${hit.path}`,
+        expectedGeneration: refreshGeneration,
+        format: 'json',
+      }),
+      'repository_coverage',
+    );
+    if (coverageRaw.generation !== refreshGeneration) {
+      throw new DoctorError('repository_coverage generation does not match refresh generation');
+    }
+    const coverageFiles = Array.isArray(coverageRaw.files) ? coverageRaw.files : [];
+    const coveredHit = coverageFiles.some((file) => {
+      const entry = file as { path?: unknown; status?: unknown };
+      return entry.path === hit.path && entry.status === 'cited';
+    });
+    if (!coveredHit) {
+      throw new DoctorError(`repository_coverage did not report ${hit.path} as cited`);
+    }
+
     const report: DoctorReport = {
       version: 1,
       ok: true,
@@ -566,9 +613,13 @@ export async function diagnoseRepository(
         line: hit.line,
         sha256: hit.sha256,
       },
+      explore: {
+        matchedLines: exploreMatched,
+        definitions: exploreDefinitions,
+      },
       clientAcceptance: 'not-tested',
       nextStep:
-        'Merge binding into the selected project client configuration, reconnect, and verify all four tools in that client. Directory changes do not retarget the server.',
+        'Merge binding into the selected project client configuration, reconnect, and verify all five tools in that client. Directory changes do not retarget the server.',
     };
 
     return report;

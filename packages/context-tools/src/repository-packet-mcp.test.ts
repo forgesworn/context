@@ -34,7 +34,7 @@ async function connect(root: string) {
   return { client, navigation, close: async () => { await client.close(); await server.close() } }
 }
 function text(result: { content?: unknown }): string { return ((result.content as Array<{ text: string }>)[0]).text }
-function call(client: Client, arguments_: object) { return client.callTool({ name: 'repository_packet', arguments: arguments_ }) as Promise<{ isError?: boolean; content?: unknown }> }
+function call(client: Client, arguments_: object) { return client.callTool({ name: 'repository_packet', arguments: { format: 'json', ...arguments_ } }) as Promise<{ isError?: boolean; content?: unknown }> }
 
 afterEach(async () => { await Promise.all(roots.splice(0).map((value) => rm(value, { recursive: true, force: true }))) })
 
@@ -47,7 +47,7 @@ describe('repository packet MCP adapter', () => {
     const connection = await connect(value)
     const fixtureSpec = (sources: unknown[]) => ({ ...spec(sources), allowedFiles: [file] })
     const search = async (term: string) => {
-      const result = await connection.client.callTool({ name: 'repository_search', arguments: { term } })
+      const result = await connection.client.callTool({ name: 'repository_search', arguments: { term, format: 'json' } })
       expect(result.isError).not.toBe(true)
       return JSON.parse(text(result))
     }
@@ -114,7 +114,7 @@ describe('repository packet MCP adapter', () => {
     try {
       const refreshed = await connection.client.callTool({ name: 'repository_refresh', arguments: {} })
       const expectedGeneration = JSON.parse(text(refreshed)).generation
-      const found = await connection.client.callTool({ name: 'repository_search', arguments: { term: 'DartMarker' } })
+      const found = await connection.client.callTool({ name: 'repository_search', arguments: { format: 'json', term: 'DartMarker' } })
       expect(found.isError).not.toBe(true)
       expect(JSON.parse(text(found)).results).toEqual([])
       for (const mode of ['build', 'plan']) {
@@ -130,11 +130,11 @@ describe('repository packet MCP adapter', () => {
     const value = await root(); const connection = await connect(value)
     try {
       const tools = await connection.client.listTools()
-      expect(tools.tools.map((tool) => tool.name).sort()).toEqual(['repository_packet', 'repository_refresh', 'repository_search', 'repository_status'])
+      expect(tools.tools.map((tool) => tool.name).sort()).toEqual(['repository_coverage', 'repository_explore', 'repository_packet', 'repository_refresh', 'repository_search', 'repository_status'])
       const packetTool = tools.tools.find((tool) => tool.name === 'repository_packet')
       expect(packetTool?.inputSchema.type).toBe('object')
       expect(packetTool?.inputSchema.additionalProperties).toBe(false)
-      expect(Object.keys(packetTool?.inputSchema.properties ?? {}).sort()).toEqual(['expectedGeneration', 'maxBytes', 'mode', 'spec'])
+      expect(Object.keys(packetTool?.inputSchema.properties ?? {}).sort()).toEqual(['expectedGeneration', 'format', 'maxBytes', 'mode', 'spec'])
       expect(packetTool?.inputSchema.required).toEqual(['mode', 'spec', 'expectedGeneration'])
       const early = await call(connection.client, { mode: 'build', spec: spec([{ path: 'alpha.ts', startLine: 1, endLine: 3 }]), expectedGeneration: 'missing' })
       expect(early.isError).toBe(true)
@@ -211,6 +211,28 @@ describe('repository packet MCP adapter', () => {
       connection.navigation.status = originalStatus
       const recovered = await call(connection.client, { mode: 'build', spec: spec([{ path: 'alpha.ts', startLine: 1, endLine: 3 }]), expectedGeneration: generation })
       expect(recovered.isError).not.toBe(true)
+    } finally { await connection.close() }
+  })
+})
+
+describe('repository packet compact rendering', () => {
+  it('returns numbered source lines with a provenance header by default', async () => {
+    const value = await root(); const connection = await connect(value)
+    try {
+      const refreshed = await connection.client.callTool({ name: 'repository_refresh', arguments: {} }) as { content: unknown }
+      const generation = (JSON.parse(text(refreshed)) as { generation: string }).generation
+      const built = await connection.client.callTool({ name: 'repository_packet', arguments: { mode: 'build', spec: spec([{ path: 'alpha.ts', startLine: 1, endLine: 3 }]), expectedGeneration: generation } }) as { isError?: boolean; content?: unknown }
+      expect(built.isError).not.toBe(true)
+      const lines = text(built).split('\n')
+      expect(lines[0]).toMatch(new RegExp(`^packet build  generation ${generation}  revision [a-f0-9]{16}  gitHEAD [a-f0-9]{12}  trust unsigned  policy current$`))
+      expect(lines[1]).toBe('task: Packet test')
+      expect(lines[2]).toMatch(/^source alpha\.ts:1-3  sha256 [a-f0-9]{16}  3 lines$/)
+      expect(lines.slice(3, 6)).toEqual(['1: export function alpha() {', '2:   return 1', '3: }'])
+      expect(lines[6]).toMatch(/^allowed: alpha\.ts \(present, [a-f0-9]{16}\)$/)
+      expect(lines.at(-1)).toMatch(/^caveat: /)
+      const planned = await connection.client.callTool({ name: 'repository_packet', arguments: { mode: 'plan', spec: spec([{ path: 'alpha.ts', line: 2 }]), expectedGeneration: generation } }) as { isError?: boolean; content?: unknown }
+      expect(planned.isError).not.toBe(true)
+      expect(text(planned)).toContain('resolved: alpha.ts:2 -> 1-3 (function)\nmerged: alpha.ts:1-3\ncoverage: ')
     } finally { await connection.close() }
   })
 })

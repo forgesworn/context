@@ -58,7 +58,7 @@ describe('repository navigation MCP adapter', () => {
     try {
       const tools = await client.listTools()
       const names = tools.tools.map((t) => t.name).sort()
-      expect(names).toEqual(['repository_packet', 'repository_refresh', 'repository_search', 'repository_status'])
+      expect(names).toEqual(['repository_coverage', 'repository_explore', 'repository_packet', 'repository_refresh', 'repository_search', 'repository_status'])
     } finally {
       await serverClose()
     }
@@ -131,7 +131,7 @@ describe('repository navigation MCP adapter', () => {
       await client.callTool({ name: 'repository_refresh', arguments: {} })
       const result = (await client.callTool({
         name: 'repository_search',
-        arguments: { term: 'alphaToken', maxBytes: 8192 },
+        arguments: { term: 'alphaToken', maxBytes: 8192, format: 'json' },
       })) as { content: Array<{ type: string; text: string }>; isError?: boolean }
       expect(result.isError).not.toBe(true)
       const text = textOf(result)
@@ -159,7 +159,7 @@ describe('repository navigation MCP adapter', () => {
       await client.callTool({ name: 'repository_refresh', arguments: {} })
       const first = (await client.callTool({
         name: 'repository_search',
-        arguments: { term: 'alphaToken', maxResults: 1 },
+        arguments: { term: 'alphaToken', maxResults: 1, format: 'json' },
       })) as { content: Array<{ type: string; text: string }>; isError?: boolean }
       expect(first.isError).not.toBe(true)
       const firstParsed = JSON.parse(textOf(first)) as {
@@ -175,7 +175,7 @@ describe('repository navigation MCP adapter', () => {
 
       const second = (await client.callTool({
         name: 'repository_search',
-        arguments: { term: 'alphaToken', maxResults: 1, cursor: firstParsed.nextCursor },
+        arguments: { term: 'alphaToken', maxResults: 1, cursor: firstParsed.nextCursor, format: 'json' },
       })) as { content: Array<{ type: string; text: string }>; isError?: boolean }
       expect(second.isError).not.toBe(true)
       const secondParsed = JSON.parse(textOf(second)) as {
@@ -226,7 +226,7 @@ describe('repository navigation MCP adapter', () => {
 
       const page = (await client.callTool({
         name: 'repository_search',
-        arguments: { term: 'alphaToken', maxResults: 1 },
+        arguments: { term: 'alphaToken', maxResults: 1, format: 'json' },
       })) as { content: Array<{ type: string; text: string }> }
       const pageBody = JSON.parse(textOf(page)) as { nextCursor: string }
       const staleCursor = pageBody.nextCursor
@@ -261,7 +261,7 @@ describe('repository navigation MCP adapter', () => {
       await b.client.callTool({ name: 'repository_refresh', arguments: {} })
       const inA = (await a.client.callTool({
         name: 'repository_search',
-        arguments: { term: 'uniqueA' },
+        arguments: { term: 'uniqueA', format: 'json' },
       })) as { content: Array<{ type: string; text: string }>; isError?: boolean }
       expect(inA.isError).not.toBe(true)
       const parsedA = JSON.parse(textOf(inA)) as {
@@ -271,7 +271,7 @@ describe('repository navigation MCP adapter', () => {
       expect(parsedA.results[0].text).toContain('uniqueA')
       const inB = (await b.client.callTool({
         name: 'repository_search',
-        arguments: { term: 'uniqueA' },
+        arguments: { term: 'uniqueA', format: 'json' },
       })) as { content: Array<{ type: string; text: string }>; isError?: boolean }
       expect(inB.isError).not.toBe(true)
       const parsedB = JSON.parse(textOf(inB)) as { results?: unknown[] }
@@ -325,6 +325,133 @@ describe('repository navigation MCP adapter', () => {
         arguments: { term: 'alphaToken' },
       })) as { content: Array<{ type: string; text: string }>; isError?: boolean }
       expect(searched.isError).not.toBe(true)
+    } finally {
+      await serverClose()
+    }
+  })
+})
+
+describe('repository navigation MCP compact rendering and explore', () => {
+  const OWNERSHIP = [
+    '/** Options bound to the owner. */',
+    'export function ownerOptions(input: string): string {',
+    '  return input',
+    '}',
+    'export class Store {',
+    '  write(value: string): string { return ownerOptions(value) }',
+    '}',
+    '',
+  ].join('\n')
+  const SERVER = "import { ownerOptions, Store } from './ownership.js'\nexport const createServer = () => new Store().write(ownerOptions('root'))\n"
+  const TEST = "import { it, expect } from 'vitest'\nimport { ownerOptions } from './ownership.js'\nit('returns its input', () => {\n  expect(ownerOptions('a')).toBe('a')\n})\n"
+
+  async function symbolRoot(): Promise<string> {
+    const root = await makeRoot({ alpha: OWNERSHIP, beta: SERVER })
+    await writeFile(join(root, 'beta.test.ts'), TEST)
+    return root
+  }
+
+  it('renders search pages as grouped text by default with a compact header and cursor hint', async () => {
+    const root = await symbolRoot()
+    const { client, serverClose } = await connect(root)
+    try {
+      const refreshed = JSON.parse(textOf(await client.callTool({ name: 'repository_refresh', arguments: {} }) as { content: unknown })) as { generation: string }
+      const page = (await client.callTool({ name: 'repository_search', arguments: { term: 'ownerOptions', maxResults: 2 } })) as { content: Array<{ type: string; text: string }>; isError?: boolean }
+      expect(page.isError).not.toBe(true)
+      const lines = textOf(page).split('\n')
+      expect(lines[0]).toBe(`search owneroptions  2 lines in 1 files  stopped at max-results (visited 2)  generation ${refreshed.generation}  freshness current  policy current`)
+      expect(lines[1]).toMatch(/^alpha\.ts  [a-f0-9]{16}$/)
+      expect(lines[2]).toBe('  2: export function ownerOptions(input: string): string {')
+      expect(lines[3]).toBe('  6:   write(value: string): string { return ownerOptions(value) }')
+      expect(lines[4]).toMatch(/^next: cursor [a-f0-9]{32} with the same term; or narrow with pathPrefix/)
+      expect(textOf(page)).not.toContain('sha256')
+      const narrowed = (await client.callTool({ name: 'repository_search', arguments: { term: 'ownerOptions', pathPrefix: 'beta' } })) as { content: Array<{ type: string; text: string }> }
+      const narrowedLines = textOf(narrowed).split('\n')
+      expect(narrowedLines[0]).toMatch(/^search owneroptions  4 lines in 2 files  prefix beta  complete/)
+      expect(narrowedLines.filter((line) => /^beta(\.test)?\.ts  [a-f0-9]{16}$/.test(line))).toHaveLength(2)
+      expect(narrowedLines.some((line) => line.startsWith('alpha.ts'))).toBe(false)
+    } finally {
+      await serverClose()
+    }
+  })
+
+  it('explores a symbol in one call, honours expectedGeneration and maxBytes, and rejects stale navigation', async () => {
+    const root = await symbolRoot()
+    const { client, serverClose } = await connect(root)
+    try {
+      const early = (await client.callTool({ name: 'repository_explore', arguments: { symbol: 'ownerOptions' } })) as { isError?: boolean }
+      expect(early.isError).toBe(true)
+      const refreshed = JSON.parse(textOf(await client.callTool({ name: 'repository_refresh', arguments: {} }) as { content: unknown })) as { generation: string }
+      const explored = (await client.callTool({ name: 'repository_explore', arguments: { symbol: 'ownerOptions', expectedGeneration: refreshed.generation } })) as { content: Array<{ type: string; text: string }>; isError?: boolean }
+      expect(explored.isError).not.toBe(true)
+      const text = textOf(explored)
+      expect(text.split('\n')[0]).toMatch(new RegExp(`^explore ownerOptions  6 lines in 3 files  generation ${refreshed.generation}  revision [a-f0-9]{16}  freshness current$`))
+      expect(text).toMatch(/^definition alpha\.ts:1-4  exported function ownerOptions  sha256 [a-f0-9]{16}$/m)
+      expect(text).toContain('1: /** Options bound to the owner. */\n2: export function ownerOptions(input: string): string {\n3:   return input\n4: }')
+      expect(text).toContain("tests 1 lines in 1 files\nbeta.test.ts\n  4 in it('returns its input'):   expect(ownerOptions('a')).toBe('a')")
+      expect(text).toContain('references 2 lines in 2 files\nalpha.ts\n  6 in Store.write:   write(value: string): string { return ownerOptions(value) }\nbeta.ts\n  2 in createServer: export const createServer = () => new Store().write(ownerOptions(\'root\'))')
+      expect(text).toContain('imports 2 files: beta.test.ts, beta.ts')
+
+      const mismatch = (await client.callTool({ name: 'repository_explore', arguments: { symbol: 'ownerOptions', expectedGeneration: 'other' } })) as { isError?: boolean; content: Array<{ text: string }> }
+      expect(mismatch.isError).toBe(true)
+      expect(mismatch.content[0].text).toMatch(/expectedGeneration/)
+
+      const json = (await client.callTool({ name: 'repository_explore', arguments: { symbol: 'Store.write', format: 'json' } })) as { content: Array<{ text: string }>; isError?: boolean }
+      expect(json.isError).not.toBe(true)
+      const parsed = JSON.parse(textOf(json)) as { definitions: Array<{ name: string; kind: string }>; references: Array<{ path: string; scope: string }>; generation: string }
+      expect(parsed.generation).toBe(refreshed.generation)
+      expect(parsed.definitions).toEqual([expect.objectContaining({ name: 'Store.write', kind: 'method' })])
+      expect(parsed.references).toEqual([expect.objectContaining({ path: 'beta.ts', scope: 'in createServer' })])
+
+      const tight = (await client.callTool({ name: 'repository_explore', arguments: { symbol: 'ownerOptions', maxBytes: 1024 } })) as { content: Array<{ text: string }>; isError?: boolean }
+      expect(tight.isError).not.toBe(true)
+      expect(Buffer.byteLength(textOf(tight), 'utf8')).toBeLessThanOrEqual(1024)
+
+      let invalid: unknown
+      try { invalid = await client.callTool({ name: 'repository_explore', arguments: { symbol: 'two words' } }) } catch (error) { invalid = error }
+      expect((invalid as { code?: number }).code === -32602 || (invalid as { isError?: boolean }).isError === true).toBe(true)
+
+      await writeFile(join(root, 'beta.ts'), SERVER + '// edited\n')
+      const stale = (await client.callTool({ name: 'repository_explore', arguments: { symbol: 'ownerOptions' } })) as { isError?: boolean; content: Array<{ text: string }> }
+      expect(stale.isError).toBe(true)
+      expect(stale.content[0].text).toMatch(/requires current navigation/)
+    } finally {
+      await serverClose()
+    }
+  })
+
+  it('reports which explored files a draft answer leaves uncited', async () => {
+    const root = await symbolRoot()
+    const { client, serverClose } = await connect(root)
+    try {
+      const refreshed = JSON.parse(textOf(await client.callTool({ name: 'repository_refresh', arguments: {} }) as { content: unknown })) as { generation: string }
+      const draft = 'ownerOptions is defined in alpha.ts and called from beta.ts.'
+      const checked = (await client.callTool({ name: 'repository_coverage', arguments: { symbols: ['ownerOptions'], answer: draft, expectedGeneration: refreshed.generation } })) as { content: Array<{ type: string; text: string }>; isError?: boolean }
+      expect(checked.isError).not.toBe(true)
+      const lines = textOf(checked).split('\n')
+      expect(lines[0]).toMatch(new RegExp(`^coverage ownerOptions  3 files: 1 missing, 0 named, 2 cited  generation ${refreshed.generation}  revision [a-f0-9]{16}  freshness current$`))
+      expect(lines[1]).toBe("missing test beta.test.ts  [ownerOptions]  in it('returns its input')")
+      expect(lines[2]).toBe('cited: alpha.ts, beta.ts')
+      expect(lines[3]).toMatch(/^next: address each missing or named file/)
+
+      const json = (await client.callTool({ name: 'repository_coverage', arguments: { symbols: ['ownerOptions', 'Store.write'], answer: `${draft} Tests: beta.test.ts.`, format: 'json' } })) as { content: Array<{ text: string }>; isError?: boolean }
+      expect(json.isError).not.toBe(true)
+      const parsed = JSON.parse(textOf(json)) as { counts: Record<string, number>; files: Array<{ path: string; role: string; status: string; symbols: string[] }> }
+      expect(parsed.counts).toEqual({ missing: 0, named: 0, cited: 3 })
+      expect(parsed.files.find((file) => file.path === 'alpha.ts')).toMatchObject({ role: 'definition', symbols: ['Store.write', 'ownerOptions'] })
+
+      const mismatch = (await client.callTool({ name: 'repository_coverage', arguments: { symbols: ['ownerOptions'], answer: draft, expectedGeneration: 'other' } })) as { isError?: boolean; content: Array<{ text: string }> }
+      expect(mismatch.isError).toBe(true)
+      expect(mismatch.content[0].text).toMatch(/expectedGeneration/)
+
+      let tooMany: unknown
+      try { tooMany = await client.callTool({ name: 'repository_coverage', arguments: { symbols: Array.from({ length: 9 }, (_, i) => `s${i}`), answer: draft } }) } catch (error) { tooMany = error }
+      expect((tooMany as { code?: number }).code === -32602 || (tooMany as { isError?: boolean }).isError === true).toBe(true)
+
+      await writeFile(join(root, 'beta.ts'), SERVER + '// edited\n')
+      const stale = (await client.callTool({ name: 'repository_coverage', arguments: { symbols: ['ownerOptions'], answer: draft } })) as { isError?: boolean; content: Array<{ text: string }> }
+      expect(stale.isError).toBe(true)
+      expect(stale.content[0].text).toMatch(/requires current navigation/)
     } finally {
       await serverClose()
     }
