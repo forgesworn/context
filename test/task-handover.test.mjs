@@ -1,14 +1,12 @@
 import assert from 'node:assert/strict';
-import { execFile } from 'node:child_process';
 import { realpath, mkdtemp, rm, writeFile, readFile, stat, symlink } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { promisify } from 'node:util';
 import test, { after } from 'node:test';
 import { saveHandover, resumeHandover } from '../scripts/task-handover.mjs';
 import { buildPacket } from '../scripts/worker-packet.mjs';
 
-const exec = promisify(execFile);
+import { fixtureExec as exec } from './git-fixture.mjs';
 const fixtures = [];
 
 after(async () => {
