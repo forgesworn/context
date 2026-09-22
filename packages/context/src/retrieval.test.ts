@@ -74,4 +74,19 @@ describe('bounded retrieval of authorised signed context', () => {
     expect(() => f.vault.retrieve('ff'.repeat(32), { query: 'turbine' })).toThrow('not available')
     expect(() => f.vault.retrieve(f.view().id, { query: '', maxRecords: 99 })).toThrow()
   })
+
+  it('ranks focused evidence above a long record that merely mentions every term', async () => {
+    const f = await fixture()
+    const filler = Array.from({ length: 12 }, (_, i) => `staffing rota parking canteen note${i}`).join(' ')
+    const decoy = await f.add(`${filler} bearing ${filler} wear ${filler} schedule`, 'fixture://minutes')
+    const focused = await f.add('Bearing wear: bearing wear measured, bearing wear within limits.', 'fixture://maintenance')
+    for (const text of ['Staffing rota agreed.', 'Parking permits renewed.', 'Canteen menu changed.', 'Rota swap approved.']) await f.add(text, 'fixture://office')
+    const named = await f.add('Inspection intervals for rotating parts.', 'fixture://gearbox.md')
+    const top = (query: string) => f.vault.retrieve(f.view().id, { query, maxRecords: 1, includeRelated: false }).records.map(r => r.id)
+    // Presence-only scoring prefers the decoy, which contains all three terms once.
+    expect(top('bearing wear schedule')).toEqual([focused.id])
+    expect(f.vault.retrieve(f.view().id, { query: 'bearing wear schedule', includeRelated: false }).records.map(r => r.id)).toEqual([focused.id, decoy.id])
+    // A term naming the source label counts beyond a passing mention.
+    expect(top('gearbox inspection')).toEqual([named.id])
+  })
 })

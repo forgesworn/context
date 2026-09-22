@@ -22,8 +22,46 @@ export interface ContextRetrieval {
 
 const encoder = new TextEncoder()
 const stop = new Set('a an and are as at be by for from how i in is it of on or that the this to was we what which with'.split(' '))
+function tokens(text: string): string[] {
+  return (text.normalize('NFKC').toLowerCase().match(/[\p{L}\p{N}]+/gu) ?? []).filter(w => !stop.has(w))
+}
 function words(text: string): Set<string> {
-  return new Set((text.normalize('NFKC').toLowerCase().match(/[\p{L}\p{N}]+/gu) ?? []).filter(w => !stop.has(w)))
+  return new Set(tokens(text))
+}
+function counts(text: string): Map<string, number> {
+  const out = new Map<string, number>()
+  for (const token of tokens(text)) out.set(token, (out.get(token) ?? 0) + 1)
+  return out
+}
+// BM25 over record text, plus a bonus when a query term names the record's
+// source label (a file or URL path), so a record from `blossom.ts` outranks
+// one that merely mentions Blossom as often.
+const K1 = 1.2
+const B = 0.75
+const SOURCE_WEIGHT = 1
+interface Indexed { row: RecordView; text: Map<string, number>; length: number; source: Set<string> }
+function rank(rows: RecordView[], terms: Set<string>): { row: RecordView; score: number }[] {
+  const indexed: Indexed[] = rows.map(row => {
+    const text = counts(row.text)
+    let length = 0
+    for (const n of text.values()) length += n
+    return { row, text, length, source: words(row.source) }
+  })
+  const average = indexed.reduce((sum, r) => sum + r.length, 0) / Math.max(1, indexed.length) || 1
+  const idf = new Map([...terms].map(term => {
+    const df = indexed.filter(r => r.text.has(term) || r.source.has(term)).length
+    return [term, Math.log(1 + (indexed.length - df + 0.5) / (df + 0.5))]
+  }))
+  return indexed.map(({ row, text, length, source }) => {
+    let score = 0
+    for (const term of terms) {
+      const weight = idf.get(term)!
+      const tf = text.get(term) ?? 0
+      if (tf) score += weight * (tf * (K1 + 1)) / (tf + K1 * (1 - B + B * length / average))
+      if (source.has(term)) score += weight * SOURCE_WEIGHT
+    }
+    return { row, score }
+  })
 }
 function size(result: ContextRetrieval): number {
   // bytesUsed is itself in the JSON. Settle its digit count before checking the cap.
@@ -45,9 +83,7 @@ export function retrieveView(view: ContextView, options: ContextRetrievalOptions
   if (typeof includeRelated !== 'boolean' || observedSince !== undefined && (!Number.isSafeInteger(observedSince) || observedSince < 0)) throw new Error('Invalid context retrieval options.')
   const rows = view.records.filter(r => observedSince === undefined || r.observedAt >= observedSince)
   const terms = words(query)
-  const indexed = rows.map(row => ({ row, tokens: words(`${row.text}\n${row.source}`) }))
-  const weights = new Map([...terms].map(term => [term, 1 + Math.log((rows.length + 1) / (1 + indexed.filter(r => r.tokens.has(term)).length))]))
-  const direct = indexed.map(({ row, tokens }) => ({ row, score: [...terms].reduce((s, term) => s + (tokens.has(term) ? weights.get(term)! : 0), 0) }))
+  const direct = rank(rows, terms)
     .filter(r => r.score > 0).sort((a, b) => b.score - a.score || b.row.observedAt - a.row.observedAt || a.row.id.localeCompare(b.row.id))
   const links: ContextLink[] = []
   if (includeRelated) {
