@@ -3,6 +3,21 @@
 21 September 2026. This records implementation and acceptance separately from
 the [goal definitions](FORGESWORN-DOGFOOD-GOALS.md).
 
+## Routing update: DeepSeek and GLM focus
+
+Operator decision, 21 September 2026: remove Qwen from the default Context
+workflow. DeepSeek Flash/thinking off now owns routine worker tasks, including
+useful extraction and synthesis; use deterministic tools where sufficient.
+GLM/low is a candidate for bounded implementation/tests and visual work, pending
+useful task acceptance. Eligible Pro is an option for harder implementation;
+qualified frontier models retain difficult design and consequential review.
+
+The next packet handoff is assigned to Flash/thinking off. Measure total cost
+per accepted result at the required development quality, including failed
+attempts and host review. This updates project instructions and plans only:
+no inference, endpoint change or automatic model routing occurred. Historical
+worker receipts and locked comparisons remain evidence of their original runs.
+
 ## Initial pilot implementation and verification
 
 - `04fda60`: adoption goals and daily agent workflow.
@@ -276,6 +291,163 @@ requires locked executable task definitions, actual paired runs and complete
 accounting. The developer reporter does not change the pinned navigation
 package, select models or execute provider calls.
 
+## Disabled-client inventory acceptance
+
+Six fresh Codex CLI 0.155.1 app-server processes exercised the existing pinned
+bindings in Context, KithMoot and Oathrun. For each explicit project directory,
+the enabled process returned exactly `repository_status`, `repository_refresh`
+and `repository_search`; the disabled process returned an empty tool catalogue
+for `z1p-repository`, without a tool-discovery error. All inventory pages were
+consumed. The disabled server remains a configuration entry; its tools are absent.
+
+The check used a per-process `mcp_servers.z1p-repository.enabled=false` override,
+without editing any project configuration. Unrelated configured MCP servers were
+disabled in that process; the client-managed app catalogue was not used. The
+check sent `initialize`, `initialized` and `mcpServerStatus/list` with `detail:
+"full"`. No model turn or inference request was started. This is the actual raw
+client catalogue missing from the earlier CLI transcript, not a model's account
+of its available tools. It closes D3 together with the earlier real tasks and
+positive/negative root-isolation checks; it is not room-consumer acceptance.
+
+Reproduce with `codex app-server --stdio` from the bound project directory,
+once enabled and once with `-c mcp_servers.z1p-repository.enabled=false`, using
+the [documented app-server protocol](https://learn.chatgpt.com/docs/app-server).
+The exact collector, generated protocol types, six raw transcripts and summary
+are retained privately in `20260921-d3-client-w6qs0oay`. The host performed these
+deterministic checks; complete host usage remains unavailable.
+
+## Heartwood daily-use handoff
+
+Heartwood has a separate local Codex binding to the same pinned navigation
+release. A fresh SDK client indexed 150 files / 56,817 locations, verified source
+hashes for four approval-policy identifier searches and returned no match for
+the Context-only negative query. Codex configuration inspection confirmed its
+explicit Heartwood root. Private setup evidence is retained in
+`20260921-heartwood-dogfood-rgc8nnk1`.
+
+The operator reports that the persistent-app-approvals task is now dogfooding in
+another Codex session. That session owns implementation, model routing, usage
+and task acceptance. A read-only M4 helper status check found a live-owner
+DeepSeek Pro request for that task; no competing worker was dispatched and its
+pending marker was preserved. This is activity evidence, not an accepted result.
+This Context session has not verified its completed task
+or changed its checkout, client configuration or worker jobs during the D3/D5
+follow-up. The ignored plan stays outside the navigation index. Ordinary-use
+receipts can inform usability, but cannot be retroactively called a controlled
+baseline or a locked D5 pair. The planned comparison uses isolated Context and
+KithMoot revisions instead.
+
+## D5 qualification: harness repaired; assisted answer rejected
+
+The [comparison protocol](D5-RESULTS.md) was locked at
+`2026-09-21T14:44:42.000Z` on immutable Context and KithMoot revisions,
+with one orientation, diagnosis, impact and coding task per repository. Eight
+private task snapshots, including three seeded regressions, passed fresh pinned
+navigation checks: unavailable → refresh → current, positive source hashes and
+negative cross-root retrieval. The largest scope has 216 files / 47,044
+locations; no limit or exclusion was relaxed. Receipts and task/setup hashes
+are retained with `20260921-d3-client-w6qs0oay`.
+
+Sol/high designed the protocol. Review caught non-applying seed patches,
+unusable hidden exact-answer requirements, a path-containment check that
+rejected valid answers, a trailing-newline identifier edge case and missing
+executable-helper hash bindings. These were repaired and verified before locking.
+Terra/medium implemented the bounded helper and verifier repairs
+because the shared M4 is occupied by Heartwood; no competing Ollama request was
+made. The host independently qualified the scopes and reviewed the design.
+Complete host/collaboration usage remains unknown. Both code checkers reject the
+seeded or unimplemented behaviour and pass the reference repair; six structured
+checkers accept valid source-backed fixtures and reject altered citations.
+Structured checking validates schema and frozen-source provenance; a separate
+blind Sol/high review must accept the conclusions. Hashes bind tasks, seeded
+patches, measurement rules, model settings and executable helpers.
+
+Independent verification passed all eight definitions. The whole-task reporter
+accepts the locked input and reports `incomplete` solely for sixteen missing
+arms, with no reduction percentage. The fixed executor is Luna/medium and the
+blind reviewer is Sol/high in both arms; this isolates retrieval from model
+routing. Preparation and reference checks are not trial arms and establish no
+inference saving. The initial pre-run report is retained. The [first pair](D5-RESULTS.md)
+has since run: both answers failed citations and semantic review, and accounting
+is incomplete. Fourteen arms remain unrun. Resolve the recorded prompt and
+receipt gaps prospectively before expanding; unknown billing or host usage must
+remain unknown.
+
+The existing repository check passed 170 tests and independent packed-package
+smoke on Node 24.21.0. Both unchanged benchmark gates passed with declared-source
+recall 1.0. These local results do not constitute new CI or registry acceptance.
+
+## D5 prospective harness repairs and corrected qualification
+
+The [v2 qualification](D5-RESULTS.md) exposed a default
+read-only Codex sandbox that blocked answer creation and self-checking. Its two
+rejections are retained. A minimal independent write-capability fixture then
+proved the explicit workspace-write executor setting and successful self-check;
+reviewers remain read-only. Sol/high approved the prospective v3 delta.
+
+The [v3 qualification](D5-RESULTS.md) completed with
+Luna/medium executors and separate Sol/high reviewers. Both answers passed exact
+citations and frozen-source checks after recorded in-session repairs. Baseline
+passed semantic review; assisted incorrectly described source freshness and
+failed-refresh behaviour, so it was rejected. Assisted whole-arm input increased
+from 664,134 to 705,141 tokens when review was included, and review time rose
+from 70.12 to 114.10 seconds. Billing and host/setup usage remain unknown.
+
+The harness now preserves full public tasks, scoped citation self-checks, original
+source hashes, explicit sandbox/toolchain settings, observed event timestamps,
+ordered retrieval evidence and failure receipts. Twelve runner tests, six public
+checker tests, prepared-arm fixtures and locked verification pass locally. Flash
+was blocked by an active shared M4 request before inference; Terra/medium drafted
+the bounded helpers, with recorded host repairs and Sol/high review. No Heartwood
+checkout, job or configuration changed. No production package code changed.
+
+D5 stays open. Improve assisted synthesis and reduce retrieval/review round trips
+before spending on more comparisons; preserve every failed version and setup
+cost. Fourteen v1 arms remain unrun. These qualification results are separate from
+the eight-pair reporter and do not close CI, registry, consumer or monetary gates.
+
+## Savings follow-up: complete syntax packets
+
+The [savings plan](SAVINGS-PLAN.md) diagnoses v3's 22 navigation searches,
+74 repeated locations and increased review work. It defines model assignments
+and a prospective three-way comparison with Graphify, including isolated anchor
+selection and whole-task cost accounting. No new comparison arm has run.
+
+The checkout packet helper now has a `plan` mode: explicit TS/JS line anchors
+resolve to complete supported syntax blocks, overlaps merge, and the result is
+an unchanged v1 packet accepted by `verify`. Unsigned coverage maps every anchor
+and hashes the emitted packet. Unsupported syntax and oversized results fail
+rather than silently truncating a branch. Source, policy, HEAD and root checks
+bind selection to assembly; deterministic source/policy race tests prove failure
+before output. This is a checkout helper, not a new MCP server capability.
+
+A retrospective fixture assembled 11 anchors into nine ranges / 471 unique
+lines in a 33,879-byte packet (8,565 offline o200k tokens). Exact source matches
+a manually checked reference. It demonstrates assembly and verification only;
+the task was chosen after v3's failure and has no new model answer or savings
+claim. The corrected manual-reference endpoint and range-order comparison are
+retained with the private evidence.
+
+Flash/thinking-off dispatch was rejected as busy on the M4 before inference.
+Terra/medium implemented the fallback draft and a focused completion pass.
+Host review caught missing edge coverage; repairs addressed source line-separator
+semantics, property commas, class-field functions and object methods/accessors.
+Host integration added deterministic selection/assembly race tests. Sol/high
+reviewed the design and final boundaries and found no remaining blocker within
+the documented contract. Development usage and billing remain unknown.
+
+Local validation on Node 24.21.0: `npm run check` passed 33 core, 107 tools,
+28 packet and 16 cost-report tests (184 total), plus independent package smoke.
+Both unchanged benchmark scripts passed `--check` against the freshly built
+packages with minimum required-source recall 1.0. These retain their existing
+compression-only meaning. Fresh CLI processes exercised the helper; the MCP
+server implementation is unchanged. No new CI, registry or consumer acceptance
+is claimed. Heartwood and the locked v1/v2/v3 experiment files are unchanged.
+
+Private evidence: `~/.cache/z1p-delivery/20260921-packet-savings-sd3d6paw`.
+Next: qualify an isolated worker handoff and then lock the three-way comparison,
+including billing attribution. D5 remains open.
+
 ## Gate status
 
 | Goal | Status | Remaining acceptance |
@@ -283,12 +455,404 @@ package, select models or execute provider calls.
 | D0 reproducible pilot | Passed | Named commits, matching CI, independent pinned install and actual Codex edit/stale/refresh/old-cursor exercise passed |
 | D1 daily Context use | Passed | Orientation, source-backed boundary diagnosis and accepted packet coding tasks span fresh clients; continue recording normal use |
 | D2 source selection | Passed with qualified review | Sol/high review defects repaired; root, policy, cancellation and cursor regressions pass locally and in CI |
-| D3 two additional repositories | Scoped clients passed; gate partial | Negative cross-root checks passed both ways; raw disabled-session tool absence remains unproven by the available CLI output |
+| D3 two additional repositories | Passed | Real scoped client tasks and negative cross-root checks passed; fresh enabled/disabled Codex client catalogues now prove tool absence |
 | D4 reusable worker packets | Passed | Build and read-only verification implemented; two coding tasks accepted with source packets, repairs and host review recorded; CI passed |
-| D5 whole-task savings | Report tooling ready; experiment open | Lock executable eight-pair definitions, then run with complete host/worker accounting; the unlocked template is not trial evidence |
+| D5 whole-task savings | Harness repaired; assisted qualification rejected | Improve assisted correctness and retrieval/review overhead; attributable billing unknown; fourteen original arms remain unrun |
 | D6 consumer/room integration | Open | Coordinate with Oathrun's own authority and execution gates |
 | D7 dependable distribution | Internal install passed; public open | Public publication and consumer upgrades still require G0–G4 |
 
 The immediate command-line workflow is in [daily use](DAILY-USE.md).
 Run [the navigation smoke](NAVIGATION-SMOKE.md) when validating a build and
 consult [policy semantics](NAVIGATION-POLICY.md) before expanding source scope.
+
+## Original dependency snapshots (22 September 2026)
+
+The checkout now has [maintained dependency capture, verification and bounded
+queries](DEPENDENCY-SNAPSHOTS.md), implemented independently of Graphify. It
+reads selected committed npm/Cargo manifests, recognises npm lock v2/v3 artifacts
+and explicitly selected local path/workspace references, and emits an unsigned
+dependency graph. Registry artifacts remain separate from same-named source
+repositories. Cargo lock resolution, installed-artifact checks, release
+attestations and shared team synchronisation remain open.
+
+The local Heartwood capture selected eight repositories and fourteen manifest/
+lock documents, yielding 147 declarations: 119 locked artifacts, two local source
+references and 26 unresolved declarations. Twenty-five unresolved rows are
+unsupported Cargo lock resolution; one references an unselected local target.
+Signet Login's `signet-protocol` lock is 1.10.1, with both selected producers left
+as candidates. Heartwood Ledger's relative common-crate path resolves to the
+selected ESP32 snapshot. These are declaration/lock observations, not installed
+or physical-device acceptance. The active Heartwood checkout was read only.
+
+Snapshots bind HEAD, selected file/lock hashes including negative observations,
+worktree/Git-administration identities and helper/resolver hashes. Verification
+regenerates derived rows/graph as well. Branch and general dirty flags remain
+labelled capture-time observations. Symlink/root races, partial-clone lazy fetch,
+URL credentials, output expansion and malformed reports have focused rejection
+checks. Queries are bounded and never read paths from a report as authority.
+
+Routing: deterministic capture and tests; `deepseek-v4.1-flash:cloud` with thinking
+off through the M4 for a pure resolver draft and one focused repair; qualified
+`gpt-5.6-sol`/high independent boundary review. The active host model/effort was
+not switched by worker dispatch; its exact effort is not exposed. The first
+worker draft failed two of 35 generated tests and had substantive contract gaps.
+The repair failed 24 of 45 tests and still mishandled path/lock identity. Both
+resolver drafts were rejected. Host boundary implementation replaced them;
+corrected test scaffolding from the repair was retained alongside independent
+regressions. Review findings produced further focused fixes. No further routine
+worker packet remained during final boundary review and acceptance.
+
+The two calls reported 18,668 prompt and 30,663 completion tokens (49,331 total).
+Dispositions are one rejected and one partially retained. Host preparation,
+replacement implementation and review usage/billing remain unknown; these costs
+must be counted before assessing savings. This is not a new D5 comparison arm,
+a monetary saving or a Graphify parity claim. Existing locked experiments were
+not changed.
+
+Private receipts, prompts, rejected drafts, captures and check logs:
+`~/.cache/z1p-delivery/20260921-dependency-snapshots-p6mr2mgs`.
+The folder was created on 21 September UTC; local completion is 22 September.
+
+Next: use one verified dependency query to select source for a real Heartwood
+investigation and record the complete accepted task. Loading these relationships
+into the prototype viewer and establishing release-to-source attestations are
+separate follow-ups. No npm publication, client rebinding or shared MCP server
+implementation change was made by this slice.
+
+Local validation for this slice passed on Node 24.21.0: `npm run check`
+(33 core + 107 tools + 28 packet + 16 cost-report + 79 dependency/snapshot tests,
+263 total) and independent package smoke. Both unchanged benchmark gates passed
+with minimum required-source recall 1.0. A fresh CLI process captured the eight
+selected repositories, bounded queries returned the expected lock/path evidence,
+and explicit verification returned `current`. An earlier full-check invocation
+overlapped a helper edit and correctly rejected the changed graph; the final
+settled-code rerun passed. No new CI, registry or hardware acceptance is claimed.
+
+## FS2: offline daily usage accounting (22 September 2026)
+
+Implemented [explicit client-export imports and task summaries](DAILY-USAGE.md)
+in `scripts/daily-usage.mjs`, with a pure request normaliser. The CLI runs offline
+without provider authentication, model calls, recursive session discovery or
+automatic client changes. It is a checkout development helper, not a new MCP
+operation or published command. The existing paired D5 reporter and locked
+experiments are unchanged.
+
+Codex per-request records are counted once; cumulative counters are ignored.
+Claude assistant usage accounts for cache reads/creation separately from fresh
+input. Missing values remain unknown, conflicting copies do not become guessed
+totals, and summary rejects conflicting task attribution. Matching repeated
+requests across exports are counted once. Usage remains in separate
+client/account/model/effort/category cohorts, including rejected and unknown
+tasks. Same-task host/review records may come from different clients. Cash,
+monthly spend and causal token savings remain null.
+
+Inputs/specs/outputs are bounded and explicit, output files are exclusive mode
+0600, and detectable symlink/replacement cases reject. Exported content and raw
+session/request IDs are omitted. Checksums provide unsigned integrity, not
+authenticity; source event time does not precisely split a request across task
+boundaries. See the guide for supported shapes, actual limits and hostile
+filesystem-race limitations.
+
+A frozen usage-only projection of this Context session, explicitly selected for
+07:00–07:50 UTC, imported 49 requests: 6,014,669 input tokens including 5,693,056
+reported cached, and 41,646 output including 4,327 reported reasoning. No
+duplicate/conflicting requests occurred in that selection. It is a partial
+development window, not the complete implementation bill or a controlled savings
+comparison. Missing model/effort and false whole-task coverage assertions remain
+visible. No real Claude transcript export was present in the selected Context
+export directory, so Claude has synthetic fixture acceptance only. Heartwood's
+active session, checkout and configuration were not read or changed.
+
+Routing followed the Ollama-workers skill and project policy: Flash/thinking off
+on the explicit M4 wrote the normaliser and tests from a verified source packet.
+The first draft had an incorrect Claude total assertion plus four host regression
+failures (independent missing counters, earliest conflict time, fractional-time
+ordering and malformed totals). One focused repair passed; both attempts remain
+recorded. Total worker usage was 15,217 prompt + 11,676 completion = 26,893 tokens.
+Host integration and independent Sol/high boundary review found and repaired
+source-metadata validation, summary resource bounds, model-context isolation,
+warning consistency and cross-export deduplication. No further ordinary worker
+packet remained during host integration/review. Complete host/review accounting
+and billing are unknown, so this work establishes no savings.
+
+Local validation: 58 focused usage tests; final `npm run check` passed 321 total
+tests and both independent package smoke workflows. Both unchanged benchmark
+gates passed against the built packages. Sol/high's final scoped boundary review
+was accepted with no remaining blocker. Fresh CLI processes exercised the helper;
+shared MCP implementation did not change and requires no runtime restart. No new
+CI, registry, Claude live-client or monthly billing acceptance is claimed.
+
+Private evidence: `~/.cache/z1p-delivery/20260922-daily-usage-t3u8a6w3`, including
+worker prompts/receipts, failed and passing checks, source capture hash, selected
+export, import specification, request receipt and summary. The worker packet
+builder rejected a JSON example as unsupported before dispatch; the accepted
+packet used exact existing JavaScript evidence instead.
+
+FS2 is **partially delivered and usable now**. Next: use the importer on the next
+accepted ecosystem task, qualify a real Claude export and add worker-receipt/task
+capture convenience where needed. Invoice reconciliation stays with the account
+holder; client/provider authentication remains outside Context.
+
+## 22 September 2026 — delegated source packets through MCP
+
+Delivered the local OS1b implementation: `repository_packet` accepts an inline
+strict task spec, exact ranges (`build`) or complete TS/JS syntax anchors (`plan`).
+It uses the configured repository root and requires the current navigation
+generation. The packaged shared assembler preserves the existing CLI packet
+format and policy, path, source-hash and Git provenance checks. The complete JSON
+response, including coverage/provenance, must fit the requested cap (maximum
+65,536 bytes); it fails rather than truncating code. No provider SDK, credentials,
+arbitrary command, spec-file path, output path or new dependency was introduced.
+
+Delegation was explicitly authorised. One Terra/medium implementation worker
+received a verified 58,417-byte packet without the conversation history. One
+Sol/high reviewer found a blocking unbounded request queue and concurrent
+freshness scans. One focused Terra repair replaced the queue with a synchronous
+busy guard before any freshness scan; the reviewer accepted the repair. No
+subdelegation or further feature work occurred. Deterministic packet preparation
+first rejected an unsupported JSON allowed-file entry and then an oversized
+selection; a separately reviewed JSON read and smaller source excerpts resolved
+these before dispatch. These failures incurred host work, not inference retries.
+
+Final local verification: `npm run check` passed **325 tests** and package smoke
+checks; both unchanged benchmark gates passed. The installed tarball's stdio
+server returned a complete function, rejected stale evidence, recovered after
+refresh and worked after restart. A separate fresh stdio process bound to this
+Context checkout returned the selected real `buildPacketInline` function in a
+3,313-byte response. This is Node MCP SDK acceptance, not a new live Claude or
+Codex model-driven task. The existing in-session MCP connection still exposes its
+old tool list and needs reconnecting; source refresh does not reload code. No
+Heartwood checkout, session or configuration was touched. No CI, publication,
+registry release or consumer application acceptance is claimed; work is uncommitted.
+
+Usage was normalised from request records in the two explicitly selected worker
+threads and this host turn, with no transcript text copied. Snapshot at
+08:29:04 UTC (host still running; final tail excluded):
+
+| Role | Recorded model / effort | Requests | Uncached input | Cached input subset | Output |
+| --- | --- | ---: | ---: | ---: | ---: |
+| Implementation plus repair | `gpt-5.6-terra` / medium | 32 | 108,989 | 1,938,432 | 17,220 |
+| Review plus repair check | `gpt-5.6-sol` / high | 17 | 71,611 | 1,092,864 | 7,959 |
+| Host preparation, integration and checks | `gpt-6-astra` / medium | 42 | 109,781 | 3,219,840 | 15,117 |
+
+The snapshot contains 6,581,813 total request tokens, including 6,251,136 cached
+input tokens, with no duplicate/conflicting requests in the selected records.
+This is development investment, not evidence of recurring savings. Host coverage
+is incomplete, billing/allowance conversion is unknown, and no controlled baseline
+exists. Delegation is not a hard spend cap: each agent made multiple requests.
+The host overhead is material; keep future handoffs and coordinator traffic
+smaller, use fixed-output Flash packets for suitably bounded routine work, and
+reserve this agent/reviewer arrangement for integration and consequential boundaries.
+
+Remaining limits: the assembler checks cancellation at phase boundaries rather
+than interrupting each active file/Git operation; MCP input is parsed before the
+inline-spec cap applies. The documented 64 KiB limit covers the JSON tool payload,
+not transport framing. Complete syntax still does not prove complete task evidence.
+
+Private evidence: `~/.cache/z1p-delivery/20260922-packet-mcp-51qzq61g/`, including
+source packet, baseline hashes, final checks, real-source response and per-role
+usage snapshots. Next: reconnect Context's MCP client and use the tool on an
+accepted task; qualify actual Claude use separately. Do not restart the active
+Heartwood session from this session.
+
+## 22 September 2026 — packet discovery repair, dogfooded through MCP
+
+A fresh local MCP discovery check found that `repository_packet` advertised
+`{"type":"object","properties":{}}`. The previous tests checked the tool name
+and invoked it with already-known arguments; they missed this client-discovery
+failure. The pinned MCP SDK falls back to an empty schema for a top-level Zod
+union. This invalidates the earlier assumption that successful SDK calls alone
+established usable argument discovery.
+
+Used a fresh stdio connection bound only to Context to obtain an 11,886-byte
+source packet for the actual repair. Verified it with the existing CLI before
+dispatch, rendered only the selected excerpts into a 7,402-byte prompt, and sent
+one `deepseek-v4.1-flash:cloud` request through explicit M4 port 11435 with thinking
+off and a 2,500-token output cap. The first draft passed: 1,893 reported prompt
+and 1,137 completion tokens (3,030 total), HTTP 200, terminal stop, no repair or
+unknown outcome. The helper was clear before and after the request.
+
+The MCP schema now has a strict top-level object with visible `mode`, `spec`,
+`expectedGeneration` and `maxBytes` properties. Mode-specific source validation
+runs before navigation inside the existing busy-slot try/finally. Mismatched
+build/plan specs are rejected. Host review retained the single-flight guard,
+root binding, freshness checks, strict unknown-field rejection and output cap.
+No additional model reviewer or autonomous implementation agent was started.
+
+Regression assertions now inspect the actual advertised schema and mismatched
+mode/spec calls. The installed-tarball stdio check also asserts property names,
+required fields and rejection of extra fields in the advertised schema. Focused
+build and 11 MCP tests passed; final `npm run check` passed all 325 tests and
+package checks; both unchanged benchmark gates passed. A fresh rebuilt stdio
+server advertised all four arguments and returned current repaired source in
+2,950 bytes. The configured in-session tool list still contains only the old
+three operations: a client reconnect remains necessary for direct model tool
+use. Actual Claude qualification is still open. No Heartwood state was touched.
+
+Host usage snapshot at 08:44:47 UTC: 13 requests, 23,508 uncached input,
+1,451,520 cached input and 6,327 output tokens, recorded as GPT-6 Astra/medium.
+This excludes the final host tail. The 3,030 worker tokens are not a whole-task
+cost or savings claim; account charges and allowance conversion remain unknown.
+This is a real accepted Context development repair using MCP-selected evidence,
+not a controlled comparison or an accepted Heartwood task.
+
+Private evidence: `~/.cache/z1p-delivery/20260922-packet-schema-pmswzs0h/` contains
+the MCP source packet, freshness verification inputs, bounded worker prompt and
+receipt, accepted draft, checks, fresh-server acceptance and host usage snapshot.
+Work remains uncommitted; no CI, release or registry acceptance was performed.
+
+## 22 September 2026 — correct the restarted Context client binding
+
+The user restarted successfully (navigation generation was unavailable), but
+this project still launched the older pinned release and its `enabled_tools`
+list excluded `repository_packet`. The prior restart advice missed those two
+configuration requirements. Updated only Context's ignored `.codex/config.toml`
+repository-server block to launch this checkout's tested build and allow all
+four repository tools. The signed-context block and Heartwood binding were not
+changed. This is a development-checkout binding, not a new immutable release.
+
+A fresh stdio client launched the exact new configured command and arguments,
+verified all four tools and the advertised packet arguments, refreshed the
+correct Context root, and successfully retrieved current source. The existing
+Codex connection still requires another reconnect to load this configuration;
+no claim of direct model-driven packet use is made yet. No inference workers,
+source changes, publication or repeated repository test run were needed for
+this configuration fix. Private old/new navigation settings and acceptance:
+`~/.cache/z1p-delivery/20260922-context-binding-ggcw5a7n/`.
+
+## 22 September 2026 — direct Codex packet tool acceptance after reconnect
+
+The corrected in-session binding now exposes `repository_packet` with its input
+schema. Direct model-issued status, refresh, bounded identifier search and a
+plan request succeeded against the explicit Context root. The packet returned
+`buildPacketInline` in full (source-packet.mjs lines 263–267), with source hash,
+coverage and matching generation `f9214e35-d12c-465d-aff4-9e6fce8ddb03`.
+This closes the direct Codex packet-discovery/retrieval check, beyond earlier
+standalone SDK tests. No worker inference or Heartwood access was needed.
+Actual Claude use, accepted application tasks and measured savings remain open.
+
+## 22 September 2026 — FS2 Ollama worker receipts, dogfooded locally
+
+Added `daily-usage.mjs import-worker` for explicitly selected raw helper receipts.
+The offline adapter preserves prompt/completion counts for successful, truncated
+and unusable drafts, leaves refusal/unknown counters unknown, and strips private
+task prose, endpoints and provider diagnostics. Existing file bounds, stable
+reads, private output permissions and no-overwrite checks apply. No provider
+authentication, network calls or automatic transcript discovery were added.
+
+The helper has no stable request ID or timestamp. The import spec therefore
+requires an operator-supplied attempt ID and accounting timestamp, with warnings
+that these cannot be independently authenticated. A fixed worker identity
+namespace makes re-imports deduplicate across captures; distinct repairs need
+distinct IDs. Summaries reject conflicting attribution, counters or statuses,
+retain separate provider/account cohorts and count worker statuses once per
+attempt. Generation success never implies accepted implementation. Cache,
+reasoning and returned-model confirmation remain unknown; model/effort are the
+helper's requested settings. Review evidence and task completeness remain
+operator assertions, not automatically established by receipt import.
+
+Used a current root-verified MCP packet and CLI verification before one bounded
+M4 Flash/off request for normalisation and regression tests. Its reviewed draft
+was accepted without repair: 2,075 reported input and 5,176 output tokens (7,251
+total), terminal stop. Host integration and review ran in the existing Codex
+session. Imported this actual helper receipt through the new CLI and generated
+a private summary; its timestamp explicitly uses capture-time attribution.
+Host preparation/integration/review usage remains uncollected and billing is
+unknown. This is development evidence, not whole-task savings or a controlled
+comparison. Claude qualification awaits an eligible account; no Claude inference
+or Heartwood application changes were made.
+
+Validation: 81 focused accounting tests; `npm run check` passed 362 tests across
+the repository plus installed-package smoke checks; both unchanged token and
+navigation benchmark gates passed. Refreshed Context and retrieved the changed
+normaliser and importer as complete syntax blocks. One post-edit packet request
+used a comment-line anchor and was rejected; the corrected function-line request
+succeeded. No additional inference or worker repair was needed.
+
+Private evidence: `~/.cache/z1p-delivery/20260922-worker-accounting/` contains the
+source packet, prompt, worker draft/receipt/review, accounting import and summary,
+capture-time note and check logs. Changes remain local and uncommitted; no CI,
+registry or release acceptance is claimed. Next: convenient task-boundary capture,
+real Claude export qualification and routine complete host/worker/review receipts.
+
+
+## 22 September 2026 — FS2 explicit task-window capture
+
+Added offline `daily-usage.mjs start` / `finish` commands and a portable task
+profile example. Start records local UTC against explicit client/session/task
+labels; finish writes the existing import specification. Outcomes, review time
+and coverage start unknown. No session discovery, Git watching, provider calls,
+configuration changes or automatic acceptance were added. The boundary retains
+its raw session ID privately; checksums are integrity checks, not authentication.
+Existing private-file, bounded-read and no-overwrite rules apply. Usage remains
+attributed by event timestamp; finish only after final request usage is recorded.
+
+Implemented and reviewed in the existing Codex host session, without extra
+workers or model switching. Effective host model/effort and whole-task usage were
+not independently captured for this change; no cost or savings claim follows.
+Used root-verified MCP source packets before editing, refreshed and retrieved the
+complete new functions afterwards. Heartwood and Claude sessions were untouched.
+
+Validation: five new capture tests, 86 accounting tests total; full `npm run check`
+passed 367 tests plus installed-package smoke checks. Both unchanged benchmark
+gates passed. Documentation links, shell blocks, example JSON and whitespace
+checks passed. The CLI start → finish → import workflow used synthetic usage
+fixtures, not a real newly completed client task. Evidence logs are private at
+`~/.cache/z1p-delivery/20260922-task-boundaries/`.
+
+Local and uncommitted; no CI, registry or new Claude acceptance. Next: use the
+capture workflow for complete host/worker/reviewer evidence on an ordinary task,
+qualify an explicitly selected real Claude export, then render a useful weekly
+scorecard. Actual savings still require comparable accepted tasks and billing
+reconciliation; capture alone does not establish them.
+
+
+## 22 September 2026 — First complete bounded Codex implementation receipt
+
+Imported the completed FS2 task-window implementation turn, 09:55:43.010 to
+10:00:31.784 UTC, from this Context session's explicitly selected request log.
+Verified session metadata against the Context checkout before selecting usage.
+A frozen private projection retains only session identity, turn model/effort and
+request usage; conversation content is excluded. The existing importer and
+summary commands ran unchanged under Node 24.21.0.
+
+The 17 unique requests report **883,063 input tokens**, including **830,336
+cached input**, and **6,190 output**, including **662 reasoning output**.
+The recorded model/effort is `gpt-6-astra` / `medium`; no model switch or worker
+call occurred in that task. Imported totals match an independent sum of the
+selected raw request records, with no duplicate, conflicting or unknown metrics.
+
+Coverage is operator asserted for that bounded implementation turn: preparation,
+edits, checks and host self-review, with no worker or separate reviewer attempts.
+Earlier feature design and later accounting/reporting are excluded; this is not
+lifetime feature cost. Acceptance means the recorded local 367-test and
+package/benchmark gates, not independent user, CI or registry acceptance.
+Review duration, account billing and savings remain unknown. Cached input is
+part of input, not additional usage and not evidence of Context-caused savings.
+
+Private evidence: `~/.cache/z1p-delivery/20260922-complete-task-receipt/`, containing
+`usage-export.jsonl`, `import-spec.json`, `capture-evidence.json`, `receipt.json`
+and `summary.json`, all mode 0600. This is a development cohort, not an ordinary
+application-task or control cohort. Heartwood was not inspected or modified.
+
+Next: capture an accepted application task in its owning session; qualify actual
+Claude source retrieval and a real transcript import once its allowance is
+eligible. No new Claude request was made for this accounting task.
+
+
+## 22 September 2026 — Shipment validation
+
+The shipment sweep passed `npm run check` (367 tests and isolated package
+consumers), both unchanged token/navigation benchmark gates, navigation stdio
+smoke, SQLite/postings tests and the 10,000-record postings run. The locked v2
+and v3 experiment verifiers also passed; no inference experiments were rerun.
+The navigation smoke's obsolete three-tool assertion was updated to require
+all four tools, including `repository_packet`.
+
+The public npm registry still reports 0.1.1 for both packages, and the local npm
+identity check returned HTTP 401. Registry publication is therefore unavailable
+in this environment. Shipment uses reviewed Git source and GitHub package
+assets at version 0.3.0; the setup guide explains installing both tarballs.
+CI, merge and release results are recorded by the corresponding GitHub PR/run
+and release rather than inferred from these local checks. No active Heartwood
+client binding or personal client configuration was changed.

@@ -1,11 +1,22 @@
 # Z1P Core
 
-Portable, signed evidence for people and agents.
+Local code graphs and bounded evidence for coding agents.
+
+**Use Context on your own machine and repositories:** follow the
+[Codex and Claude Code setup guide](docs/GETTING-STARTED.md), including current
+source-build availability, worktrees and first-request verification.
 
 Z1P Core is the free, open-source foundation of [Z1P](https://z1p.app): signed,
 encrypted project evidence, bounded retrieval and authorised relationship
 graphs. It runs locally, requires no account and does not send source code or
 records to a hosted service.
+
+The product goal is an independently built, MIT-licensed Graphify alternative
+for developers on their own projects, with less repeated discovery and smaller,
+sufficient model context. Feature parity and whole-task savings remain unproven.
+See [the product direction](PRODUCT_DIRECTION.md) for priorities and current gaps.
+ForgeSworn projects are early users; Oathrun is an optional consumer, not a
+required runtime.
 
 The Node tools include deterministic, bounded TypeScript and JavaScript source
 analysis that emits reviewable file, declaration, import and call evidence into
@@ -26,16 +37,24 @@ deterministic, so routine scans consume no model tokens.
 - `packages/context-tools`: Node persistence, CLI and MCP, published as
   `@forgesworn/context-tools`.
 
-Both are MIT licensed. Provider routing, worker execution and application UI
-belong to consumers, not this library. No model provider is required by core.
+Both are MIT licensed. Provider routing, worker execution and coding-agent UI
+belong to consumers. Local graph exploration belongs in the MIT developer tool;
+the current ecosystem viewer is a prototype, not a packaged capability.
+No model provider is required by core.
+
+Local stdio MCP servers already provide repository navigation and separate signed
+context/graph tools. Claude Code and Codex are first-class target clients; actual
+Codex use is recorded, while Claude model/tool acceptance remains open. See the
+[client and language plan](docs/CLIENTS-AND-LANGUAGES.md) for current capabilities,
+deeper Rust/TS/Kotlin work and the provider-authentication boundary.
 
 ## Open-core boundary
 
-This repository will remain the inspectable local and protocol foundation:
-formats, cryptography, deterministic extraction, verification, bounded graph
-operations, CLI and MCP tools. The commercial Z1P Platform is a separate
-product for continuously maintained private graphs, repository connections,
-team access, review workflows, hosted operation and enterprise controls.
+This repository will remain the complete MIT local developer tool: formats,
+cryptography, extraction, verification, indexing and refresh, bounded graph
+operations, local exploration, CLI and MCP tools. Some of that scope remains
+planned. The commercial offering can provide managed shared graphs, repository
+connections, company administration, deployment and support around that engine.
 
 The free core is intended to be useful on its own, not a time-limited trial.
 See [OPEN_CORE.md](OPEN_CORE.md) for the durable product boundary and
@@ -43,6 +62,9 @@ compatibility policy.
 
 See [GOALS.md](GOALS.md) for the core-first release gates, required evidence
 and whole-task inference-cost evaluation.
+See [the execution plan](docs/OPEN-SOURCE-EXECUTION.md) for ordered work, owners,
+locations and model/effort assignments. Enterprise development comes after a
+working open-source release with demonstrated benefits.
 The current candidate results and blockers are recorded in
 [RELEASE_EVIDENCE.md](RELEASE_EVIDENCE.md).
 

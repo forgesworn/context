@@ -71,6 +71,63 @@ export const view = await vault.create({ title: 'Independent consumer', scope: '
   checkNotices(toolsConsumer, '@forgesworn/context-tools')
   const cli = join(toolsConsumer, 'node_modules/@forgesworn/context-tools/bin/encrypted-context.mjs')
   assert.match(execFileSync(process.execPath, [cli, '--help'], { encoding: 'utf8' }), /encrypted-context mcp/)
+  // Exercise the installed stdio server: no checkout scripts or source imports.
+  const packetRoot = join(toolsConsumer, 'packet-repository')
+  mkdirSync(packetRoot)
+  writeFileSync(join(packetRoot, 'example.ts'), 'export function example() {\n  return 1\n}\n')
+  const git = args => execFileSync('git', ['-C', packetRoot, ...args], { stdio: 'pipe', env: Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith('GIT_'))) })
+  git(['init', '--quiet'])
+  git(['add', 'example.ts'])
+  git(['-c', 'user.name=Context package test', '-c', 'user.email=package-test@example.invalid', '-c', 'commit.gpgsign=false', '-c', 'core.hooksPath=/dev/null', 'commit', '--quiet', '-m', 'Fixture'])
+  execFileSync(process.execPath, ['--input-type=module', '-e', `
+    import assert from 'node:assert/strict'
+    import { writeFile } from 'node:fs/promises'
+    import { Client } from '@modelcontextprotocol/sdk/client/index.js'
+    import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js'
+    const cli = process.argv[1], root = process.argv[2]
+    const spec = { version: 1, task: 'Inspect example', acceptanceChecks: ['Complete function returned'], allowedFiles: ['example.ts'], sources: [{ path: 'example.ts', line: 2 }], exclusions: [], unresolvedQuestions: [] }
+    const text = result => result.content.find(item => item.type === 'text').text
+    async function open() {
+      const client = new Client({ name: 'packed-packet-check', version: '1' })
+      await client.connect(new StdioClientTransport({ command: process.execPath, args: [cli, 'navigate', root], stderr: 'pipe' }))
+      return client
+    }
+    let client = await open()
+    try {
+      const packetTool = (await client.listTools()).tools.find(tool => tool.name === 'repository_packet')
+      assert.ok(packetTool)
+      assert.equal(packetTool.inputSchema.type, 'object')
+      assert.deepEqual(Object.keys(packetTool.inputSchema.properties).sort(), ['expectedGeneration', 'maxBytes', 'mode', 'spec'])
+      assert.deepEqual([...packetTool.inputSchema.required].sort(), ['expectedGeneration', 'mode', 'spec'])
+      assert.equal(packetTool.inputSchema.additionalProperties, false)
+      const early = await client.callTool({ name: 'repository_packet', arguments: { mode: 'plan', expectedGeneration: 'unrefreshed', spec } })
+      assert.equal(early.isError, true)
+      let status = JSON.parse(text(await client.callTool({ name: 'repository_refresh', arguments: {} })))
+      const get = generation => client.callTool({ name: 'repository_packet', arguments: { mode: 'plan', expectedGeneration: generation, spec, maxBytes: 65536 } })
+      const result = await get(status.generation)
+      assert.notEqual(result.isError, true, text(result))
+      assert.ok(Buffer.byteLength(text(result), 'utf8') <= 65536)
+      const value = JSON.parse(text(result))
+      assert.equal(value.packet.gitHEAD.length, 40)
+      assert.equal(value.packet.sources.length, 1)
+      assert.equal(value.packet.sources[0].startLine, 1)
+      assert.equal(value.packet.sources[0].endLine, 3)
+      await writeFile(root + '/example.ts', 'export function example() {\\n  return 22\\n}\\n')
+      assert.equal((await get(status.generation)).isError, true)
+      const oldGeneration = status.generation
+      status = JSON.parse(text(await client.callTool({ name: 'repository_refresh', arguments: {} })))
+      assert.equal((await get(oldGeneration)).isError, true)
+      assert.notEqual((await get(status.generation)).isError, true)
+    } finally { await client.close() }
+    client = await open()
+    try {
+      const status = JSON.parse(text(await client.callTool({ name: 'repository_status', arguments: {} })))
+      assert.equal(status.freshness, 'unavailable')
+      const refreshed = JSON.parse(text(await client.callTool({ name: 'repository_refresh', arguments: {} })))
+      const result = await client.callTool({ name: 'repository_packet', arguments: { mode: 'plan', expectedGeneration: refreshed.generation, spec } })
+      assert.notEqual(result.isError, true, text(result))
+    } finally { await client.close() }
+  `, cli, packetRoot], { cwd: toolsConsumer, stdio: 'pipe', timeout: 60000 })
   const ecosystem = join(toolsConsumer, 'ecosystem')
   mkdirSync(join(ecosystem, 'alpha'), { recursive: true }); mkdirSync(join(ecosystem, 'beta'), { recursive: true })
   writeFileSync(join(ecosystem, 'alpha/package.json'), JSON.stringify({ name: '@packed/alpha', dependencies: { '@packed/beta': '*' } }))
@@ -119,6 +176,7 @@ export const view = await vault.create({ title: 'Independent consumer', scope: '
   execFileSync(process.execPath, ['--input-type=module', '-e', "import assert from 'node:assert/strict'; import {createRequire} from 'node:module'; assert.throws(()=>createRequire(import.meta.url).resolve('kithmoot'))"], { cwd: toolsConsumer, stdio: 'pipe' })
   console.log('Packed core: independent Node import, declarations and browser bundle passed.')
   console.log('Packed Node tools: independent CLI create, append and restart recovery passed.')
+  console.log('Packed repository MCP: complete source packet, stale rejection, refresh and restart passed.')
 } finally {
   rmSync(temp, { recursive: true, force: true })
 }

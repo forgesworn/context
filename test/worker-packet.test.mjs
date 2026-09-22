@@ -1,15 +1,13 @@
 import assert from 'node:assert/strict';
-import { execFile } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { mkdtemp, mkdir, readFile, rm, stat, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { basename, dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { promisify } from 'node:util';
 import test, { after } from 'node:test';
-import { buildPacket, verifyPacket } from '../scripts/worker-packet.mjs';
+import { buildPacket, planPacket, verifyPacket } from '../scripts/worker-packet.mjs';
 
-const exec = promisify(execFile);
+import { fixtureExec as exec } from './git-fixture.mjs';
 const fixtures = [];
 const SCRIPT = fileURLToPath(new URL('../scripts/worker-packet.mjs', import.meta.url));
 
@@ -55,6 +53,196 @@ function base(overrides = {}) {
     ...overrides,
   };
 }
+
+function planBase(overrides = {}) {
+  return {
+    version: 1,
+    task: 'Plan fixture blocks.',
+    acceptanceChecks: ['node --test'],
+    allowedFiles: ['src.ts'],
+    sources: [{ path: 'src.ts', line: 1 }],
+    exclusions: ['No network.'],
+    unresolvedQuestions: [],
+    ...overrides,
+  };
+}
+
+test('plans complete nested callback and function units, then merges adjacent selections', async () => {
+  const root = await fixture();
+  await writeFile(join(root, 'src.ts'), `describe('suite', () => {\n  it.each([1])('case', (value) => {\n    const helper = () => {\n      return value;\n    };\n    expect(helper()).toBe(1);\n  });\n});\n\nfunction outside() {\n  return 2;\n}\n`);
+  const result = await planPacket({ root, spec: await spec(root, planBase({ sources: [
+    { path: 'src.ts', line: 4 }, { path: 'src.ts', line: 6 }, { path: 'src.ts', line: 10 },
+  ] })) });
+  assert.deepEqual(result.coverage.resolutions.map(({ kind, startLine, endLine }) => ({ kind, startLine, endLine })), [
+    { kind: 'variable', startLine: 3, endLine: 5 }, { kind: 'callbackCall', startLine: 2, endLine: 7 }, { kind: 'function', startLine: 10, endLine: 12 },
+  ]);
+  assert.deepEqual(result.coverage.mergedSources, [{ path: 'src.ts', startLine: 2, endLine: 7 }, { path: 'src.ts', startLine: 10, endLine: 12 }]);
+  assert.match(result.coverage.packetSha256, /^[0-9a-f]{64}$/);
+  assert.deepEqual(await verifyPacket({ root, packet: await (async () => { const path = join(root, 'planned.json'); await writeFile(path, JSON.stringify(result.packet)); return path; })() }), { status: 'current' });
+});
+
+test('planner rejects unsupported, malformed, signature-only and ambiguous same-line anchors', async () => {
+  const root = await fixture();
+  await writeFile(join(root, 'src.ts'), 'function a() {} function b() {}\ndeclare function absent(): void;\n');
+  await assert.rejects(planPacket({ root, spec: await spec(root, planBase({ sources: [{ path: 'src.ts', line: 1 }] })) }), /ambiguous/);
+  await assert.rejects(planPacket({ root, spec: await spec(root, planBase({ sources: [{ path: 'src.ts', line: 2 }] })) }), /no supported/);
+  await assert.rejects(planPacket({ root, spec: await spec(root, planBase({ sources: [{ path: 'src.py', line: 1 }] })) }), /unsupported/);
+  await writeFile(join(root, 'bad.ts'), 'function broken( {\n');
+  await assert.rejects(planPacket({ root, spec: await spec(root, planBase({ sources: [{ path: 'bad.ts', line: 1 }] })) }), /parse errors/);
+});
+
+test('plan CLI writes the v1 packet and reports coverage', async () => {
+  const root = await fixture();
+  await writeFile(join(root, 'src.ts'), 'const named = () => {\n  return 1;\n};\n');
+  const input = await spec(root, planBase());
+  const out = join(root, 'planned-out.json');
+  const { stdout } = await exec(process.execPath, [SCRIPT, 'plan', '--root', root, '--spec', input, '--out', out]);
+  const summary = JSON.parse(stdout);
+  assert.equal(summary.coverage.resolutions[0].kind, 'variable');
+  assert.equal(JSON.parse(await readFile(out, 'utf8')).version, 1);
+  assert.equal((await stat(out)).mode & 0o777, 0o600);
+});
+
+test('planner retains decorators, JSDoc, async generic methods and every branch', async () => {
+  const root = await fixture();
+  await writeFile(join(root, 'src.ts'), `class Service {\n  /** Returns the selected value. */\n  @logged\n  async choose<T>(value: T, ok: boolean): Promise<T> {\n    if (ok) {\n      return value;\n    } else {\n      return await Promise.resolve(value);\n    }\n  }\n}\n`);
+  const result = await planPacket({ root, spec: await spec(root, planBase({ sources: [{ path: 'src.ts', line: 8 }] })) });
+  assert.deepEqual(result.coverage.resolutions[0], { requestIndex: 0, path: 'src.ts', line: 8, kind: 'method', startLine: 2, endLine: 10 });
+  assert.deepEqual(result.packet.sources[0].lines.map((entry) => entry.line), [2, 3, 4, 5, 6, 7, 8, 9, 10]);
+});
+
+test('planner supports property owners, duplicate anchors and adjacent blocks', async () => {
+  const root = await fixture();
+  await writeFile(join(root, 'src.ts'), `const handlers = {\n  run: async () => {\n    return '£';\n  },\n};\nconst next = () => {\n  return 'ok';\n};\nconst final = () => {\n  return 'done';\n};\n`);
+  const result = await planPacket({ root, spec: await spec(root, planBase({ sources: [
+    { path: 'src.ts', line: 3 }, { path: 'src.ts', line: 3 }, { path: 'src.ts', line: 7 }, { path: 'src.ts', line: 10 },
+  ] })) });
+  assert.deepEqual(result.coverage.mergedSources, [{ path: 'src.ts', startLine: 2, endLine: 4 }, { path: 'src.ts', startLine: 6, endLine: 11 }]);
+  assert.equal(result.coverage.resolutions[0].kind, 'property');
+});
+
+test('planner chooses a nested helper callback over its enclosing test callback', async () => {
+  const root = await fixture();
+  await writeFile(join(root, 'src.ts'), `describe('suite', () => {\n  it('case', () => {\n    helper(() => {\n      expect(true).toBe(true);\n    });\n  });\n});\n`);
+  const result = await planPacket({ root, spec: await spec(root, planBase({ sources: [{ path: 'src.ts', line: 4 }] })) });
+  assert.deepEqual(result.coverage.resolutions[0], { requestIndex: 0, path: 'src.ts', line: 4, kind: 'callbackCall', startLine: 3, endLine: 5 });
+});
+
+test('planner includes a named class-field callback owner', async () => {
+  const root = await fixture();
+  await writeFile(join(root, 'src.ts'), 'class Service {\n  handler = () => {\n    return 1;\n  };\n}\n');
+  const result = await planPacket({ root, spec: await spec(root, planBase({ sources: [{ path: 'src.ts', line: 3 }] })) });
+  assert.deepEqual(result.coverage.mergedSources, [{ path: 'src.ts', startLine: 2, endLine: 4 }]);
+  assert.equal(result.coverage.resolutions[0].kind, 'property');
+  assert.equal(result.packet.sources[0].lines[0].content, '  handler = () => {');
+});
+
+test('planner retains object methods and accessors with their trailing commas', async () => {
+  const root = await fixture();
+  await writeFile(join(root, 'src.ts'), 'const handlers = {\n  run() {\n    return 1;\n  },\n  get value() {\n    return 2;\n  },\n  set value(next: number) {\n    this.current = next;\n  },\n};\n');
+  const result = await planPacket({ root, spec: await spec(root, planBase({ sources: [3, 6, 9].map((line) => ({ path: 'src.ts', line })) })) });
+  assert.deepEqual(result.coverage.resolutions.map(({ startLine, endLine }) => [startLine, endLine]), [[2, 4], [5, 7], [8, 10]]);
+  assert.deepEqual(result.coverage.mergedSources, [{ path: 'src.ts', startLine: 2, endLine: 10 }]);
+  assert.equal(result.packet.sources[0].lines.filter((line) => line.content === '  },').length, 3);
+});
+
+test('planner rejects source or policy changes between selection and packet assembly without output', async () => {
+  const realGit = (await exec('which', ['git'])).stdout.trim();
+  for (const mutation of ['source', 'policy']) {
+    const root = await fixture();
+    await writeFile(join(root, 'src.ts'), 'function value() {\n  return 1;\n}\n');
+    const input = await spec(root, planBase({ sources: [{ path: 'src.ts', line: 2 }] }));
+    const shim = await mkdtemp(join(tmpdir(), 'packet-plan-race-'));
+    fixtures.push(shim);
+    const counter = join(shim, 'counter');
+    const changedPath = join(root, mutation === 'source' ? 'src.ts' : '.gitignore');
+    const changedText = mutation === 'source' ? 'function value() {\n  return 2;\n}\n' : '*.tmp\n';
+    await writeFile(join(shim, 'git'), `#!${process.execPath}
+import { readFileSync, writeFileSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
+if (process.argv.includes('--verify')) {
+  let count = 0;
+  try { count = Number(readFileSync(${JSON.stringify(counter)}, 'utf8')); } catch (error) { if (error.code !== 'ENOENT') throw error; }
+  count++;
+  writeFileSync(${JSON.stringify(counter)}, String(count));
+  if (count === 2) writeFileSync(${JSON.stringify(changedPath)}, ${JSON.stringify(changedText)});
+}
+const result = spawnSync(${JSON.stringify(realGit)}, process.argv.slice(2), { stdio: 'inherit' });
+process.exit(result.status ?? 1);
+`, { mode: 0o700 });
+    const out = join(root, 'must-not-exist.json');
+    await assert.rejects(exec(process.execPath, [SCRIPT, 'plan', '--root', root, '--spec', input, '--out', out], {
+      env: { ...process.env, PATH: `${shim}:${process.env.PATH}` },
+    }), mutation === 'source' ? /source changed during packet planning/ : /navigation policy changed during packet planning/);
+    await assert.rejects(stat(out), { code: 'ENOENT' });
+    assert.equal(await readFile(changedPath, 'utf8'), changedText);
+  }
+});
+
+test('planner preserves CRLF, EOF and multibyte source lines', async () => {
+  const root = await fixture();
+  await writeFile(join(root, 'src.ts'), 'const value = () => {\r\n  return "£😀";\r\n};');
+  const result = await planPacket({ root, spec: await spec(root, planBase({ sources: [{ path: 'src.ts', line: 2 }] })) });
+  assert.deepEqual(result.packet.sources[0].lines, [
+    { line: 1, content: 'const value = () => {\r' }, { line: 2, content: '  return "£😀";\r' }, { line: 3, content: '};' },
+  ]);
+});
+
+test('planner rejects line separators that v1 packet excerpts cannot represent', async () => {
+  const root = await fixture();
+  for (const separator of ['\r', '\u2028', '\u2029']) {
+    await writeFile(join(root, 'src.ts'), `const value = () => {${separator}  return 1;${separator}};`);
+    await assert.rejects(planPacket({ root, spec: await spec(root, planBase({ sources: [{ path: 'src.ts', line: 2 }] })) }), /line separators unsupported/);
+  }
+});
+
+test('planner handles every supported TypeScript and JavaScript extension', async () => {
+  const root = await fixture();
+  const extensions = ['ts', 'tsx', 'js', 'jsx', 'mts', 'cts', 'mjs', 'cjs'];
+  const sources = [];
+  for (const extension of extensions) {
+    const path = `item.${extension}`;
+    const body = extension === 'tsx' || extension === 'jsx' ? '  return <div />;' : '  return 1;';
+    await writeFile(join(root, path), `const value = () => {\n${body}\n};\n`);
+    sources.push({ path, line: 2 });
+  }
+  const result = await planPacket({ root, spec: await spec(root, planBase({ allowedFiles: extensions.map((extension) => `item.${extension}`), sources })) });
+  assert.equal(result.coverage.resolutions.length, extensions.length);
+  assert(result.coverage.resolutions.every((entry) => entry.kind === 'variable'));
+});
+
+test('planner rejects policy and symlink sources, stale packets and malformed anchor plans', async () => {
+  const root = await fixture();
+  await writeFile(join(root, '.gitignore'), 'src.ts\n');
+  await assert.rejects(planPacket({ root, spec: await spec(root, planBase()) }), /excluded/);
+  await writeFile(join(root, '.gitignore'), '');
+  await symlink(join(root, 'src.ts'), join(root, 'linked.ts'));
+  await assert.rejects(planPacket({ root, spec: await spec(root, planBase({ allowedFiles: ['linked.ts'], sources: [{ path: 'linked.ts', line: 1 }] })) }), /symlink/);
+  await assert.rejects(planPacket({ root, spec: await spec(root, planBase({ sources: [{ path: 'src.ts', line: 1, extra: true }] })) }), /unknown or missing/);
+  assert.deepEqual((await planPacket({ root, spec: await spec(root, { ...planBase(), sources: [] }) })).coverage.mergedSources, []);
+  await assert.rejects(planPacket({ root, spec: await spec(root, planBase({ sources: Array.from({ length: 33 }, () => ({ path: 'src.ts', line: 1 })) })) }), /limited/);
+  await writeFile(join(root, 'src.ts'), 'const live = () => {\n return 1;\n};\n');
+  const result = await planPacket({ root, spec: await spec(root, planBase({ sources: [{ path: 'src.ts', line: 2 }] })) });
+  const packet = join(root, 'planned-stale.json');
+  await writeFile(packet, JSON.stringify(result.packet));
+  await writeFile(join(root, 'src.ts'), 'const live = () => {\n return 2;\n};\n');
+  await assert.rejects(verifyPacket({ root, packet }), /stale or has been tampered/);
+});
+
+test('plan CLI reports exact coverage digest and leaves no output after invalid planning', async () => {
+  const root = await fixture();
+  await writeFile(join(root, 'src.ts'), 'const value = () => {\n  return 1;\n};\n');
+  const input = await spec(root, planBase({ sources: [{ path: 'src.ts', line: 2 }] }));
+  const out = join(root, 'digest.json');
+  const { stdout } = await exec(process.execPath, [SCRIPT, 'plan', '--root', root, '--spec', input, '--out', out]);
+  const summary = JSON.parse(stdout);
+  assert.equal(summary.coverage.packetSha256, createHash('sha256').update(await readFile(out)).digest('hex'));
+  await assert.rejects(exec(process.execPath, [SCRIPT, 'plan', '--root', root, '--spec', input, '--out', out]), /create output exclusively/);
+  const invalid = await spec(root, planBase({ sources: [{ path: 'src.ts', line: 99 }] }));
+  const absent = join(root, 'must-not-exist.json');
+  await assert.rejects(exec(process.execPath, [SCRIPT, 'plan', '--root', root, '--spec', invalid, '--out', absent]), /no supported|anchor line/);
+  await assert.rejects(stat(absent));
+});
 
 test('builds deterministic exact excerpts and absent allowed state', async () => {
   const root = await fixture();
@@ -251,4 +439,23 @@ test('rejects tampered, invalid UTF-8 and oversized packets', async () => {
   const oversized = join(root, 'oversized.json');
   await writeFile(oversized, 'x'.repeat(64 * 1024 + 1));
   await assert.rejects(verifyPacket({ root, packet: oversized }), /exceeds/);
+});
+
+test('fixture Git operations cannot inherit another repository from a hook', async () => {
+  const root = await fixture();
+  const decoy = await fixture();
+  const head = async path => (await exec('git', ['-C', path, 'rev-parse', 'HEAD'])).stdout;
+  const beforeRoot = await head(root);
+  const beforeDecoy = await head(decoy);
+  await exec('git', ['-C', root, 'commit', '--allow-empty', '-qm', 'fixture isolation'], {
+    env: {
+      ...process.env,
+      GIT_DIR: join(decoy, '.git'), GIT_WORK_TREE: decoy,
+      GIT_INDEX_FILE: join(decoy, '.git', 'index'), GIT_COMMON_DIR: join(decoy, '.git'),
+      GIT_CONFIG_COUNT: '1', GIT_CONFIG_KEY_0: 'user.name', GIT_CONFIG_VALUE_0: 'Wrong identity',
+    },
+  });
+  assert.notEqual(await head(root), beforeRoot);
+  assert.equal(await head(decoy), beforeDecoy);
+  assert.equal((await exec('git', ['-C', root, 'show', '-s', '--format=%an'])).stdout.trim(), 'Test');
 });

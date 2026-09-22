@@ -52,13 +52,13 @@ afterEach(async () => {
 })
 
 describe('repository navigation MCP adapter', () => {
-  it('lists exactly the three required tools', async () => {
+  it('lists the repository navigation and packet tools', async () => {
     const root = await makeRoot()
     const { client, serverClose } = await connect(root)
     try {
       const tools = await client.listTools()
       const names = tools.tools.map((t) => t.name).sort()
-      expect(names).toEqual(['repository_refresh', 'repository_search', 'repository_status'])
+      expect(names).toEqual(['repository_packet', 'repository_refresh', 'repository_search', 'repository_status'])
     } finally {
       await serverClose()
     }

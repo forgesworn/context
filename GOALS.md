@@ -1,12 +1,26 @@
 # Z1P Core release goals
 
-Updated: 21 September 2026.
+Updated: 22 September 2026.
 
-We want coding agents to spend less time and inference rediscovering a codebase, without making their answers or changes less reliable.  The open-source core comes first.  It must be useful, dependable and independently installable before private services become a dependency.
+We want coding agents to spend less time and inference rediscovering a codebase,
+without making their answers or changes less reliable. The open-source core
+comes first. It must be useful, dependable and independently installable;
+commercial services remain optional for the local developer workflow.
 
 This is an acceptance plan, not a claim that the gates have passed.  Existing code and tests are a starting point.  Record fresh evidence against the release commit before closing a gate.
 
 Current results and open blockers are recorded in [RELEASE_EVIDENCE.md](RELEASE_EVIDENCE.md).
+
+Use [the open-source execution plan](docs/OPEN-SOURCE-EXECUTION.md) for ordered
+tasks, responsible owners, repository/file locations and model/effort assignments.
+OS0–OS6 organise delivery; the G0–G4 gates below still govern release acceptance.
+Enterprise implementation is deferred until working open-source value is proven.
+
+[PRODUCT_DIRECTION.md](PRODUCT_DIRECTION.md) defines the general developer
+product and shortest delivery route. Graphify replacement is an independent MIT
+implementation goal, not a current parity claim. Acceptance must include an
+explicitly selected non-ForgeSworn repository and a workflow requiring no
+Oathrun, ForgeSworn account or private worker helper.
 
 For immediate internal use, follow the [ForgeSworn dogfooding goals](docs/FORGESWORN-DOGFOOD-GOALS.md).
 They define the shorter D0–D7 adoption sequence, model and effort assignments,
@@ -19,9 +33,14 @@ release gates below are complete.
 2. Prove trust boundaries, extraction and retrieval behaviour.
 3. Prove installation and real consumer workflows.
 4. Measure complete tasks, then publish a verified release.
-5. Only then build private operational features justified by real use.
+5. Only then build paid operational offerings justified by real company use.
 
-The free/private boundary remains [OPEN_CORE.md](OPEN_CORE.md).  Local extraction, verification, bounded retrieval, CLI, MCP and portable formats stay MIT licensed.  Provider routing and worker execution belong in consumers.  A generally useful core fix belongs here even if a private pilot discovers it.
+The core/service boundary remains [OPEN_CORE.md](OPEN_CORE.md). Local extraction,
+indexing and refresh, graph exploration, verification, bounded retrieval, CLI,
+MCP and portable formats stay MIT licensed. Provider routing and worker execution
+belong in consumers. A generally useful core fix belongs here even if a private
+pilot discovers it. Oathrun/KithMoot application integration is optional and is
+not a prerequisite for these release gates.
 
 ## G0: A reproducible baseline
 
@@ -60,7 +79,9 @@ Exit: documented behaviour matches executable fixtures, including the cases wher
 
 - [ ] Test real package tarballs outside the workspace: imports, exports, browser isolation, CLI, MCP, notices and licences.
 - [ ] Walk through the documented install, scan, persist, retrieve, export and import path on a clean machine or isolated environment.
+- [ ] Exercise the supported local workflow on an explicitly selected non-ForgeSworn repository without workspace-specific paths, private worker helpers, Oathrun or a ForgeSworn account. State language/relationship coverage and gaps.
 - [ ] Exercise an actual MCP client session, including initialisation, errors, cancellation and bounded output.  Name the tested client and version.
+- [ ] Qualify actual Claude Code and Codex task/tool use separately, recording model/effort, source freshness, restart and disable. Connection health alone is insufficient; Claude Desktop is a separate client surface. Keep provider authentication outside Context.
 - [ ] Verify compatibility fixtures for existing package names, APIs and signed wire formats.  Document any required migration before release.
 - [ ] Test intended consumer integration in isolated branches or fixtures.  Do not silently repin or migrate live consumers.
 - [ ] Reconcile README commands, package versions, changelog and extraction provenance.  Distinguish a prepared tarball from an available registry release.
