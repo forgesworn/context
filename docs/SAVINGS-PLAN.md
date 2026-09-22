@@ -133,6 +133,23 @@ yes/no completeness questions over 60 recorded answers did not meet its rule
 (AUC 0.70, 58 percent of rejections caught), so no model-judged gate is built.
 Further comparisons follow the [repeated-run design](experiments/REPEATED-RUNS.md).
 
+An independent review of these runs corrected the headline. v2's lower input
+total is mostly cache reads; Context's uncached input was 24.1 percent above
+plain and its cost per session 10.7 percent higher, and its per-accepted-task
+margin rests on five acceptances against three, within the verdict churn seen
+between runs. Report uncached input and cost per session first. In every v2
+session Context's first prompt was about 3,140 tokens larger than plain
+(Graphify's about 350), roughly 45 percent of the uncached gap; the rest is
+larger tool results. The served instructions and tool listing were cut from
+8,207 to 6,068 bytes (about 530 tokens per session) by removing repeated
+boilerplate and advertising one packet source shape instead of two, with a
+test holding the budget; the suggested project instruction fell from 1,242 to
+687 bytes. The review also found that only the orientation and diagnosis
+tasks separate the arms, that impact rubrics require the author's own design,
+and that reviewer disagreement has never been measured. Before any new
+executor runs: typed per-item reviewer verdicts, a reviewer-agreement check on
+recorded answers, and usage on real project work with and without Context.
+
 ## Proposed competitive decision rule
 
 Before any three-way trial, pin Graphify's revision/configuration, define tasks
