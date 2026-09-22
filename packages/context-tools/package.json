@@ -1,6 +1,6 @@
 {
   "name": "@forgesworn/context-tools",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "description": "Local CLI and MCP tools for Z1P Core encrypted context",
   "license": "MIT",
   "type": "module",
@@ -36,7 +36,7 @@
     "test": "vitest run --config vitest.config.ts"
   },
   "dependencies": {
-    "@forgesworn/context": "0.3.1",
+    "@forgesworn/context": "0.3.2",
     "@modelcontextprotocol/sdk": "1.30.0",
     "@noble/hashes": "1.8.0",
     "ignore": "7.0.9",

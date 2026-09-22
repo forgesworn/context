@@ -17,6 +17,22 @@ function bySource(result: Awaited<ReturnType<typeof scanBroadSourceGraph>>, expe
 }
 
 describe('bounded broad-language source graph scan', () => {
+  it.each(['kts', 'cc', 'cxx', 'hh', 'hpp', 'hxx', 'HPP'])('extracts .%s declarations with lexical provenance', async (extension) => {
+    const root = await fixture()
+    await source(root, `sample.${extension}`, 'class SuffixMarker {}\n')
+    const result = await scanBroadSourceGraph(root, { observedAt: 123 })
+    expect(result.languages).toEqual([extension === 'kts' ? 'kotlin' : 'cpp'])
+    expect(result.records.some(record => record.source.startsWith(`repo://sample.${extension}#`) && record.text.includes('SuffixMarker') && record.provenance?.derivation === 'inferred' && record.provenance.method === 'language-regex')).toBe(true)
+  })
+
+  it('does not infer Dart declarations', async () => {
+    const root = await fixture()
+    await source(root, 'sample.dart', 'class DartMarker {}\n')
+    const result = await scanBroadSourceGraph(root, { observedAt: 123 })
+    expect(result.languages).toEqual([])
+    expect(result.records).toEqual([])
+  })
+
   it('finds representative declarations across every supported language family', async () => {
     const root = await fixture()
     const samples: Record<string, string> = {

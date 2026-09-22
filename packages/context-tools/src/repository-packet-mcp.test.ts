@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { execFile } from 'node:child_process'
-import { mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { createHash } from 'node:crypto'
+import { mkdtemp, realpath, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { promisify } from 'node:util'
@@ -38,6 +39,93 @@ function call(client: Client, arguments_: object) { return client.callTool({ nam
 afterEach(async () => { await Promise.all(roots.splice(0).map((value) => rm(value, { recursive: true, force: true }))) })
 
 describe('repository packet MCP adapter', () => {
+  it.each(['kts', 'cc', 'cxx', 'hh', 'hpp', 'hxx', 'HPP'])('retrieves .%s evidence, refreshes edits and retains policy and planner boundaries', async (extension) => {
+    const value = await root()
+    const file = `sample.${extension}`
+    const content = '// fixture\nclass EvidenceMarker {}\n'
+    await writeFile(join(value, file), content)
+    const connection = await connect(value)
+    const fixtureSpec = (sources: unknown[]) => ({ ...spec(sources), allowedFiles: [file] })
+    const search = async (term: string) => {
+      const result = await connection.client.callTool({ name: 'repository_search', arguments: { term } })
+      expect(result.isError).not.toBe(true)
+      return JSON.parse(text(result))
+    }
+    const refresh = async () => {
+      const result = await connection.client.callTool({ name: 'repository_refresh', arguments: {} })
+      expect(result.isError).not.toBe(true)
+      return JSON.parse(text(result)).generation as string
+    }
+    const build = (expectedGeneration: string) => call(connection.client, {
+      mode: 'build', expectedGeneration,
+      spec: fixtureSpec([{ path: file, startLine: 2, endLine: 2 }]),
+    })
+    try {
+      let generation = await refresh()
+      const digest = createHash('sha256').update(content).digest('hex')
+      expect((await search('EvidenceMarker')).results).toEqual([
+        { path: file, line: 2, text: 'class EvidenceMarker {}', sha256: digest },
+      ])
+      const built = await build(generation)
+      expect(built.isError).not.toBe(true)
+      const packet = JSON.parse(text(built)).packet
+      expect(packet.canonicalRoot).toBe(await realpath(value))
+      expect(packet.gitHEAD).toBe((await exec('git', ['-C', value, 'rev-parse', 'HEAD'])).stdout.trim())
+      expect(packet.sources[0]).toMatchObject({ path: file, sha256: digest, startLine: 2, endLine: 2, lines: [{ line: 2, content: 'class EvidenceMarker {}' }] })
+      expect(packet.allowedFiles[0]).toMatchObject({ path: file, state: 'present', sha256: digest })
+      const planned = await call(connection.client, { mode: 'plan', expectedGeneration: generation, spec: fixtureSpec([{ path: file, line: 2 }]) })
+      expect(planned.isError).toBe(true)
+      expect(text(planned)).toMatch(/planner source extension is unsupported/)
+
+      const changed = '// fixture\nclass UpdatedEvidenceMarker {}\n'
+      await writeFile(join(value, file), changed)
+      const status = await connection.client.callTool({ name: 'repository_status', arguments: {} })
+      expect(JSON.parse(text(status)).freshness).toBe('stale')
+      const stale = await build(generation)
+      expect(stale.isError).toBe(true)
+      expect(text(stale)).toMatch(/requires current navigation/)
+      const previous = generation
+      generation = await refresh()
+      expect(generation).not.toBe(previous)
+      expect((await build(previous)).isError).toBe(true)
+      expect((await search('EvidenceMarker')).results).toEqual([])
+      expect((await search('UpdatedEvidenceMarker')).results[0].path).toBe(file)
+      const updated = await build(generation)
+      expect(updated.isError).not.toBe(true)
+      expect(JSON.parse(text(updated)).packet.sources[0]).toMatchObject({
+        sha256: createHash('sha256').update(changed).digest('hex'),
+        lines: [{ line: 2, content: 'class UpdatedEvidenceMarker {}' }],
+      })
+
+      await writeFile(join(value, '.gitignore'), `${file}\n`)
+      expect((await build(generation)).isError).toBe(true)
+      generation = await refresh()
+      expect((await search('UpdatedEvidenceMarker')).results).toEqual([])
+      const excluded = await build(generation)
+      expect(excluded.isError).toBe(true)
+      expect(text(excluded)).toMatch(/excluded|policy/)
+    } finally { await connection.close() }
+  })
+
+  it('continues to exclude Dart from navigation and reject its build and plan packets', async () => {
+    const value = await root()
+    await writeFile(join(value, 'sample.dart'), 'class DartMarker {}\n')
+    const connection = await connect(value)
+    try {
+      const refreshed = await connection.client.callTool({ name: 'repository_refresh', arguments: {} })
+      const expectedGeneration = JSON.parse(text(refreshed)).generation
+      const found = await connection.client.callTool({ name: 'repository_search', arguments: { term: 'DartMarker' } })
+      expect(found.isError).not.toBe(true)
+      expect(JSON.parse(text(found)).results).toEqual([])
+      for (const mode of ['build', 'plan']) {
+        const source = mode === 'build' ? { path: 'sample.dart', startLine: 1, endLine: 1 } : { path: 'sample.dart', line: 1 }
+        const result = await call(connection.client, { mode, expectedGeneration, spec: { ...spec([source]), allowedFiles: ['sample.dart'] } })
+        expect(result.isError).toBe(true)
+        expect(text(result)).toMatch(/extension is unsupported/)
+      }
+    } finally { await connection.close() }
+  })
+
   it('discovers inline-only packet input and requires a current matching generation', async () => {
     const value = await root(); const connection = await connect(value)
     try {

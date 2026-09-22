@@ -16,7 +16,7 @@ const MAX_PACKET_BYTES = 64 * 1024;
 const MAX_FILES = 32;
 const MAX_FILE_BYTES = 1024 * 1024;
 const MAX_TOTAL_BYTES = 8 * 1024 * 1024;
-const SOURCE_EXTENSIONS = new Set(['ts', 'tsx', 'js', 'jsx', 'mts', 'cts', 'mjs', 'cjs', 'py', 'rs', 'go', 'java', 'kt', 'swift', 'c', 'cpp', 'h', 'cs', 'rb', 'php', 'md']);
+const SOURCE_EXTENSIONS = new Set(['ts', 'tsx', 'js', 'jsx', 'mts', 'cts', 'mjs', 'cjs', 'py', 'rs', 'go', 'java', 'kt', 'kts', 'swift', 'c', 'cc', 'cpp', 'cxx', 'h', 'hh', 'hpp', 'hxx', 'cs', 'rb', 'php', 'md']);
 const PLANNABLE_EXTENSIONS = new Set(['ts', 'tsx', 'js', 'jsx', 'mts', 'cts', 'mjs', 'cjs']);
 const GENERATED_DIRECTORIES = new Set(['node_modules', 'dist', 'build', 'coverage', 'out', 'vendor', 'target']);
 

@@ -75,6 +75,9 @@ export const view = await vault.create({ title: 'Independent consumer', scope: '
   const packetRoot = join(toolsConsumer, 'packet-repository')
   mkdirSync(packetRoot)
   writeFileSync(join(packetRoot, 'example.ts'), 'export function example() {\n  return 1\n}\n')
+  for (const extension of ['kts', 'cc', 'cxx', 'hh', 'hpp', 'hxx']) {
+    writeFileSync(join(packetRoot, 'example.' + extension), 'class InstalledSuffixMarker {}\n')
+  }
   const git = args => execFileSync('git', ['-C', packetRoot, ...args], { stdio: 'pipe', env: Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith('GIT_'))) })
   git(['init', '--quiet'])
   git(['add', 'example.ts'])
@@ -121,6 +124,18 @@ export const view = await vault.create({ title: 'Independent consumer', scope: '
       assert.equal(value.packet.sources.length, 1)
       assert.equal(value.packet.sources[0].startLine, 1)
       assert.equal(value.packet.sources[0].endLine, 3)
+      const found = await client.callTool({ name: 'repository_search', arguments: { term: 'InstalledSuffixMarker' } })
+      assert.notEqual(found.isError, true, text(found))
+      assert.deepEqual(JSON.parse(text(found)).results.map(item => item.path).sort(), ['cc', 'cxx', 'hh', 'hpp', 'hxx', 'kts'].map(extension => 'example.' + extension))
+      for (const extension of ['kts', 'cc', 'cxx', 'hh', 'hpp', 'hxx']) {
+        const path = 'example.' + extension
+        const result = await client.callTool({ name: 'repository_packet', arguments: {
+          mode: 'build', expectedGeneration: status.generation,
+          spec: { ...spec, allowedFiles: [path], sources: [{ path, startLine: 1, endLine: 1 }] },
+        } })
+        assert.notEqual(result.isError, true, text(result))
+        assert.deepEqual(JSON.parse(text(result)).packet.sources[0].lines, [{ line: 1, content: 'class InstalledSuffixMarker {}' }])
+      }
       await writeFile(root + '/example.ts', 'export function example() {\\n  return 22\\n}\\n')
       assert.equal((await get(status.generation)).isError, true)
       const oldGeneration = status.generation
