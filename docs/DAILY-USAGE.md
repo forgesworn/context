@@ -213,7 +213,7 @@ same-model task comparisons. Pricing estimates and invoice attribution are
 different evidence. Account identifiers group usage; no subscription charge is
 invented or multiplied by the number of tasks.
 
-Remaining FS2 work: real Claude export acceptance, client-version coverage,
+Remaining FS2 work: wider client-version coverage,
 complete everyday host/worker/review captures and convenient weekly report
 rendering. Explicit task boundaries and worker-helper receipt imports are available. The current tool handles explicit exports immediately;
 automatic session discovery, provider authentication and telemetry are excluded.
@@ -230,6 +230,29 @@ metadata was unavailable and all whole-task coverage assertions were false.
 This is a partial Context **development** window, not an accepted Heartwood task,
 a baseline, a complete cost of this implementation or evidence of savings. No
 real Claude export was present in the selected Context export directory; the
-Claude adapter has synthetic fixture acceptance only. The active Heartwood
+Claude adapter had synthetic fixture acceptance only at that point. The active Heartwood
 session was not inspected or modified. Private evidence is recorded in the
 [execution ledger](DOGFOOD-EXECUTION.md).
+
+## First real Claude export acceptance
+
+On 22 September 2026, Claude Code 2.1.278 completed a read-only Context language
+coverage audit using an independently installed 0.3.1 MCP package. Its frozen
+transcript contained 19 assistant entries representing seven unique message IDs.
+The existing importer removed 12 identical usage copies, found no conflicts and
+reconciled exactly with the CLI result: 166,442 total input tokens (130,617 cache
+reads, 35,811 cache creation and 14 fresh input) plus 5,322 output tokens. Cache
+creation's nested breakdown was not added again. No adapter code change was needed.
+
+The observed model was `claude-sonnet-5`; medium effort was requested in the launch
+command, but transcript effort remains unknown to the adapter. The CLI separately
+reported 1,310 thinking tokens within output; this adapter deliberately leaves
+reasoning unknown for its supported transcript shape. The result's list-price
+cost is not an invoice or subscription charge.
+
+The audited document was accepted after host source-review corrections. Only the
+Claude execution counters are complete here: Codex preparation, integration and
+review are not fully captured, and review duration is unknown. Task coverage stays
+incomplete. This validates one real Claude export shape and read-only task use;
+it does not establish whole-task cost, normal-session lifecycle acceptance or
+savings. See [the audit](LANGUAGE-SUPPORT.md) and [ledger](DOGFOOD-EXECUTION.md).

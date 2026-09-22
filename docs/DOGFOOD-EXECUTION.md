@@ -926,3 +926,79 @@ The local release-check blocker is resolved. Doctor and benchmark changes remain
 uncommitted and unpublished; this is not new CI, registry or client acceptance.
 Next adoption gate: a real Claude source-packet task and usage import. The existing
 Heartwood owner retains its application task; no consumer checkout was changed.
+
+## 22 September 2026 — First Claude task and real export import
+
+After the 0.3.1 shipment, an independent installation of its downloaded GitHub
+tarballs passed `doctor` against the Context checkout at `bb83fa3`. Claude Code
+2.1.278 then ran a useful read-only language coverage audit using that installed
+MCP server. The actual model was `claude-sonnet-5`, with medium effort requested.
+The existing Max subscription login was used; no new API credential was supplied.
+One client invocation completed successfully, with no reported provider refusal,
+tool error or permission denial and no host replay. Heartwood was not inspected or modified.
+
+The invocation supplied an explicit MCP binding, `--strict-mcp-config`, the four
+allowed repository tools, no built-in tools, and disabled skills for this bounded
+audit. It preserved saved client settings. This establishes real Claude Code
+print-mode use with an explicit binding, not acceptance of every interactive
+configuration. [CLI flag reference](https://code.claude.com/docs/en/cli-reference).
+
+The model called status once, refresh once, search eight times and packet once.
+The source-backed result needed host corrections: it falsely called `.kts`
+absent from broad scanning, misstated the number of packet suffixes, described
+the planner rejection incorrectly and omitted `.hh` from its proposed alignment.
+The reviewed [support matrix](LANGUAGE-SUPPORT.md) is accepted after those
+corrections; the original draft remains partial, retained privately. No second
+model pass was needed. The audit identifies a concrete next task: align Kotlin
+script and C++ suffix eligibility across navigation and exact source packets,
+with per-suffix tests and no broader parsing claim.
+
+The completed transcript was copied from this explicitly created session only.
+The existing daily importer accepted its real shape without code changes: 19
+assistant entries became seven unique request records, with 12 identical copies
+removed and no conflicts. Imported totals exactly match the CLI result:
+166,442 input tokens (130,617 cache reads, 35,811 cache creation, 14 fresh input),
+5,322 output tokens, 171,764 combined. The separate CLI thinking count is included
+in output; imported reasoning and effective effort remain unknown. Reported
+list-price cost is not subscription billing and is not treated as cash spend.
+
+Private launch, transcript, original answer, review, reconciled receipt and task
+summary are retained outside Git. Only the observed Claude execution is fully
+accounted here. Codex preparation, repair/integration and review usage are not
+fully captured; review duration and whole-task cost remain unknown. Coverage
+assertions explicitly retain those gaps. This is Context development, not an
+accepted Heartwood application task, a controlled comparison or evidence of
+token/subscription/cash savings.
+
+OS1a and FS2 now have first real Claude read-only tool-use and export evidence.
+Actual-client edit → stale → refresh, restart/disable, a consequential task and
+complete everyday host/worker/review receipts remain open. Eight searches before
+one packet are an observation to review on further tasks, not a demonstrated
+regression or causal savings claim. Documentation links and source assertions
+were checked; no production code or language eligibility changed in this slice.
+
+## 22 September 2026 — Kotlin script and C++ retrieval alignment (0.3.2)
+
+The language audit's six concrete gaps are fixed: `.kts`, `.cc`, `.cxx`, `.hh`,
+`.hpp` and `.hxx` are eligible for navigation and exact packets. Broad scanning
+already recognised them; syntax planning remains TS/JS-only. No new parser or
+semantic-resolution claim is made. The support matrix now documents this state.
+
+The M4 worker endpoint was occupied by another live session, so no inference was
+dispatched or interrupted. The host implemented and reviewed the small allowlist
+change and regression tests. The first focused run failed seven assertions on
+test error wording; the repair checks actual stale status and the existing
+refresh-required error. All 26 focused tests then passed. Whole host usage and
+review cost remain incomplete; no worker-token or monetary saving is claimed.
+
+Local shipment checks passed 402 tests, independent installed-package smoke,
+both unchanged benchmark gates, navigation stdio smoke, 22 scale tests and the
+10k postings probe. Per-suffix MCP tests cover search, source hashes/lines,
+checkout/commit provenance, stale rejection and refresh, Git-ignore exclusions
+and unsupported plan requests; the installed smoke retrieves all six suffixes.
+Dart remains explicitly unsupported. Publication/CI evidence belongs to the
+0.3.2 release, separately from these local checks; npm auth returned HTTP 401.
+
+Existing servers need a reconnect after the upgrade. No Heartwood checkout,
+configuration or live job was changed. Real Claude lifecycle qualification,
+routine whole-task receipts and measured benefit remain the next adoption gates.

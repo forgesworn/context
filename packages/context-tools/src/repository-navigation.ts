@@ -105,7 +105,8 @@ const DEFAULT_LIMITS: NavigationLimits = {
 
 const EXTENSIONS = new Set([
   '.ts', '.tsx', '.js', '.jsx', '.mts', '.cts', '.mjs', '.cjs',
-  '.py', '.rs', '.go', '.java', '.kt', '.swift', '.c', '.cpp', '.h',
+  '.py', '.rs', '.go', '.java', '.kt', '.kts', '.swift',
+  '.c', '.cc', '.cpp', '.cxx', '.h', '.hh', '.hpp', '.hxx',
   '.cs', '.rb', '.php', '.md',
 ]);
 

@@ -44,7 +44,8 @@ No model provider is required by core.
 
 Local stdio MCP servers already provide repository navigation and separate signed
 context/graph tools. Claude Code and Codex are first-class target clients; actual
-Codex use is recorded, while Claude model/tool acceptance remains open. See the
+Codex use and a first Claude read-only task are recorded; full Claude lifecycle
+and routine coding acceptance remain open. See the
 [client and language plan](docs/CLIENTS-AND-LANGUAGES.md) for current capabilities,
 deeper Rust/TS/Kotlin work and the provider-authentication boundary.
 

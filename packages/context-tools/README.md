@@ -6,12 +6,12 @@ ESM, Node 24+. Separate from the browser-safe core: filesystem and MCP
 dependencies never enter its root import. No KithMoot or NanoClaw runtime
 dependency.
 
-The 0.3.1 release tarballs include the setup doctor and require the matching core
+The 0.3.2 release tarballs include the setup doctor and require the matching core
 package. Follow the [installation guide](../../docs/GETTING-STARTED.md) to install
 both archives together. npm publication is pending; once published, use:
 
 ```sh
-npm install @forgesworn/context-tools@0.3.1
+npm install @forgesworn/context-tools@0.3.2
 ```
 
 The source is maintained in the public Z1P Core workspace. Build with

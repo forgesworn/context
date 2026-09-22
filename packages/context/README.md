@@ -9,12 +9,12 @@ This compatibility package is maintained in the public Z1P Core repository
 alongside its CLI/MCP adapter. Its established package, API and protocol names
 remain unchanged during the product rebrand. It has its own manifest, exports,
 build and distributable tarball.
-The matching 0.3.1 packages are distributed as GitHub release tarballs; see the
+The matching 0.3.2 packages are distributed as GitHub release tarballs; see the
 [installation guide](../../docs/GETTING-STARTED.md). npm publication is pending.
 Once the matching version is published, install with:
 
 ```sh
-npm install @forgesworn/context@0.3.1
+npm install @forgesworn/context@0.3.2
 ```
 
 From a source checkout, use `npm ci --ignore-scripts`,

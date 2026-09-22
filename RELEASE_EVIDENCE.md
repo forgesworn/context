@@ -4,6 +4,27 @@ Latest implementation and adoption results are in the
 [dogfood execution ledger](docs/DOGFOOD-EXECUTION.md). The dated snapshots below
 remain historical evidence; internal pilot acceptance is separate from G0–G4.
 
+## 0.3.2 shipment checks, 22 September 2026
+
+Navigation and exact source packets now accept `.kts`, `.cc`, `.cxx`, `.hh`,
+`.hpp` and `.hxx`, matching the broad scanner's existing lexical coverage.
+Syntax-aware planning remains TS/JS-only and Dart remains unsupported.
+See the [language support matrix](docs/LANGUAGE-SUPPORT.md).
+
+Local Node 24.21.0 checks passed 402 tests, independent package installation,
+both unchanged benchmark gates, navigation stdio smoke, 22 scale tests and the
+10k postings probe. Added coverage checks each suffix's search, exact source
+lines/hashes, stale rejection and refresh, policy exclusion, unsupported planning
+and retrieval through installed stdio MCP. Commit-specific CI, public artifact
+checksums and download verification accompany the GitHub release.
+
+npm authentication still returns HTTP 401; registry publication is outstanding.
+Upgrade using matching GitHub tarballs or the source build, then reconnect the
+MCP server: refreshing its source index does not reload its implementation.
+These checks do not establish new Claude lifecycle acceptance or measured
+whole-task/subscription/cash savings. The first actual Claude audit and its
+incomplete host-cost coverage are recorded in the execution ledger.
+
 ## 0.3.1 shipment, 22 September 2026
 
 This patch adds an installed, read-only `doctor` command that verifies the exact

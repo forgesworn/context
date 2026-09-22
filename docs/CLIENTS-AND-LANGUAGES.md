@@ -47,15 +47,18 @@ contracts, keeping unsigned navigation and signed evidence clearly distinguished
 Actual Codex calls have succeeded, including this review. The recorded Claude
 Code health check connected, but a previous Haiku attempt returned HTTP 429 for
 a weekly limit before tool use. This is historical evidence, not a current quota
-check. Claude task acceptance remains unverified. See
+check. On 22 September, Claude Code 2.1.278 used all four tools from an installed
+0.3.1 package for a [language coverage audit](LANGUAGE-SUPPORT.md). The read-only
+task was accepted after host corrections; actual-client edit/stale/refresh,
+restart/disable and consequential task qualification remain open. See
 [the pilot record](DOGFOOD.md) and [navigation contract](LOCAL-NAVIGATION.md).
 
 ## OS1 client and retrieval assignments
 
 | Task | Owner / where | Model and effort | Acceptance |
 | --- | --- | --- | --- |
-| **OS1a — Claude Code alongside Codex. Next** | Context integration owner, Node tools, public setup docs and isolated client fixtures | Flash/thinking off for bounded docs/fixtures; Terra/medium integration; **Claude Sonnet 5/medium** as the first real Claude executor; **Claude Opus 5/high** for one consequential source-backed task after basic acceptance | A pinned package launches in both clients against an explicit root; real tool discovery, status/refresh/search, bounded evidence, edit/stale/refresh, restart and disable work. Record actual client/model/effort and accepted task, not just Connected |
-| **OS1b — Sufficient evidence through MCP. Implemented locally; live client qualification remains** | Context implementation owner, shared packet module plus `packages/context-tools` adapters/tests | Terra/medium implementation; Sol/high boundary review; Flash/off for scoped fixtures | `repository_packet` returns bounded exact ranges or complete selected TS/JS blocks with provenance and stale rejection. Installed-tarball stdio retrieval, edit/refresh and restart pass. Reconnect existing clients to discover the new tool; actual Claude use remains open. No shell helper required by the consuming model; no arbitrary path escape |
+| **OS1a — Claude Code alongside Codex. Partial: read-only audit accepted** | Context integration owner, Node tools, public setup docs and isolated client fixtures | Flash/thinking off for bounded docs/fixtures; Terra/medium integration; **Claude Sonnet 5/medium** as the first real Claude executor; **Claude Opus 5/high** for one consequential source-backed task after basic acceptance | A pinned package launches in both clients against an explicit root; real tool discovery, status/refresh/search, bounded evidence, edit/stale/refresh, restart and disable work. Record actual client/model/effort and accepted task, not just Connected |
+| **OS1b — Sufficient evidence through MCP. Shipped; first Claude use recorded** | Context implementation owner, shared packet module plus `packages/context-tools` adapters/tests | Terra/medium implementation; Sol/high boundary review; Flash/off for scoped fixtures | `repository_packet` returns bounded exact ranges or complete selected TS/JS blocks with provenance and stale rejection. Installed-tarball stdio retrieval, edit/refresh and restart pass. Reconnect existing clients to discover the new tool; first Claude read-only use is recorded, while lifecycle qualification remains open. No shell helper required by the consuming model; no arbitrary path escape |
 | **OS1c — Graph questions through MCP** | Context graph owner, same tools adapter; follows OS3/OS4 evidence integration | Terra/medium; Sol/high review of scope/provenance | Bounded repository symbol/neighbour/path queries return precise source and derivation metadata in both clients; do not mistake the existing signed-cache graph tools for this capability |
 | **OS1d — Other client surfaces** | Context integration owner, portable examples and clean-client acceptance | Flash/off for docs, Terra/medium review; user's chosen model for the actual client | Claude Desktop is separately qualified after Claude Code; other MCP clients follow demand. Never infer their acceptance from Claude Code or Codex |
 
@@ -79,6 +82,10 @@ The existing prospective Sol/high assignment remains the Codex cohort; Claude
 client support does not require repeating every benchmark on every model.
 
 ## Current language depth and priorities
+
+The [selected suffix audit](LANGUAGE-SUPPORT.md) records exact navigation, broad
+scan, build-packet and plan-packet outcomes for Kotlin, C/C++, Dart and TypeScript,
+with source references and explicit test gaps.
 
 These findings come from this repository's source and tests, not a new scan of
 every ForgeSworn project. The captured Heartwood pilot confirms Rust, TS/JS and
