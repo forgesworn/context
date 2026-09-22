@@ -856,3 +856,73 @@ assets at version 0.3.0; the setup guide explains installing both tarballs.
 CI, merge and release results are recorded by the corresponding GitHub PR/run
 and release rather than inferred from these local checks. No active Heartwood
 client binding or personal client configuration was changed.
+
+## 22 September 2026 — Read-only installation doctor (local, unreleased)
+
+Added `encrypted-context doctor <repository-root> --term <known-identifier>`
+to OS1's installation workflow. It launches the installed CLI with the current
+Node executable and verifies all four repository tools over stdio. It checks
+canonical root/HEAD, generation, search and exact source-packet agreement;
+reports binding details, exclusions and evidence hashes without source text;
+and closes its owned process on success or failure. It changes neither client
+configuration nor repository files. Actual Claude/Codex acceptance remains
+separate and is explicitly `not-tested` in the report.
+
+One DeepSeek Flash draft (`deepseek-v4.1-flash:cloud`, thinking off) reported
+1,082 prompt and 5,209 completion tokens. The draft compiled, but a focused test
+caught lost exclusion metadata and host review found executable/environment
+and validation defects. A repair dispatch was blocked by the shared endpoint's
+busy guard before inference. The host retained and corrected the draft without
+interrupting the other request. Private prompt, answer, attempt receipts and
+live doctor output remain outside Git. This is partial worker acceptance with
+host repairs, not evidence of savings; complete host cost and billing are unknown.
+
+Validation: build and all 378 tests passed, including 11 new doctor checks.
+The independent installed-tarball smoke passed after correcting its macOS
+canonical-path assertion. A live doctor probe passed on the Context checkout.
+The unchanged navigation benchmark passed with declared-source recall 1.0.
+
+**Release blocker:** the unchanged raw-evidence benchmark failed because the
+expanded source/test corpus has 136 chunks, above signed v1's 128-record limit.
+No threshold, corpus selection or collection limit was changed. This needs a
+separately reviewed scale/benchmark solution before shipping these changes;
+navigation passing does not replace that gate. These local changes are not in
+the previously published v0.3.0 assets or npm. Heartwood was not modified, and
+no new Claude qualification or application-level consumer acceptance occurred.
+
+## 22 September 2026 — Doctor benchmark blocker resolved locally
+
+The preceding raw-evidence benchmark failure is retained as historical evidence.
+The v2 runner now partitions the complete deterministic corpus into valid
+synthetic collection views instead of requiring the entire repository to fit in
+one collection. All 136 chunks from 38 selected files are retained, in collections
+of 128 and 8 records. Signed v1's 128-record and 32-collection limits are unchanged.
+
+Every question queries both collections. All response payloads, including empty
+ones, contribute to the token and byte totals. The original questions, required
+sources, 8,192-byte/four-record per-call budgets, 10x raw regression floor and
+71.5x navigation threshold are unchanged. Aggregate per-question budgets grow
+with collection count, so this is explicitly versioned and documented as a new
+measurement method, not a reproduction of v1 on the same budget. There is no new
+production aggregate retrieval API. Locked D5 experiments remain untouched.
+
+On this working tree, `npm run check` passed 386 tests and independent packed
+package consumers. The raw v2 gate passed at 32.50x against its naive full-corpus
+baseline with required-source recall 1.0; the unchanged navigation gate passed
+at 270.71x with recall 1.0. Stdio smoke, 22 scale tests and the 10,000-record
+posting-index check passed. These synthetic payload comparisons do not establish
+whole-task, subscription or monetary savings. Eight new tests cover partition
+boundaries through 4,096 records, explicit over-capacity rejection, evidence
+beyond record 128, empty-response costs and single-collection v1 payload parity.
+
+Implementation used one DeepSeek Flash/off draft (551 reported prompt tokens,
+1,207 completion tokens). Host review corrected its timestamp type and unintended
+async interface and strengthened response-accounting checks before acceptance.
+The worker draft is recorded as partial with host integration; no retry or paid
+comparison arm ran. Private evidence is outside Git; complete host usage and
+billing remain unknown.
+
+The local release-check blocker is resolved. Doctor and benchmark changes remain
+uncommitted and unpublished; this is not new CI, registry or client acceptance.
+Next adoption gate: a real Claude source-packet task and usage import. The existing
+Heartwood owner retains its application task; no consumer checkout was changed.

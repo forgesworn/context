@@ -6,10 +6,12 @@ ESM, Node 24+. Separate from the browser-safe core: filesystem and MCP
 dependencies never enter its root import. No KithMoot or NanoClaw runtime
 dependency.
 
-Install the patch release, which depends on the matching core package:
+The 0.3.1 release tarballs include the setup doctor and require the matching core
+package. Follow the [installation guide](../../docs/GETTING-STARTED.md) to install
+both archives together. npm publication is pending; once published, use:
 
 ```sh
-npm install @forgesworn/context-tools@0.3.0
+npm install @forgesworn/context-tools@0.3.1
 ```
 
 The source is maintained in the public Z1P Core workspace. Build with
@@ -54,6 +56,24 @@ depth limits. `context_graph_path` finds a shortest bounded path between two
 records. These read-only tools preserve provenance and edge direction, never
 cross collection boundaries and do not claim that a signed relationship is
 true.
+
+## Check a repository installation
+
+```sh
+encrypted-context doctor /absolute/path/to/repository --term knownIdentifier
+```
+
+Use the exact Git checkout/worktree root with an existing commit and an identifier
+in an indexed source file. This read-only command starts the installed stdio
+server, verifies all four repository tools and checks a source packet against the
+search result and Git provenance. The JSON report contains binding details,
+exclusions and a source location/hash, without source text. It makes no model
+calls and writes no repository files or client settings.
+
+A passing probe establishes installation health. It does not check saved client
+configuration or prove Claude/Codex acceptance: merge the binding for that project,
+reconnect and verify the tools in the actual client. See the
+[portable setup guide](https://github.com/forgesworn/context/blob/main/docs/GETTING-STARTED.md).
 
 ## Local ecosystem and source scanning
 

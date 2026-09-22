@@ -27,8 +27,8 @@ matching core version:
 mkdir context-install
 cd context-install
 npm init -y
-npm install --ignore-scripts /absolute/path/to/forgesworn-context-0.3.0.tgz \
-  /absolute/path/to/forgesworn-context-tools-0.3.0.tgz
+npm install --ignore-scripts /absolute/path/to/forgesworn-context-0.3.1.tgz \
+  /absolute/path/to/forgesworn-context-tools-0.3.1.tgz
 ```
 
 For that installation, use
@@ -86,6 +86,34 @@ The server command is `NODE CLI navigate REPOSITORY`; it is a stdio service,
 so starting it by hand waits for a client rather than printing a scan report.
 
 ## 2. Connect your client
+
+With a build that lists `doctor` in `--help`, first check the installed executable
+against the selected checkout. Choose a known identifier from an indexed source
+file; replace `yourKnownIdentifier` below:
+
+```sh
+"$CONTEXT_NODE" "$CONTEXT_CLI" doctor "$CONTEXT_REPO" --term yourKnownIdentifier
+```
+
+The command launches this installation's repository server and exercises all four
+tools over stdio: status, refresh, search and a one-line source packet. It checks
+the canonical Git root, HEAD, generation and matching source hash. It prints JSON
+with `ok: true`, the executable/arguments to configure, exclusion counts and the
+evidence location/hash. It does not print source text, write client configuration,
+change repository files or call a model. Paths and hashes in the report are local
+diagnostics; review them before sharing.
+
+Pass the exact Git worktree root, with an existing commit. A subdirectory is
+rejected instead of silently widening the selection. An excluded or absent term
+fails the check; choose a known indexed identifier or inspect the selection policy.
+Each MCP request has a 15-second timeout and the probe has a 90-second deadline;
+a timeout is a diagnostic failure, not permission to remove selection bounds.
+
+`clientAcceptance: "not-tested"` is intentional: this checks a fresh server
+process, not your saved configuration or an already-running Claude/Codex session.
+Merge the reported binding using the client-specific instructions below, reconnect,
+then complete step 4. Older releases without `doctor` can still follow these
+manual setup and verification steps.
 
 Use either or both clients. Each launches its own process and in-memory index.
 Merge settings with existing configuration; do not overwrite other servers,
@@ -246,8 +274,9 @@ stable checkout to bind.
 | Packet already in progress | Wait for the active request to finish, then issue the next request sequentially |
 | Git HEAD error | Select a Git checkout with a commit; packet provenance requires it |
 
-There is no automatic watcher, worktree rebinding or setup-and-doctor command
-yet. Git ignores and selection policy apply; hidden files, symlinks, generated
+There is no automatic watcher, worktree rebinding or configuration-writing setup
+command yet. `doctor` checks a fresh process; it cannot retarget a running client.
+Git ignores and selection policy apply; hidden files, symlinks, generated
 directories and unsupported suffixes are excluded. `node_modules` is not indexed,
 and local navigation does not automatically resolve a published package back to
 the correct producer source revision. See [navigation policy](NAVIGATION-POLICY.md),

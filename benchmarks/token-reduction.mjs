@@ -3,7 +3,7 @@ import { readFile, readdir } from 'node:fs/promises'
 import { relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { encode } from 'gpt-tokenizer/encoding/o200k_base'
-import { retrieveView } from '../packages/context/dist/retrieval.js'
+import { BENCHMARK_LIMITS, partitionBenchmarkRecords, measureBenchmarkRetrieval } from './collection-corpus.mjs'
 
 const root = resolve(fileURLToPath(new URL('..', import.meta.url)))
 const parityTarget = 71.5
@@ -51,7 +51,6 @@ for (const path of [...sourceFiles, ...documentation].sort()) {
   const content = await readFile(path, 'utf8')
   for (const [part, text] of chunks(content).entries()) corpus.push({ source, part, text })
 }
-if (corpus.length > 128) throw new Error(`Corpus has ${corpus.length} chunks; ContextVault supports at most 128 records.`)
 
 const records = corpus.map(item => ({
   id: createHash('sha256').update(`${item.source}\0${item.part}\0${item.text}`).digest('hex'),
@@ -59,36 +58,37 @@ const records = corpus.map(item => ({
   author: '1d'.repeat(32),
   event: createHash('sha256').update(`event\0${item.source}\0${item.part}\0${item.text}`).digest('hex'),
 }))
-const view = {
-  id: '2e'.repeat(32), owner: '1d'.repeat(32), title: 'Context repository benchmark',
-  scope: 'personal', epoch: 1, head: '3f'.repeat(32), revision: 1,
-  updatedAt: now, role: 'write', uploaded: false, records,
-}
+const views = partitionBenchmarkRecords(records, now)
 
 // The naïve comparator is exactly what an agent would receive if every source
 // were inserted verbatim, including filenames, without signatures or graph data.
 const baselinePayload = corpus.map(({ source, part, text }) => ({ source, part, text }))
 const baselineTokens = tokens(baselinePayload)
 const results = questions.map(question => {
-  const payload = retrieveView(view, { query: question.query, maxBytes: 8192, maxRecords: 4, includeRelated: false })
-  const retrievedTokens = tokens(payload)
-  const returned = new Set(payload.records.map(record => record.source))
+  const measurement = measureBenchmarkRetrieval(views, question.query, tokens)
+  const { retrievedTokens } = measurement
+  const returned = new Set(measurement.returnedSources)
   const found = question.required.filter(source => returned.has(source))
   const recall = found.length / question.required.length
   return {
     id: question.id, query: question.query, requiredSources: question.required,
-    returnedSources: [...returned], baselineTokens, retrievedTokens,
+    ...measurement, baselineTokens,
     multiplier: baselineTokens / retrievedTokens,
     reductionPercent: (1 - retrievedTokens / baselineTokens) * 100,
-    evidenceRecall: recall, bytesUsed: payload.bytesUsed,
+    evidenceRecall: recall,
   }
 })
 const totalBaselineTokens = baselineTokens * results.length
 const totalRetrievedTokens = results.reduce((sum, result) => sum + result.retrievedTokens, 0)
 const aggregateMultiplier = totalBaselineTokens / totalRetrievedTokens
 const report = {
-  benchmark: 'forgesworn-context-token-reduction-v1', tokenizer: 'o200k_base',
-  corpus: { files: sourceFiles.length + documentation.length, chunks: corpus.length, baselineTokens },
+  benchmark: 'forgesworn-context-token-reduction-v2', tokenizer: 'o200k_base',
+  contract: 'synthetic-authorised-collections-payload-only',
+  limits: BENCHMARK_LIMITS,
+  corpus: { files: sourceFiles.length + documentation.length, chunks: corpus.length, baselineTokens,
+    sha256: createHash('sha256').update(JSON.stringify(corpus)).digest('hex'),
+    collections: views.length, collectionSizes: views.map(view => view.records.length),
+    indexedRecords: views.reduce((sum, view) => sum + view.records.length, 0) },
   queries: results.map(result => ({ ...result,
     multiplier: Number(result.multiplier.toFixed(2)), reductionPercent: Number(result.reductionPercent.toFixed(2)),
   })),

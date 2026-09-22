@@ -4,6 +4,30 @@ Latest implementation and adoption results are in the
 [dogfood execution ledger](docs/DOGFOOD-EXECUTION.md). The dated snapshots below
 remain historical evidence; internal pilot acceptance is separate from G0–G4.
 
+## 0.3.1 shipment, 22 September 2026
+
+This patch adds an installed, read-only `doctor` command that verifies the exact
+Git checkout, all four repository tools and one source line's generation/hash
+through a fresh stdio connection. It reports client acceptance as `not-tested`;
+an SDK probe does not establish Claude/Codex task acceptance.
+
+The raw-evidence benchmark now uses versioned v2 synthetic collections, retaining
+every corpus chunk within the existing 128-record and 32-collection bounds.
+Each question queries every collection and counts every response. Per-call
+budgets and gate thresholds are unchanged; the total per-question budget scales
+with the collection count. See [the methodology](benchmarks/README.md).
+
+The version-bumped 0.3.1 local checks passed 386 tests, independent installed-package smoke,
+both benchmark gates, navigation stdio smoke, 22 scale tests and the 10k postings
+probe. Raw v2 measured 32.53x and navigation 270.71x, both with required-source
+recall 1.0. Commit-specific CI and artifact checksums accompany the GitHub release. No new client,
+consumer or whole-task savings acceptance follows from these checks.
+
+npm authentication returned HTTP 401 on 22 September. Registry publication
+remains blocked; matching release tarballs provide the independent installation
+route. The next adoption gate is an accepted Claude task with complete usage,
+repair and review accounting, alongside continuing Codex use.
+
 ## Current internal adoption review, 21 September 2026
 
 The [ForgeSworn dogfooding plan](docs/FORGESWORN-DOGFOOD-GOALS.md) now tracks
