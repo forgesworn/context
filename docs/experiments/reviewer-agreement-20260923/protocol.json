@@ -1,0 +1,42 @@
+{
+  "probeId": "reviewer-agreement-20260923",
+  "lockedAt": null,
+  "purpose": "Measure how often the blind acceptance reviewer returns the same verdict for the same recorded answer, so that reviewer variance can be separated from executor variance before any further executor run. No executor runs.",
+  "sample": {
+    "runs": ["v1", "v2", "s5", "v3"],
+    "cells": "every run/task/arm directory holding receipt.json with a reviewer verdict and reviewer.prompt.txt: 80 cells (v1, v2 and S5: 8 tasks x 3 arms; v3: 8 tasks x Context arm)",
+    "note": "S5 executors were DeepSeek V4 Pro but its reviewer was the same Sonnet 5 configuration, so its answers are valid review inputs."
+  },
+  "conditions": {
+    "replay": "The recorded reviewer.prompt.txt, byte for byte (SHA-256 checked against reviewer.argv.json), with the recorded review schema. Measures agreement under the conditions that produced every verdict so far.",
+    "fixed": "The same recorded prompt with one block inserted before its final line naming the exact dimension ids to report, once each, in order, and a schema that restricts ids to that list with exactly that many items. Structured tasks use the rubric ids; code tasks use b1..bN for the N required behaviours plus scope. Measures whether a fixed dimension list removes the dimension-set drift and reduces verdict churn."
+  },
+  "repeats": 3,
+  "reviewer": {
+    "client": "claude-code (version recorded per run; the recorded reviews used 2.1.278)",
+    "model": "claude-sonnet-5",
+    "effort": "high",
+    "maxTurns": 3,
+    "tools": "none: the executor and reviewer disallowed-tool lists of graphify-20260922/protocol.json, empty strict MCP config, agents-md plugin disabled, no session persistence",
+    "invocation": "Headless print mode with --output-format json in a per-cell output directory; the recorded reviews used stream-json in the arm directory. Neither affects what the model receives. The reviewer never had tools, so the recorded PATH setting is not reproduced.",
+    "retry": "one further attempt only when the verdict does not parse; a provider or client failure (rate limit, quota, authentication, overload) stops the whole probe without retry"
+  },
+  "acceptedRule": "As in the recorded runs: deterministic checker passed (taken from the receipt), verdict.accepted true and no material issues.",
+  "measures": {
+    "acceptance": "Per condition: share of cells whose three fresh verdicts agree; mean pairwise disagreement (probability two independent reviews of the same answer differ); Fleiss' kappa over cells. The replay condition also reports agreement of the three fresh verdicts with the recorded one.",
+    "dimensions": "Per condition and task: distribution of dimension counts; per dimension id, share of cells with unanimous pass/fail and pooled Fleiss' kappa.",
+    "attribution": "Cross-run disagreement between v1 and v2 on the arms whose tools and executor model did not change (plain and Graphify, 16 task/arm pairs, 5 flipped; the Context arm changed between runs and flipped once more) compared with the replay condition's mean pairwise disagreement on the same 32 answers.",
+    "cost": "Sum of client-reported total_cost_usd, input (uncached and cached), output and seconds per condition."
+  },
+  "decisionRule": {
+    "reviewerStable": "Replay condition: mean pairwise acceptance disagreement at most 0.10 and no task with more than one split cell. If met, whole-task acceptance from one review stays the measure for the repeated-run design.",
+    "fixedListAdopted": "If the replay condition is not stable and the fixed condition is (same thresholds), the fixed list replaces the recorded reviewer prompt in all later runs, and earlier runs are not re-scored with it.",
+    "neitherStable": "If neither condition is stable, whole-task acceptance from a single review is not used in later comparisons; the next step is a majority of three reviews or deterministic rubric checks, costed and approved separately.",
+    "attribution": "If replay pairwise disagreement on the 32 unchanged-arm answers is at least half the v1-v2 cross-run flip rate on those arms (5 of 16, 0.3125), reviewer variance is reported as a major share of the recorded churn."
+  },
+  "cost": {
+    "basis": "The 80 recorded reviews: client-reported $10.81 in total ($0.110 code change, $0.122 impact, $0.149 diagnosis, $0.159 orientation per review on average), 2.30M input of which 1.27M uncached, 0.55M output, 5,344 seconds.",
+    "estimate": "Both conditions x 3 repeats = 480 reviews: about $65 client-reported, 13.8M input (7.6M uncached), 3.3M output, about 8.9 hours of review time, about 3 hours at concurrency 3. Replay only: 240 reviews, about $32. Per-review cost can exceed the average when a verdict needs its second attempt.",
+    "billing": "total_cost_usd is the client's API-price estimate. On a subscription the reviews draw on the Sonnet weekly quota instead; an earlier acceptance run was blocked by that quota."
+  }
+}

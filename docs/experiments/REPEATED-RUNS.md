@@ -17,6 +17,9 @@ the changed tool was never called. Every later comparison uses this design.
 - **Executor.** One model per run, recorded with effort and client version.
   The next run uses `claude-opus-5-5`, with the reviewer unchanged
   (`claude-sonnet-5`, high) so verdicts stay comparable with earlier runs.
+- **Code-change acceptance.** Checker plus the deterministic scope check
+  (`"codeAcceptance": "checker-and-scope"`, see `code-acceptance-20260923/`);
+  the model reviewer judges structured answers only.
 - **Arms.** Plain tools, Graphify, and Context at its current build, which
   includes `repository_explore` and `repository_coverage` with the exact-quote
   check. A category checklist in the instructions, if tested, is a fourth arm
