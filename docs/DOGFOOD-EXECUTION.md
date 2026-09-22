@@ -1002,3 +1002,56 @@ Dart remains explicitly unsupported. Publication/CI evidence belongs to the
 Existing servers need a reconnect after the upgrade. No Heartwood checkout,
 configuration or live job was changed. Real Claude lifecycle qualification,
 routine whole-task receipts and measured benefit remain the next adoption gates.
+
+## 22 September 2026 — Scope-aware TS/JS call evidence (local, unreleased)
+
+Starting from `5df1b8b`, the source scanner replaces file-level name matching with
+an isolated TypeScript Program/TypeChecker over the already selected syntax trees.
+It resolves lexical bindings and selected local import/default/re-export aliases,
+without loading tsconfig, external libraries, package metadata or extra files.
+The compiler host has no filesystem fallback. Relative imports reuse the scanner's
+real-path selection so virtual-root normalisation cannot widen the graph.
+
+This corrects a reproduced edge from `invoke(target) { target() }` to an unrelated
+file-level `target`. Nested functions/arrows/classes no longer donate their calls
+to their parent; multiple arrow declarations in one statement are independent.
+Unindexed nested symbols, dynamic/object dispatch and project-level configuration
+remain outside this bounded static-evidence contract. This is not complete
+language support or proof of runtime dispatch; the signed wire format is unchanged.
+
+The host implemented the resolver and compiler-boundary tests. DeepSeek
+`deepseek-v4.1-flash:cloud`, thinking off, supplied seven regression drafts through
+the explicit M4 endpoint. The first draft invented indexed nested declarations;
+two tests failed. One focused repair fixed those failures, but the host still
+corrected negative assertions that contradicted direct calls in their fixtures.
+Both attempts are retained and marked partial. Worker usage was 8,934 reported
+prompt + 3,567 completion = 12,501 tokens. Preparation, integration and independent
+review usage/billing are incomplete; worker tokens establish no savings.
+
+The new regression set fails 11 tests against the original scanner. Restoring the
+implementation passes all 47 focused source/broad-scanner tests. Initial full
+Node 24.21.0 validation passed 416 tests and independent packed-package checks;
+both unchanged benchmark gates passed with required-source recall 1.0. These
+are deterministic correctness checks and synthetic payload gates, not improved
+whole-task/subscription/cash results.
+
+Independent Sol/high review found three additional cases: type-only export-star
+barrels leaked a value target; ambiguous barrels selected the first target; and
+same-named static/instance methods shared one record identity. The host added
+selected-module value-export provenance with explicit-over-star precedence and
+ambiguity rejection, plus distinct static identities only on a name collision.
+Direct/chained/mixed/cyclic export and member-identity regressions bring the
+focused suite to 51 passing tests. Compiler feedback also required an explicit
+JSDoc-import exclusion; no JSDoc type import becomes runtime access. Final full
+validation passed 420 tests, independent packed-package smoke and both unchanged
+benchmark gates with required-source recall 1.0. The reviewer reprobed all three
+findings successfully after repair. Identifier default-export assignments
+(`export default value`) remain unsupported, as in HEAD; documentation now states
+that limit separately from supported named default function declarations.
+Private worker attempts and validation logs are under
+`/tmp/context-scope-worker.4AxXdm`; no private transcript is committed.
+
+The product/client plans and language docs distinguish this unreleased change
+from the published 0.3.2 artefacts. No client configuration, consumer pin, registry
+release or deployment was changed. Next: explicit project resolution and useful
+bounded symbol/reference/test evidence queries.

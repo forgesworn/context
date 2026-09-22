@@ -81,7 +81,7 @@ Exit: documented behaviour matches executable fixtures, including the cases wher
 - [ ] Walk through the documented install, scan, persist, retrieve, export and import path on a clean machine or isolated environment.
 - [ ] Exercise the supported local workflow on an explicitly selected non-ForgeSworn repository without workspace-specific paths, private worker helpers, Oathrun or a ForgeSworn account. State language/relationship coverage and gaps.
 - [ ] Exercise an actual MCP client session, including initialisation, errors, cancellation and bounded output.  Name the tested client and version.
-- [ ] Qualify actual Claude Code and Codex task/tool use separately, recording model/effort, source freshness, restart and disable. Connection health alone is insufficient; Claude Desktop is a separate client surface. Keep provider authentication outside Context.
+- [ ] Qualify actual Claude Code, Codex and OpenCode task/tool use separately, recording model/effort, source freshness, restart and disable. Connection health alone is insufficient; Claude Desktop is a separate client surface. Keep provider authentication outside Context.
 - [ ] Verify compatibility fixtures for existing package names, APIs and signed wire formats.  Document any required migration before release.
 - [ ] Test intended consumer integration in isolated branches or fixtures.  Do not silently repin or migrate live consumers.
 - [ ] Reconcile README commands, package versions, changelog and extraction provenance.  Distinguish a prepared tarball from an available registry release.
@@ -89,13 +89,22 @@ Exit: documented behaviour matches executable fixtures, including the cases wher
 
 Exit: a newcomer can follow the published instructions successfully without local workspace links or unpublished dependencies.
 
-## G4: Useful savings, with quality held constant
+## G4: Useful savings and better accepted results
+
+The owner's stronger product requirement is **better accepted developer results**.
+The [deterministic intelligence contract](docs/DETERMINISTIC-CODE-INTELLIGENCE.md)
+adds a prospectively locked quality-improvement measure and competent
+ordinary/Graphify-assisted baselines, including an OpenCode client cohort.
+Smaller packets or unchanged quality alone do not establish that claim. Preserve
+existing D5 protocols/results; qualify retrieval first, then mixed-model routing
+separately. Internal adoption need not wait for the complete external comparison.
 
 - [ ] Define representative tasks and acceptance tests before comparing baseline and Z1P-assisted runs.  Include repository orientation, bug investigation, change impact and an accepted code change.
 - [ ] Hold repository revisions, task instructions, model settings and acceptance standards constant.  Separate context improvements from any later model-routing experiment.
 - [ ] Count the whole task: retrieved source, input/output tokens, cached tokens where reported, retries, tool calls, failures and review time.  Include scan and refresh overhead.
 - [ ] Record missing provider usage as unknown, never zero.  Keep observed billing, estimated token cost and fixed subscription costs distinct.
 - [ ] Report accepted tasks, regressions and unsuccessful runs alongside cost.  Navigation compression alone is not an inference-bill saving.
+- [ ] Demonstrate a predeclared improvement in first-pass acceptance, missed/incorrect dependencies or substantive review repairs on representative tasks against the stated existing workflow; report losses and inconclusive results too.
 - [ ] Publish a reproducible, non-sensitive evaluation and its limitations.  Keep private code, prompts, invoices and customer data out of this repository.
 
 Exit: the tested workflow reduces cost per accepted outcome without lowering the agreed quality bar.  If it does not, record the result and fix the cause before making a savings claim.

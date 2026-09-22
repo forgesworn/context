@@ -142,11 +142,28 @@ encrypted-context scan-source /projects/my-project \
   --max-file-bytes 262144 --max-records 128 --observed-at 1800000000
 ```
 
-The first analyser supports `.ts`, `.tsx`, `.js`, `.jsx`, `.mts`, `.cts`,
-`.mjs` and `.cjs`. Identifier calls, imported named calls and `this.method()`
-within a class are linked only when their target is present and unambiguous.
-Dynamic imports, computed calls, object dispatch, package exports and type-level
-resolution are deliberately not inferred. These records are reviewable static
+The analyser supports `.ts`, `.tsx`, `.js`, `.jsx`, `.mts`, `.cts`,
+`.mjs` and `.cjs`. Version 0.3.3 binds identifier calls using an
+isolated TypeScript Program/TypeChecker over already selected syntax trees.
+Parameter, local, block and import shadowing use the actual declaration identity.
+Selected named default function declarations and re-export aliases can resolve through local
+modules; type-only aliases and re-export names without a local binding do not
+establish value calls. `this.method()` uses the selected method declaration.
+Conflicting value targets from named/star barrels produce no call edge;
+explicit exports take precedence over stars. When a class has both static and
+instance members with the same name, their source identities are separated:
+`Class.static.member` and `Class.member`. Other member identities stay unchanged.
+Nested functions, arrows and classes are not attributed as direct calls of an
+enclosing callable; their unindexed symbols remain outside this graph. Sibling
+arrow declarations are analysed independently.
+
+Compiler binding has no filesystem fallback, default libraries, configuration
+loading or additional dependency discovery. It only follows relative modules
+already resolved against the bounded source selection. Version 0.3.2 and earlier
+retain the earlier name-based call hints.
+Default-export expression assignments (`export default value`), dynamic imports,
+computed calls, object dispatch, package exports and type-level
+project resolution are deliberately not inferred. These records are reviewable static
 evidence, not proof of runtime behaviour or semantic intent.
 
 `encrypted-context scan-broad-source <directory>` adds conservative navigation

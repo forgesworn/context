@@ -39,9 +39,8 @@ export interface SourceGraphScan {
 }
 
 type SymbolKind = 'function' | 'class' | 'method' | 'interface' | 'type' | 'enum' | 'variable'
-interface ImportBinding { target: string; imported: string }
 interface ParsedSymbol { key: string; file: string; name: string; kind: SymbolKind; exported: boolean; line: number; parameters?: number; node: ts.Node; className?: string }
-interface ParsedFile { path: string; bytes: number; source: ts.SourceFile; imports: string[]; bindings: Map<string, ImportBinding>; symbols: ParsedSymbol[] }
+interface ParsedFile { path: string; bytes: number; source: ts.SourceFile; imports: string[]; modules: Map<string, string>; symbols: ParsedSymbol[] }
 
 const ignored = new Set(['.git', 'node_modules', 'build', 'dist', 'coverage', 'out'])
 const extensions = new Set(['.ts', '.tsx', '.js', '.jsx', '.mts', '.cts', '.mjs', '.cjs'])
@@ -80,6 +79,154 @@ function declarationName(node: ts.DeclarationStatement): string | undefined {
 }
 function relation(to: string, kind: ContextRelationKind): ContextRelation { return { to, kind } }
 function relationSort(a: ContextRelation, b: ContextRelation): number { return a.kind.localeCompare(b.kind) || a.to.localeCompare(b.to) }
+
+/** Bind only already selected syntax trees. The compiler has no filesystem,
+ * config, default-library, package or network fallback. Virtual paths keep
+ * compiler resolution independent of the operator's current directory. */
+function callResolver(files: ParsedFile[]): (expression: ts.Expression, caller: ParsedSymbol) => ParsedSymbol | undefined {
+  const sources = new Map(files.map(file => [file.source.fileName, file.source]))
+  const modules = new Map(files.map(file => [file.source.fileName, file.modules]))
+  const options: ts.CompilerOptions = {
+    target: ts.ScriptTarget.Latest, module: ts.ModuleKind.ESNext,
+    allowJs: true, noLib: true, noEmit: true, types: [], skipLibCheck: true,
+  }
+  const host: ts.CompilerHost = {
+    getSourceFile: path => sources.get(path),
+    getDefaultLibFileName: () => '/__context_no_lib__.d.ts',
+    writeFile: () => {},
+    getCurrentDirectory: () => '/',
+    getDirectories: () => [],
+    fileExists: path => sources.has(path),
+    readFile: path => sources.get(path)?.text,
+    getCanonicalFileName: path => path,
+    useCaseSensitiveFileNames: () => true,
+    getNewLine: () => '\n',
+    resolveModuleNames: (names, from) => names.map(name => {
+      // Reuse only imports resolved against the real selected paths. Resolving
+      // ../ at a virtual / root could otherwise alias an out-of-root import.
+      const target = modules.get(from)?.get(name)
+      return target ? { resolvedFileName: `/${target}` } : undefined
+    }),
+  }
+  const checker = ts.createProgram([...sources.keys()], options, host).getTypeChecker()
+  const declarations = new Map<ts.Symbol, ParsedSymbol>()
+  for (const file of files) for (const symbol of file.symbols) {
+    const name = (symbol.node as ts.NamedDeclaration).name
+    if (!name) continue
+    const binding = checker.getSymbolAtLocation(name)
+    if (binding) declarations.set(binding, symbol)
+  }
+  // The checker follows type-only export stars to their original value symbol.
+  // Prove a value export path separately before accepting an imported call.
+  const byPath = new Map(files.map(file => [file.path, file]))
+  type ExportSeen = Set<string | ts.Symbol>
+  function valueBindings(binding: ts.Symbol | undefined, seen: ExportSeen): Set<ts.Symbol> {
+    const values = new Set<ts.Symbol>()
+    if (!binding || seen.has(binding)) return values
+    seen.add(binding)
+    if (!(binding.flags & ts.SymbolFlags.Alias)) {
+      if (binding.flags & ts.SymbolFlags.Value) values.add(binding)
+      return values
+    }
+    for (const node of binding.declarations ?? []) {
+      if (ts.isTypeOnlyImportOrExportDeclaration(node)) continue
+      let declaration: ts.ImportDeclaration | ts.ExportDeclaration
+      let name: string
+      if (ts.isImportSpecifier(node)) {
+        if (!ts.isImportDeclaration(node.parent.parent.parent)) continue
+        declaration = node.parent.parent.parent
+        name = (node.propertyName ?? node.name).text
+      } else if (ts.isImportClause(node)) {
+        if (!ts.isImportDeclaration(node.parent)) continue
+        declaration = node.parent
+        name = 'default'
+      } else if (ts.isExportSpecifier(node)) {
+        declaration = node.parent.parent
+        name = (node.propertyName ?? node.name).text
+        if (!declaration.moduleSpecifier) {
+          for (const value of valueBindings(checker.getExportSpecifierLocalTargetSymbol(node), seen)) values.add(value)
+          continue
+        }
+      } else continue
+      const specifier = declaration.moduleSpecifier
+      if (!specifier || !ts.isStringLiteral(specifier)) continue
+      const target = modules.get(declaration.getSourceFile().fileName)?.get(specifier.text)
+      if (target !== undefined) for (const value of valueExports(target, name, seen)) values.add(value)
+    }
+    return values
+  }
+  function valueExports(path: string, name: string, seen: ExportSeen): Set<ts.Symbol> {
+    const values = new Set<ts.Symbol>(), key = `${path}\0${name}`
+    if (seen.has(key)) return values
+    seen.add(key)
+    const file = byPath.get(path)
+    if (!file) return values
+    let explicit = false
+    for (const symbol of file.symbols) {
+      if (!symbol.exported || symbol.kind === 'method') continue
+      const exportName = ts.getCombinedModifierFlags(symbol.node as ts.Declaration) & ts.ModifierFlags.Default ? 'default' : symbol.name
+      if (exportName === name) {
+        explicit = true
+        const binding = checker.getSymbolAtLocation((symbol.node as ts.NamedDeclaration).name!)
+        for (const value of valueBindings(binding, seen)) values.add(value)
+      }
+    }
+    const stars: string[] = []
+    for (const node of file.source.statements) {
+      if (!ts.isExportDeclaration(node)) continue
+      if (node.exportClause && ts.isNamedExports(node.exportClause)) {
+        for (const element of node.exportClause.elements) if (element.name.text === name) {
+          explicit = true
+          if (node.isTypeOnly || element.isTypeOnly) continue
+          if (!node.moduleSpecifier) {
+            for (const value of valueBindings(checker.getExportSpecifierLocalTargetSymbol(element), seen)) values.add(value)
+          } else if (ts.isStringLiteral(node.moduleSpecifier)) {
+            const target = file.modules.get(node.moduleSpecifier.text)
+            if (target !== undefined) for (const value of valueExports(target, (element.propertyName ?? element.name).text, seen)) values.add(value)
+          }
+        }
+      } else if (!node.exportClause && !node.isTypeOnly && node.moduleSpecifier && ts.isStringLiteral(node.moduleSpecifier)) {
+        const target = file.modules.get(node.moduleSpecifier.text)
+        if (target) stars.push(target)
+      }
+    }
+    if (!explicit && name !== 'default') for (const target of stars) {
+      for (const value of valueExports(target, name, seen)) values.add(value)
+    }
+    return values
+  }
+  const importedValues = new Map<ts.Symbol, Set<ts.Symbol>>()
+  return (expression, caller) => {
+    // Ordinary object/namespace/dynamic calls remain outside this contract.
+    const identifier = ts.isIdentifier(expression)
+    const member = ts.isPropertyAccessExpression(expression)
+      && expression.expression.kind === ts.SyntaxKind.ThisKeyword && !!caller.className
+    if (!identifier && !member) return undefined
+    let binding = checker.getSymbolAtLocation(identifier ? expression : expression.name)
+    if (!binding) return undefined
+    const imported = !!(binding.flags & ts.SymbolFlags.Alias)
+    if (imported) {
+      let values = importedValues.get(binding)
+      if (!values) { values = valueBindings(binding, new Set()); importedValues.set(binding, values) }
+      // A checker alias alone can choose the first of conflicting barrel exports.
+      if (values.size !== 1) return undefined
+      const [value] = values
+      if (checker.getAliasedSymbol(binding) !== value) return undefined
+    }
+    const seen = new Set<ts.Symbol>()
+    while (binding.flags & ts.SymbolFlags.Alias) {
+      if (seen.has(binding) || binding.declarations?.some(ts.isTypeOnlyImportOrExportDeclaration)) return undefined
+      seen.add(binding)
+      binding = checker.getImmediateAliasedSymbol(binding)
+      if (!binding) return undefined
+    }
+    const target = declarations.get(binding)
+    // Do not infer a shared script-global environment across unrelated files.
+    if (!target || (!imported && target.file !== caller.file)) return undefined
+    if (member && !ts.isMethodDeclaration(target.node)) return undefined
+    return target
+  }
+}
 
 async function readBounded(path: string, max: number): Promise<{ text: string; bytes: number }> {
   const handle = await open(path, constants.O_RDONLY | constants.O_NOFOLLOW)
@@ -152,18 +299,24 @@ export async function scanSourceGraph(root: string, options: SourceGraphScanOpti
   const known = new Set(selected.map(file => file.path.split(sep).join('/')))
   const parsed: ParsedFile[] = selected.map(file => {
     const path = normal(canonicalRoot, file.path)
-    const source = ts.createSourceFile(path, file.text, ts.ScriptTarget.Latest, true, sourceKind(path))
-    const symbols: ParsedSymbol[] = [], rawImports: { specifier: string; clause?: ts.ImportClause; declaration?: ts.ExportDeclaration }[] = []
+    const source = ts.createSourceFile(`/${path}`, file.text, ts.ScriptTarget.Latest, true, sourceKind(path))
+    const symbols: ParsedSymbol[] = [], rawImports: string[] = []
     for (const node of source.statements) {
-      if (ts.isImportDeclaration(node) && ts.isStringLiteral(node.moduleSpecifier)) rawImports.push({ specifier: node.moduleSpecifier.text, clause: node.importClause })
-      if (ts.isExportDeclaration(node) && node.moduleSpecifier && ts.isStringLiteral(node.moduleSpecifier)) rawImports.push({ specifier: node.moduleSpecifier.text, declaration: node })
+      if (ts.isImportDeclaration(node) && ts.isStringLiteral(node.moduleSpecifier)) rawImports.push(node.moduleSpecifier.text)
+      if (ts.isExportDeclaration(node) && node.moduleSpecifier && ts.isStringLiteral(node.moduleSpecifier)) rawImports.push(node.moduleSpecifier.text)
       if (ts.isFunctionDeclaration(node) || ts.isClassDeclaration(node) || ts.isInterfaceDeclaration(node) || ts.isTypeAliasDeclaration(node) || ts.isEnumDeclaration(node)) {
         const name = declarationName(node)
         if (name) symbols.push({ key: `${path}#${name}`, file: path, name, kind: ts.isFunctionDeclaration(node) ? 'function' : ts.isClassDeclaration(node) ? 'class' : ts.isInterfaceDeclaration(node) ? 'interface' : ts.isTypeAliasDeclaration(node) ? 'type' : 'enum', exported: exported(node), line: source.getLineAndCharacterOfPosition(node.getStart(source)).line + 1, parameters: ts.isFunctionDeclaration(node) ? node.parameters.length : undefined, node })
-        if (name && ts.isClassDeclaration(node)) for (const member of node.members) {
-          if ((!ts.isMethodDeclaration(member) && !ts.isGetAccessorDeclaration(member) && !ts.isSetAccessorDeclaration(member)) || !member.name || !ts.isIdentifier(member.name)) continue
-          const method = member.name.text
-          symbols.push({ key: `${path}#${name}.${method}`, file: path, name: `${name}.${method}`, kind: 'method', exported: exported(node), line: source.getLineAndCharacterOfPosition(member.getStart(source)).line + 1, parameters: member.parameters.length, node: member, className: name })
+        if (name && ts.isClassDeclaration(node)) {
+          const instanceNames = new Set(node.members.flatMap(member => member.name && ts.isIdentifier(member.name)
+            && !(ts.getCombinedModifierFlags(member) & ts.ModifierFlags.Static) ? [member.name.text] : []))
+          for (const member of node.members) {
+            if ((!ts.isMethodDeclaration(member) && !ts.isGetAccessorDeclaration(member) && !ts.isSetAccessorDeclaration(member)) || !member.name || !ts.isIdentifier(member.name)) continue
+            // Static and instance members have different bindings. Split a legacy
+            // shared name only when both exist; ordinary source identities stay stable.
+            const method = (instanceNames.has(member.name.text) && (ts.getCombinedModifierFlags(member) & ts.ModifierFlags.Static) ? 'static.' : '') + member.name.text
+            symbols.push({ key: `${path}#${name}.${method}`, file: path, name: `${name}.${method}`, kind: 'method', exported: exported(node), line: source.getLineAndCharacterOfPosition(member.getStart(source)).line + 1, parameters: member.parameters.length, node: member, className: name })
+          }
         }
       }
       if (ts.isVariableStatement(node)) for (const declaration of node.declarationList.declarations) {
@@ -171,22 +324,20 @@ export async function scanSourceGraph(root: string, options: SourceGraphScanOpti
         const init = declaration.initializer
         if (!init || (!ts.isArrowFunction(init) && !ts.isFunctionExpression(init))) continue
         const name = declaration.name.text
-        symbols.push({ key: `${path}#${name}`, file: path, name, kind: 'variable', exported: exported(node), line: source.getLineAndCharacterOfPosition(node.getStart(source)).line + 1, parameters: init.parameters.length, node })
+        symbols.push({ key: `${path}#${name}`, file: path, name, kind: 'variable', exported: exported(node), line: source.getLineAndCharacterOfPosition(node.getStart(source)).line + 1, parameters: init.parameters.length, node: declaration })
       }
     }
-    const imports: string[] = [], bindings = new Map<string, ImportBinding>()
-    for (const item of rawImports) {
-      const absolute = resolveImport(file.path.split(sep).join('/'), item.specifier, known)
+    const imports: string[] = [], modules = new Map<string, string>()
+    for (const specifier of rawImports) {
+      const absolute = resolveImport(file.path.split(sep).join('/'), specifier, known)
       if (!absolute) continue
       const target = normal(canonicalRoot, absolute)
       imports.push(target)
-      if (item.clause?.name) bindings.set(item.clause.name.text, { target, imported: 'default' })
-      if (item.clause?.namedBindings && ts.isNamedImports(item.clause.namedBindings)) for (const element of item.clause.namedBindings.elements) bindings.set(element.name.text, { target, imported: element.propertyName?.text ?? element.name.text })
-      if (item.declaration?.exportClause && ts.isNamedExports(item.declaration.exportClause)) for (const element of item.declaration.exportClause.elements) bindings.set(element.name.text, { target, imported: element.propertyName?.text ?? element.name.text })
+      modules.set(specifier, target)
     }
     const uniqueSymbols = new Map<string, ParsedSymbol>()
     for (const symbol of symbols) uniqueSymbols.set(symbol.key, symbol)
-    return { path, bytes: file.bytes, source, imports: [...new Set(imports)].sort(), bindings,
+    return { path, bytes: file.bytes, source, imports: [...new Set(imports)].sort(), modules,
       symbols: [...uniqueSymbols.values()].filter(symbol => validRecordSource(`repo://${path}#${encodeURIComponent(symbol.name)}`))
         .sort((a, b) => a.line - b.line || a.name.localeCompare(b.name)) }
   })
@@ -233,7 +384,7 @@ export async function scanSourceGraph(root: string, options: SourceGraphScanOpti
     }
   }
   const ids = new Map(retained.map(candidate => [candidate.key, id(candidate.type, candidate.key)]))
-  const symbolsByFile = new Map(parsed.map(file => [file.path, new Map(file.symbols.map(symbol => [symbol.name, symbol]))]))
+  const resolveCall = callResolver(parsed)
   let callsFound = 0
   const records = retained.map((candidate): ContextRecord => {
     const relations: ContextRelation[] = []
@@ -260,18 +411,13 @@ export async function scanSourceGraph(root: string, options: SourceGraphScanOpti
     }
     const symbol = candidate.symbol
     if (retainedKeys.has(symbol.file)) relations.push(relation(ids.get(symbol.file)!, 'relates-to'))
-    const local = symbolsByFile.get(symbol.file)!
+    const body = ts.isVariableDeclaration(symbol.node) ? symbol.node.initializer! : symbol.node
     function visit(node: ts.Node): void {
+      // A nested callable owns its calls. It is not a direct call by its parent,
+      // even when an arrow captures lexical this. Nested symbols are not indexed.
+      if (node !== body && (ts.isFunctionLike(node) || ts.isClassLike(node))) return
       if (ts.isCallExpression(node) || ts.isNewExpression(node)) {
-        const expression = node.expression
-        let target: ParsedSymbol | undefined
-        if (ts.isIdentifier(expression)) {
-          target = local.get(expression.text)
-          const imported = candidate.file.bindings.get(expression.text)
-          if (!target && imported) target = symbolsByFile.get(imported.target)?.get(imported.imported)
-        } else if (ts.isPropertyAccessExpression(expression) && expression.expression.kind === ts.SyntaxKind.ThisKeyword && symbol.className) {
-          target = local.get(`${symbol.className}.${expression.name.text}`)
-        }
+        const target = resolveCall(node.expression, symbol)
         if (target && retainedKeys.has(target.key) && target.key !== symbol.key) {
           const edge = relation(ids.get(target.key)!, 'calls')
           if (!relations.some(item => item.kind === edge.kind && item.to === edge.to)) { relations.push(edge); callsFound++ }
@@ -279,7 +425,7 @@ export async function scanSourceGraph(root: string, options: SourceGraphScanOpti
       }
       ts.forEachChild(node, visit)
     }
-    if (['function', 'method', 'variable'].includes(symbol.kind)) visit(symbol.node)
+    if (['function', 'method', 'variable'].includes(symbol.kind)) visit(body)
     return { id: ids.get(candidate.key)!, kind: 'evidence', text: `${symbol.exported ? 'Exported' : 'Local'} ${symbol.kind} ${symbol.name} in ${symbol.file} at line ${symbol.line}${symbol.parameters === undefined ? '' : ` with ${symbol.parameters} parameter${symbol.parameters === 1 ? '' : 's'}`}.`, source: `repo://${symbol.file}#${encodeURIComponent(symbol.name)}`, observedAt, provenance, ...(relations.length ? { relations: relations.sort(relationSort).slice(0, 16) } : {}) }
   })
   return { root: canonicalRoot, records, filesScanned: parsed.length, filesSkipped, bytesRead,

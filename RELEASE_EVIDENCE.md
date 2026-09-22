@@ -4,6 +4,29 @@ Latest implementation and adoption results are in the
 [dogfood execution ledger](docs/DOGFOOD-EXECUTION.md). The dated snapshots below
 remain historical evidence; internal pilot acceptance is separate from G0–G4.
 
+## 0.3.3 shipment checks, 22 September 2026
+
+The TS/JS scanner now binds calls to scoped compiler symbols over selected source
+files. It avoids false shadowed targets and nested-callback attribution, follows
+supported local aliases, rejects type-only/ambiguous exports and separates
+same-named static/instance methods. Analysis uses no LLM and the compiler host has
+no filesystem, configuration, default-library or network fallback. Full project
+resolution and default-export expression assignments remain unsupported.
+
+Implementation validation passed 420 tests, independent packed-package smoke and
+both unchanged benchmark gates with required-source recall 1.0. Independent
+review findings were repaired and rechecked. See the
+[execution ledger](docs/DOGFOOD-EXECUTION.md#22-september-2026--scope-aware-tsjs-call-evidence-local-unreleased)
+for attempts, repairs and the distinction between worker tokens and total cost.
+Versioned shipment CI, archive checksums and public-download checks accompany the
+GitHub release; this source entry does not pre-claim their outcome.
+
+Install both matching 0.3.3 tarballs with Node 24. Existing MCP servers require a
+reconnect after upgrading. npm authentication again returned HTTP 401 on
+22 September; registry publication remains blocked. Actual client acceptance,
+consumer upgrades and measured developer/subscription/cash benefits are separate
+checks; this scanner correction does not close those gates.
+
 ## 0.3.2 shipment checks, 22 September 2026
 
 Navigation and exact source packets now accept `.kts`, `.cc`, `.cxx`, `.hh`,
