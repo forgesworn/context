@@ -205,7 +205,7 @@ describe('repository navigation MCP adapter', () => {
       try {
         badArgumentOutcome = await client.callTool({
           name: 'repository_search',
-          arguments: { term: 'not a valid identifier!' },
+          arguments: { term: '12 34' },
         })
       } catch (error) {
         badArgumentOutcome = error
@@ -322,7 +322,8 @@ describe('repository navigation MCP adapter', () => {
       await expectRejection('repository_status', { unexpected: 1 })
       await expectRejection('repository_refresh', { unexpected: 1 })
       await expectRejection('repository_search', { term: 'alphaToken', unexpected: 1 })
-      await expectRejection('repository_search', { term: 'not a valid identifier!' })
+      await expectRejection('repository_search', { term: '12 34' })
+      await expectRejection('repository_search', { term: 'line\nbreak' })
       await expectRejection('repository_search', { term: 'alphaToken', cursor: 'x'.repeat(65) })
 
       const status = (await client.callTool({
@@ -385,6 +386,10 @@ describe('repository navigation MCP compact rendering and explore', () => {
       expect(narrowedLines[0]).toMatch(/^search owneroptions  4 lines in 2 files  prefix beta  complete/)
       expect(narrowedLines.filter((line) => /^beta(\.test)?\.ts  [a-f0-9]{16}$/.test(line))).toHaveLength(2)
       expect(narrowedLines.some((line) => line.startsWith('alpha.ts'))).toBe(false)
+      const literal = (await client.callTool({ name: 'repository_search', arguments: { term: 'ownerOptions(value)', pathPrefix: 'alpha' } })) as { content: Array<{ type: string; text: string }>; isError?: boolean }
+      expect(literal.isError).not.toBe(true)
+      expect(textOf(literal).split('\n')[0]).toMatch(/^search owneroptions\(value\)  1 lines in 1 files  prefix alpha  complete/)
+      expect(textOf(literal)).toContain('  6:   write(value: string): string { return ownerOptions(value) }')
     } finally {
       await serverClose()
     }
@@ -473,8 +478,16 @@ describe('repository navigation MCP compact rendering and explore', () => {
       expect(neither.isError).toBe(true)
       expect(neither.content[0].text).toMatch(/needs symbols, evidence or both/)
 
+      const many = (await client.callTool({ name: 'repository_coverage', arguments: { symbols: ['ownerOptions', ...Array.from({ length: 10 }, (_, i) => `s${i}`), 'ownerOptions'], answer: draft, format: 'json' } })) as { isError?: boolean; content: Array<{ text: string }> }
+      expect(many.isError).not.toBe(true)
+      const manyParsed = JSON.parse(textOf(many)) as { symbols: Array<{ symbol: string }>; symbolsNotChecked: string[] }
+      expect(manyParsed.symbols.map((entry) => entry.symbol)).toEqual(['ownerOptions', 's0', 's1', 's2', 's3', 's4', 's5', 's6'])
+      expect(manyParsed.symbolsNotChecked).toEqual(['s7', 's8', 's9'])
+      const manyText = (await client.callTool({ name: 'repository_coverage', arguments: { symbols: ['ownerOptions', ...Array.from({ length: 10 }, (_, i) => `s${i}`)], answer: draft } })) as { content: Array<{ text: string }> }
+      expect(manyText.content[0].text).toContain('not checked (over 8 symbols): s7, s8, s9; pass them in another call')
+
       let tooMany: unknown
-      try { tooMany = await client.callTool({ name: 'repository_coverage', arguments: { symbols: Array.from({ length: 9 }, (_, i) => `s${i}`), answer: draft } }) } catch (error) { tooMany = error }
+      try { tooMany = await client.callTool({ name: 'repository_coverage', arguments: { symbols: Array.from({ length: 65 }, (_, i) => `s${i}`), answer: draft } }) } catch (error) { tooMany = error }
       expect((tooMany as { code?: number }).code === -32602 || (tooMany as { isError?: boolean }).isError === true).toBe(true)
 
       await writeFile(join(root, 'beta.ts'), SERVER + '// edited\n')

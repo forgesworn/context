@@ -65,7 +65,8 @@ over an unsigned in-memory index of that root: `repository_status`,
 references with enclosing declarations, importing files and tests),
 `repository_coverage` (which explored files a draft answer leaves uncited,
 and whether each cited token is quoted exactly),
-`repository_search` (exact identifier lines grouped by file, with `pathPrefix`)
+`repository_search` (exact identifier or literal lines grouped by file, with
+`pathPrefix`)
 and `repository_packet` (verbatim ranges or complete TypeScript/JavaScript
 blocks). Search, explore and packet responses are compact text by default and
 JSON with `format: "json"`. See the

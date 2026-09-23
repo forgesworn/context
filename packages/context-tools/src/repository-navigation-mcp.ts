@@ -3,13 +3,16 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { z } from 'zod'
 import { RepositoryNavigation, type NavigationResult, type NavigationStatus } from './repository-navigation.js'
 import { EXPLORE_SYMBOL, fitExplore, type ExploreResult } from './repository-explore.js'
-import { COVERAGE_MAX_ANSWER_BYTES, COVERAGE_MAX_QUOTE_CHARS, COVERAGE_MAX_QUOTES, COVERAGE_MAX_SYMBOLS, analyseCoverage, checkQuotes, renderCoverage, type CoverageResult } from './repository-coverage.js'
+import { COVERAGE_MAX_ANSWER_BYTES, COVERAGE_MAX_QUOTE_CHARS, COVERAGE_MAX_QUOTES, COVERAGE_MAX_SYMBOLS, COVERAGE_MAX_SYMBOLS_ACCEPTED, analyseCoverage, checkQuotes, renderCoverage, type CoverageResult } from './repository-coverage.js'
 import { buildPacketInline, planPacketInline } from './source-packet.mjs'
 
-const SEARCH_TERM = /^[A-Za-z_][A-Za-z0-9_]{0,127}$/
+// One identifier, or a printable ASCII literal containing one (hyphens, dots, spaces).
+const SEARCH_TERM = /^(?=.*[A-Za-z_])[\x20-\x7e]{1,128}$/
 const DEFAULT_PACKET_MAX_BYTES = 65_536
 const DEFAULT_EXPLORE_MAX_BYTES = 32_768
 const MAX_EXPLORE_MAX_BYTES = 131_072
+// Packet builds run one at a time; later calls wait their turn rather than fail.
+const MAX_QUEUED_PACKETS = 8
 
 const formatSchema = z.enum(['text', 'json']).optional()
 const pathPrefixSchema = z.string().min(1).max(512).optional()
@@ -56,7 +59,7 @@ const exploreInputSchema = z.object({
 }).strict()
 
 const coverageInputSchema = z.object({
-  symbols: z.array(z.string().min(1).max(257).regex(EXPLORE_SYMBOL, 'symbol must be one ASCII identifier, optionally qualified as Owner.member')).max(COVERAGE_MAX_SYMBOLS).optional(),
+  symbols: z.array(z.string().min(1).max(257).regex(EXPLORE_SYMBOL, 'symbol must be one ASCII identifier, optionally qualified as Owner.member')).max(COVERAGE_MAX_SYMBOLS_ACCEPTED).optional(),
   evidence: z.array(z.object({ path: z.string().min(1).max(512), token: z.string().min(1).max(COVERAGE_MAX_QUOTE_CHARS) }).strict()).max(COVERAGE_MAX_QUOTES).optional(),
   answer: z.string().min(1).refine((value) => Buffer.byteLength(value, 'utf8') <= COVERAGE_MAX_ANSWER_BYTES, `answer must be at most ${COVERAGE_MAX_ANSWER_BYTES} bytes`),
   pathPrefix: pathPrefixSchema,
@@ -65,7 +68,7 @@ const coverageInputSchema = z.object({
 }).strict()
 
 const searchInputSchema = z.object({
-  term: z.string().min(1).max(128).regex(SEARCH_TERM, 'term must be a single ASCII identifier'),
+  term: z.string().min(1).max(128).regex(SEARCH_TERM, 'term must be an identifier or a printable ASCII literal containing one'),
   pathPrefix: pathPrefixSchema,
   maxBytes: z.number().int().min(1024).max(262144).optional(),
   maxResults: z.number().int().min(1).max(100).optional(),
@@ -81,7 +84,8 @@ export interface RepositoryNavigationServer {
 
 export function createRepositoryNavigationServer(root: string): RepositoryNavigationServer {
   const navigation = new RepositoryNavigation(root)
-  let packetBusy = false
+  let packetTail: Promise<void> = Promise.resolve()
+  let packetsWaiting = 0
   const server = new McpServer(
     { name: 'repository-navigation', version: '0.0.0' },
     {
@@ -171,7 +175,9 @@ export function createRepositoryNavigationServer(root: string): RepositoryNaviga
     },
     async (input, extra) => {
       try {
-        const symbols = [...new Set(input.symbols ?? [])]
+        const distinct = [...new Set(input.symbols ?? [])]
+        const symbols = distinct.slice(0, COVERAGE_MAX_SYMBOLS)
+        const symbolsNotChecked = distinct.slice(COVERAGE_MAX_SYMBOLS)
         if (symbols.length === 0 && !input.evidence?.length) throw new Error('repository coverage needs symbols, evidence or both')
         const explored: ExploreResult[] = []
         for (const symbol of symbols) {
@@ -193,6 +199,7 @@ export function createRepositoryNavigationServer(root: string): RepositoryNaviga
           freshness: 'current',
           ...(explored[0]?.pathPrefix !== undefined ? { pathPrefix: explored[0].pathPrefix } : {}),
           ...analyseCoverage(input.answer, explored),
+          ...(symbolsNotChecked.length ? { symbolsNotChecked } : {}),
           ...(quoted ? { quotes: checkQuotes(input.evidence!, quoted.files) } : {}),
         }
         return { content: [{ type: 'text' as const, text: input.format === 'json' ? JSON.stringify(result) : renderCoverage(result) }] }
@@ -206,8 +213,9 @@ export function createRepositoryNavigationServer(root: string): RepositoryNaviga
     'repository_search',
     {
       description:
-        'Lines containing one exact identifier (case-insensitive), grouped by file. For ' +
-        'literals and non-declarations; prefer repository_explore for symbols. Narrow ' +
+        'Lines containing one exact identifier or literal such as a-b.c (case-insensitive, ' +
+        'whole tokens at each end), grouped by file. For literals and non-declarations; ' +
+        'prefer repository_explore for symbols. Narrow ' +
         'with pathPrefix; pass cursor with the same arguments for more.',
       inputSchema: searchInputSchema,
       annotations: { readOnlyHint: true, openWorldHint: false },
@@ -237,9 +245,15 @@ export function createRepositoryNavigationServer(root: string): RepositoryNaviga
     async (input, extra) => {
       try {
         throwIfAborted(extra.signal)
-        if (packetBusy) throw new Error('repository packet already in progress')
-        packetBusy = true
+        if (packetsWaiting >= MAX_QUEUED_PACKETS) throw new Error(`repository packet queue is full (${MAX_QUEUED_PACKETS} waiting)`)
+        const previous = packetTail
+        let finished!: () => void
+        packetTail = new Promise<void>((resolve) => { finished = resolve })
+        packetsWaiting += 1
         try {
+          await previous
+          packetsWaiting -= 1
+          throwIfAborted(extra.signal)
           const parsedSpec = input.mode === 'build'
             ? packetBuildSpecSchema.parse(input.spec)
             : packetPlanSpecSchema.parse(input.spec)
@@ -269,7 +283,7 @@ export function createRepositoryNavigationServer(root: string): RepositoryNaviga
           if (before.revision !== after.revision) throw new Error('repository packet navigation changed during packet build')
           return { content: [{ type: 'text' as const, text: input.format === 'json' ? encoded : renderPacket(response) }] }
         } finally {
-          packetBusy = false
+          finished()
         }
       } catch (error) {
         return { content: [{ type: 'text' as const, text: formatError(error) }], isError: true }

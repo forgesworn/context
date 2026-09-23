@@ -7,8 +7,10 @@ limited to 128 records per collection; this bridge does not change that format.
 Instead, an explicitly configured repository can have a disposable in-memory
 source index, independent of the signed evidence cache.
 
-The initial search contract is exact, case-insensitive ASCII identifier tokens
-on source lines. It is not semantic search, compiler-resolved relationships or
+The search contract is exact and case-insensitive on source lines: one ASCII
+identifier token, or a printable ASCII literal such as `local-source-unsigned`
+or `grants no authority` whose ends fall on whole tokens (so `source-unsig`
+matches nothing). It is not semantic search, compiler-resolved relationships or
 a replacement for signed evidence. Results must say `local-source-unsigned`.
 
 The engine retains source lines and their file hashes from an explicit refresh.
@@ -99,8 +101,9 @@ object.
 
 ## Check a draft answer's coverage
 
-`repository_coverage` is a deterministic pre-submit check. It takes up to eight
-`symbols` and the draft `answer` (at most 128 KiB), explores each symbol as
+`repository_coverage` is a deterministic pre-submit check. It checks up to eight
+distinct `symbols` per call (further ones, up to 64, are returned as not checked
+for a second call) and the draft `answer` (at most 128 KiB), explores each symbol as
 above and lists every definition, test, reference and importing file as
 `cited` (the repository-relative path appears in the answer), `named` (only its
 basename does) or `missing`, missing files first with their enclosing

@@ -381,6 +381,44 @@ function normalizeTerm(term: string): string | null {
   return m[0].toLowerCase();
 }
 
+const LITERAL_RE = /^[\x20-\x7e]+$/;
+const IDENTIFIER_CHAR = /[A-Za-z0-9_]/;
+
+/** A literal term: printable ASCII containing at least one identifier token,
+ * such as `local-source-unsigned` or `grants no authority`. Returns the
+ * lowercased literal and its tokens, or null. */
+function normalizeLiteral(term: string): { text: string; tokens: string[] } | null {
+  const trimmed = term.trim();
+  if (trimmed.length === 0 || trimmed.length > MAX_TOKEN_LEN || !LITERAL_RE.test(trimmed)) return null;
+  const tokens = tokenizeLine(trimmed);
+  return tokens.length > 0 ? { text: trimmed.toLowerCase(), tokens } : null;
+}
+
+/** True when `literal` (lowercased) occurs in `line` case-insensitively with
+ * whole tokens at both ends, so every token in the literal is a whole token of
+ * the line and the index postings find every match. */
+function containsLiteral(line: string, literal: string): boolean {
+  const lower = line.toLowerCase();
+  const startsWord = IDENTIFIER_CHAR.test(literal[0]);
+  const endsWord = IDENTIFIER_CHAR.test(literal[literal.length - 1]);
+  for (let at = lower.indexOf(literal); at >= 0; at = lower.indexOf(literal, at + 1)) {
+    if (startsWord && at > 0 && IDENTIFIER_CHAR.test(lower[at - 1])) continue;
+    const end = at + literal.length;
+    if (endsWord && end < lower.length && IDENTIFIER_CHAR.test(lower[end])) continue;
+    return true;
+  }
+  return false;
+}
+
+function literalPostings(gen: Generation, literal: { text: string; tokens: string[] }): number[] {
+  let rarest: number[] | undefined;
+  for (const token of literal.tokens) {
+    const list = gen.byToken.get(token) ?? [];
+    if (rarest === undefined || list.length < rarest.length) rarest = list;
+  }
+  return (rarest ?? []).filter((index) => containsLiteral(gen.locations[index].text, literal.text));
+}
+
 export class RepositoryNavigation {
   private readonly rootInput: string;
   private readonly limits: NavigationLimits;
@@ -509,12 +547,16 @@ export class RepositoryNavigation {
     if (!options || typeof options.term !== 'string') {
       throw new Error('RepositoryNavigation: term is required');
     }
-    const token = normalizeTerm(options.term);
-    if (!token || token.length > 128) {
+    // One identifier uses its postings directly; a literal uses the postings of
+    // its rarest token, filtered to lines containing the whole literal.
+    const identifier = normalizeTerm(options.term);
+    const literal = identifier ? null : normalizeLiteral(options.term);
+    if (!identifier && !literal) {
       throw new Error(
-        'RepositoryNavigation: term must be a single ASCII identifier token',
+        'RepositoryNavigation: term must be an identifier or a printable ASCII literal containing one, at most 128 characters',
       );
     }
+    const token = identifier ?? literal!.text;
 
     const maxBytes = options.maxBytes === undefined ? 32768 : options.maxBytes;
     const maxResults = options.maxResults === undefined ? 40 : options.maxResults;
@@ -572,7 +614,7 @@ export class RepositoryNavigation {
 
     const generationAtStart = gen.id;
     const nextCursorToken = randomUUID().replace(/-/g, '');
-    const postings = gen.byToken.get(token) ?? [];
+    const postings = literal ? literalPostings(gen, literal) : gen.byToken.get(token) ?? [];
     const results: NavigationResultRecord[] = [];
 
     const buildResult = (
