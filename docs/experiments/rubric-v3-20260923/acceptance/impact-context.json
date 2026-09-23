@@ -1,0 +1,50 @@
+{
+  "version": 3,
+  "checkerSha256": "539b5d7cd593f0dd6c5707b3426e243e90092614921c8024b8a69a5c49ffaa9c",
+  "kind": "structured",
+  "requiredFindingIds": [
+    "request-surface",
+    "default",
+    "filter",
+    "cursor",
+    "response",
+    "coverage"
+  ],
+  "reviewerRubric": {
+    "request-surface": "Required, both: optional caseSensitive is added to (a) the search options type (NavigationSearchOptions in repository-navigation.ts) and (b) the repository_search MCP input schema.",
+    "default": "Required: omitted or false keeps today's behaviour: the term is normalised by normalizeTerm (lower-cased) and looked up in the case-insensitive postings, so existing callers see no change.",
+    "filter": "Required: the postings are lower-case, so case-sensitive mode must filter candidate source lines for the exact-case token. Accepted alternatives: reuse the lower-case postings and post-filter the candidate lines, or add a separate case-preserving index, provided exact-case filtering of results is stated.",
+    "cursor": "Required, both: (a) caseSensitive is stored in the Cursor; (b) continuing a cursor with a different mode is rejected.",
+    "response": "Required: no point beyond the fails-if condition; the prompt does not ask about response fields, so an answer silent on them passes. Adding a separate field that reports the mode is allowed. Fails if: the answer proposes changing what an existing response field reports (for example echoing the raw-case term in term).",
+    "coverage": "Required, all three named: (a) default matching stays case-insensitive; (b) case-sensitive mode returns only exact-case matches; (c) continuing a cursor in the other mode is rejected. Not required: MCP schema validation or pagination within one mode."
+  },
+  "requiredEvidence": [
+    {
+      "path": "packages/context-tools/src/repository-navigation.ts",
+      "token": "export interface NavigationSearchOptions"
+    },
+    {
+      "path": "packages/context-tools/src/repository-navigation.ts",
+      "token": "interface Cursor"
+    },
+    {
+      "path": "packages/context-tools/src/repository-navigation-mcp.ts",
+      "token": "repository_search"
+    },
+    {
+      "path": "packages/context-tools/src/repository-navigation.test.ts",
+      "token": "wrong-term, stale, and unknown cursors"
+    },
+    {
+      "path": "docs/LOCAL-NAVIGATION.md",
+      "token": "case-insensitive"
+    }
+  ],
+  "basedOn": "d5-20260921/acceptance/impact-context.json",
+  "reviewerRules": [
+    "Judge each dimension against the whole answer: the summary and every finding. A required point stated under a different finding id counts; never fail a dimension for placement alone.",
+    "A required point passes only when the answer states it explicitly, in words a reader could quote. Different wording is fine; a point that is only implied by other statements does not pass.",
+    "Where a dimension lists items, each listed item must be named. A generic phrase such as \"edge cases\" or \"all semantics unchanged\" does not cover named items.",
+    "A dimension passes when every required point is stated, no \"fails if\" condition applies and nothing it states contradicts the frozen source excerpts. Points marked \"not required\" never cause a failure. Accepted alternatives pass equally."
+  ]
+}

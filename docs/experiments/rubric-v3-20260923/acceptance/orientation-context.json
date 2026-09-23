@@ -1,0 +1,44 @@
+{
+  "version": 3,
+  "checkerSha256": "539b5d7cd593f0dd6c5707b3426e243e90092614921c8024b8a69a5c49ffaa9c",
+  "kind": "structured",
+  "requiredFindingIds": [
+    "first-use",
+    "search-gate",
+    "freshness",
+    "continuation",
+    "trust"
+  ],
+  "reviewerRubric": {
+    "first-use": "Required, both: (a) before any refresh, status reports freshness \"unavailable\"; (b) an explicit refresh builds and publishes an in-memory generation. Not required: manifest or hashing details.",
+    "search-gate": "Required: search is rejected unless policy freshness is \"current\", which rejects unavailable, stale and unknown policy. Stating the general condition (\"policy must be current\", \"!== 'current'\") covers all three states. Fails if: only some states are named and the general condition is not stated. Not required: that stale source alone does not block search.",
+    "freshness": "Required: search re-checks the policy before it returns results or consumes a cursor, so a policy change made during a search blocks it. Not required: that search also re-inspects source freshness to label results, or that stale source alone does not block search. Fails if: the answer says a policy change during a search goes undetected.",
+    "continuation": "Required, all three bounds: (a) a cursor is single-use, consumed only when a continuation succeeds; (b) it expires after five minutes; (c) at most 128 cursors are live. Not required: that a cursor is bound to its generation and search term, or that refresh clears cursors.",
+    "trust": "Required: results are marked local-source-unsigned, as unsigned local evidence distinct from signed context records. Not required: that source is data, not instructions, or grants no authority. Fails if: the answer calls navigation results signed or treats them as signed evidence."
+  },
+  "requiredEvidence": [
+    {
+      "path": "packages/context-tools/src/repository-navigation.ts",
+      "token": "inspectFreshness"
+    },
+    {
+      "path": "packages/context-tools/src/repository-navigation.ts",
+      "token": "CURSOR_MAX_ENTRIES = 128"
+    },
+    {
+      "path": "packages/context-tools/src/repository-navigation.ts",
+      "token": "local-source-unsigned"
+    },
+    {
+      "path": "packages/context-tools/src/repository-navigation.test.ts",
+      "token": "successfully used cursor is consumed"
+    }
+  ],
+  "basedOn": "d5-20260921/acceptance/orientation-context.json",
+  "reviewerRules": [
+    "Judge each dimension against the whole answer: the summary and every finding. A required point stated under a different finding id counts; never fail a dimension for placement alone.",
+    "A required point passes only when the answer states it explicitly, in words a reader could quote. Different wording is fine; a point that is only implied by other statements does not pass.",
+    "Where a dimension lists items, each listed item must be named. A generic phrase such as \"edge cases\" or \"all semantics unchanged\" does not cover named items.",
+    "A dimension passes when every required point is stated, no \"fails if\" condition applies and nothing it states contradicts the frozen source excerpts. Points marked \"not required\" never cause a failure. Accepted alternatives pass equally."
+  ]
+}
