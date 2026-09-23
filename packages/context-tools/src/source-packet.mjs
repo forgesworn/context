@@ -176,7 +176,8 @@ async function readSource(root, entry, policy, scopes, total) {
   total.value += bytes.byteLength;
   const text = strictText(bytes, `source ${entry.path}`);
   const lines = text.split('\n');
-  assert(entry.endLine <= lines.length, `line range exceeds source length: ${entry.path}`);
+  const lineCount = text.endsWith('\n') ? lines.length - 1 : lines.length;
+  assert(entry.endLine <= lines.length, `line range exceeds source length: ${entry.path} has ${lineCount} lines; request endLine ${lineCount} or less`);
   const excerpt = [];
   for (let line = entry.startLine; line <= entry.endLine; line++) {
     const record = { line, content: lines[line - 1] };
@@ -323,7 +324,8 @@ function plannerCandidates(source) {
   return candidates;
 }
 function resolveAnchor(source, path, line) {
-  assert(line <= source.getLineAndCharacterOfPosition(source.end).line + 1, `anchor line exceeds source length: ${path}`);
+  const lastLine = source.getLineAndCharacterOfPosition(source.end).line + 1;
+  assert(line <= lastLine, `anchor line exceeds source length: ${path} has ${lastLine} lines`);
   const containing = source.__packetCandidates.filter((candidate) => line >= candidate.startLine && line <= candidate.endLine);
   assert(containing.length > 0, `no supported syntax block contains ${path}:${line}`);
   containing.sort((a, b) => (a.end - a.start) - (b.end - b.start) || a.start - b.start || compare(a.kind, b.kind));

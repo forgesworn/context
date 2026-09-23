@@ -69,7 +69,8 @@ without truncation. The tool rejects unavailable, stale or unknown navigation
 and a mismatched generation, and checks freshness again before returning. Refresh
 and rebuild after relevant changes. This is bounded freshness checking, not an
 atomic snapshot against hostile concurrent filesystem changes.
-Only one packet request runs at a time; a concurrent request fails immediately.
+Only one packet request runs at a time; concurrent requests wait in order (up to
+eight), and a further one fails immediately.
 Cancellation is checked around assembly and freshness inspection. The shared
 bounded assembler does not interrupt an individual file read or Git provenance
 check already in progress; cancelled results are not returned as successful packets.

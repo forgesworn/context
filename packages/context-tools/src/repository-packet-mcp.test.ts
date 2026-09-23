@@ -184,7 +184,7 @@ describe('repository packet MCP adapter', () => {
     } finally { await connection.close() }
   })
 
-  it('rejects a concurrent packet before freshness scanning and releases the slot after cancellation', async () => {
+  it('queues a concurrent packet until the running one finishes, including after cancellation', async () => {
     const value = await root(); const connection = await connect(value)
     try {
       const refreshed = await connection.client.callTool({ name: 'repository_refresh', arguments: {} }) as { content: unknown }
@@ -193,24 +193,41 @@ describe('repository packet MCP adapter', () => {
       let entered!: () => void; let release!: () => void
       const started = new Promise<void>((resolve) => { entered = resolve })
       const gate = new Promise<void>((resolve) => { release = resolve })
+      let calls = 0
       connection.navigation.status = async (signal?: AbortSignal) => {
-        entered()
-        await gate
-        if (signal?.aborted) throw new Error('repository packet aborted')
+        calls += 1
+        if (calls === 1) {
+          entered()
+          await gate
+          if (signal?.aborted) throw new Error('repository packet aborted')
+        }
         return originalStatus(signal)
       }
       const controller = new AbortController()
       const first = connection.client.callTool({ name: 'repository_packet', arguments: { mode: 'build', spec: spec([{ path: 'alpha.ts', startLine: 1, endLine: 3 }]), expectedGeneration: generation } }, undefined, { signal: controller.signal })
       await started
-      const second = await call(connection.client, { mode: 'build', spec: spec([{ path: 'alpha.ts', startLine: 1, endLine: 3 }]), expectedGeneration: generation })
-      expect(second.isError).toBe(true)
-      expect(text(second)).toBe('repository packet already in progress')
+      let secondSettled = false
+      const second = call(connection.client, { mode: 'build', spec: spec([{ path: 'alpha.ts', startLine: 1, endLine: 3 }]), expectedGeneration: generation }).finally(() => { secondSettled = true })
+      await new Promise((resolve) => setTimeout(resolve, 50))
+      expect(secondSettled).toBe(false)
+      expect(calls).toBe(1)
       controller.abort()
       release()
       await first.catch(() => undefined)
+      const queued = await second
+      expect(queued.isError).not.toBe(true)
       connection.navigation.status = originalStatus
-      const recovered = await call(connection.client, { mode: 'build', spec: spec([{ path: 'alpha.ts', startLine: 1, endLine: 3 }]), expectedGeneration: generation })
-      expect(recovered.isError).not.toBe(true)
+    } finally { await connection.close() }
+  })
+
+  it('reports the file length when a range runs past the end', async () => {
+    const value = await root(); const connection = await connect(value)
+    try {
+      const refreshed = await connection.client.callTool({ name: 'repository_refresh', arguments: {} }) as { content: unknown }
+      const generation = (JSON.parse(text(refreshed)) as { generation: string }).generation
+      const past = await call(connection.client, { mode: 'build', spec: spec([{ path: 'alpha.ts', startLine: 1, endLine: 40 }]), expectedGeneration: generation })
+      expect(past.isError).toBe(true)
+      expect(text(past)).toMatch(/line range exceeds source length: alpha\.ts has 3 lines; request endLine 3 or less/)
     } finally { await connection.close() }
   })
 })

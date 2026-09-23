@@ -272,7 +272,7 @@ stable checkout to bind.
 | Stale or unknown evidence / generation mismatch | Inspect status, refresh successfully, and use the newly returned generation |
 | Excluded or unsupported source | Inspect policy/exclusion metadata and use a bounded direct-read fallback; do not silently broaden scope |
 | Response exceeds budget | Select a smaller sufficient block or split the evidence request |
-| Packet already in progress | Wait for the active request to finish, then issue the next request sequentially |
+| Packet queue is full | Wait for queued packet requests to finish; up to eight wait behind the running one |
 | Git HEAD error | Select a Git checkout with a commit; packet provenance requires it |
 
 There is no automatic watcher, worktree rebinding or configuration-writing setup

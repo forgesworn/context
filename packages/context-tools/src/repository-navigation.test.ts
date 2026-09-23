@@ -414,10 +414,43 @@ describe('RepositoryNavigation', () => {
     const nav = new RepositoryNavigation(root);
     await nav.refresh();
     await expect(nav.search({ term: '' })).rejects.toThrow();
-    await expect(nav.search({ term: 'two words' })).rejects.toThrow();
+    await expect(nav.search({ term: '12 34' })).rejects.toThrow(/identifier or a printable ASCII literal/);
+    await expect(nav.search({ term: 'caf\u00e9' })).rejects.toThrow(/identifier or a printable ASCII literal/);
+    await expect(nav.search({ term: `a${'-'.repeat(128)}` })).rejects.toThrow(/identifier or a printable ASCII literal/);
     await expect(nav.search({ term: 'ok', maxBytes: 10 })).rejects.toThrow();
     await expect(nav.search({ term: 'ok', maxResults: 0 })).rejects.toThrow();
     await expect(nav.search({ term: 'ok', maxVisited: 0 })).rejects.toThrow();
+  });
+
+  it('searches a literal with whole tokens at each end, case-insensitively', async () => {
+    const root = await mkFixture();
+    await writeFile(root, 'a.ts', [
+      "const trust = 'local-source-unsigned'",
+      '// Local-Source-Unsigned in a comment',
+      "const other = 'local-source-unsigned-extra'",
+      "const prefixed = 'xlocal-source-unsigned'",
+      "const spaced = 'local source unsigned'",
+      'unsigned alone',
+      'it grants no authority here',
+    ].join('\n'));
+    const nav = new RepositoryNavigation(root);
+    await nav.refresh();
+    const hyphenated = await nav.search({ term: 'local-source-unsigned' });
+    expect(hyphenated.term).toBe('local-source-unsigned');
+    expect(hyphenated.results.map((r) => r.line)).toEqual([1, 2, 3]);
+    expect(hyphenated.complete).toBe(true);
+    const phrase = await nav.search({ term: '  Grants No Authority ' });
+    expect(phrase.results.map((r) => r.line)).toEqual([7]);
+    const quoted = await nav.search({ term: "'local-source-unsigned'" });
+    expect(quoted.results.map((r) => r.line)).toEqual([1]);
+    expect((await nav.search({ term: 'source-unsig' })).results).toEqual([]);
+    expect((await nav.search({ term: 'absent-token' })).results).toEqual([]);
+    const page = await nav.search({ term: 'local-source-unsigned', maxResults: 1 });
+    expect(page.results.map((r) => r.line)).toEqual([1]);
+    const next = await nav.search({ term: 'LOCAL-source-unsigned', maxResults: 2, cursor: page.nextCursor });
+    expect(next.results.map((r) => r.line)).toEqual([2, 3]);
+    expect(next.complete).toBe(true);
+    await expect(nav.search({ term: 'local', cursor: page.nextCursor })).rejects.toThrow(/unknown or expired cursor|different term/);
   });
 
   it('throws on oversized first record budget', async () => {
