@@ -220,14 +220,50 @@ describe('repository packet MCP adapter', () => {
     } finally { await connection.close() }
   })
 
-  it('reports the file length when a range runs past the end', async () => {
+  it('reads to the end of the file when a range runs past it, and verification rebuilds the clamped range', async () => {
     const value = await root(); const connection = await connect(value)
     try {
       const refreshed = await connection.client.callTool({ name: 'repository_refresh', arguments: {} }) as { content: unknown }
       const generation = (JSON.parse(text(refreshed)) as { generation: string }).generation
-      const past = await call(connection.client, { mode: 'build', spec: spec([{ path: 'alpha.ts', startLine: 1, endLine: 40 }]), expectedGeneration: generation })
-      expect(past.isError).toBe(true)
-      expect(text(past)).toMatch(/line range exceeds source length: alpha\.ts has 3 lines; request endLine 3 or less/)
+      const past = await call(connection.client, { mode: 'build', spec: spec([{ path: 'alpha.ts', startLine: 2, endLine: 40 }]), expectedGeneration: generation })
+      expect(past.isError).not.toBe(true)
+      const packet = JSON.parse(text(past)).packet
+      expect(packet.sources[0]).toMatchObject({ path: 'alpha.ts', startLine: 2, endLine: 3 })
+      expect(packet.sources[0].lines.map((line: { line: number }) => line.line)).toEqual([2, 3])
+      expect(packet.originalSpec.sources[0]).toEqual({ path: 'alpha.ts', startLine: 2, endLine: 3 })
+      const { verifyPacket, serializePacket } = await import('./source-packet.mjs') as unknown as { verifyPacket: (input: { root: string; packet: string }) => Promise<{ status: string }>; serializePacket: (value: unknown) => string }
+      const saved = join(value, 'packet.json')
+      await writeFile(saved, serializePacket(packet))
+      expect(await verifyPacket({ root: await realpath(value), packet: saved })).toEqual({ status: 'current' })
+      const beyond = await call(connection.client, { mode: 'build', spec: spec([{ path: 'alpha.ts', startLine: 9, endLine: 40 }]), expectedGeneration: generation })
+      expect(beyond.isError).toBe(true)
+      expect(text(beyond)).toMatch(/line range exceeds source length: alpha\.ts has 3 lines; request endLine 3 or less/)
+    } finally { await connection.close() }
+  })
+
+  it('accepts a spec with only sources and fills neutral handoff metadata', async () => {
+    const value = await root(); const connection = await connect(value)
+    try {
+      const refreshed = await connection.client.callTool({ name: 'repository_refresh', arguments: {} }) as { content: unknown }
+      const generation = (JSON.parse(text(refreshed)) as { generation: string }).generation
+      const bare = await call(connection.client, { mode: 'build', spec: { sources: [{ path: 'alpha.ts', startLine: 1, endLine: 1 }] }, expectedGeneration: generation })
+      expect(bare.isError).not.toBe(true)
+      expect(JSON.parse(text(bare)).packet.originalSpec).toMatchObject({ version: 1, task: 'read exact source', acceptanceChecks: ['cite exact source lines'], allowedFiles: [], exclusions: [], unresolvedQuestions: [] })
+      const empty = await call(connection.client, { mode: 'plan', spec: { version: 1, task: '', acceptanceChecks: [], allowedFiles: [], exclusions: [''], unresolvedQuestions: [], sources: [{ path: 'alpha.ts', line: 2 }] }, expectedGeneration: generation })
+      expect(empty.isError).not.toBe(true)
+    } finally { await connection.close() }
+  })
+
+  it('points a plan anchor outside any block at an exact build range', async () => {
+    const value = await root()
+    await writeFile(join(value, 'beta.ts'), "import { alpha } from './alpha'\nexport function beta() {\n  return alpha()\n}\n")
+    const connection = await connect(value)
+    try {
+      const refreshed = await connection.client.callTool({ name: 'repository_refresh', arguments: {} }) as { content: unknown }
+      const generation = (JSON.parse(text(refreshed)) as { generation: string }).generation
+      const outside = await call(connection.client, { mode: 'plan', spec: { sources: [{ path: 'beta.ts', line: 1 }] }, expectedGeneration: generation })
+      expect(outside.isError).toBe(true)
+      expect(text(outside)).toMatch(/no supported syntax block contains beta\.ts:1; request an exact range with mode build instead/)
     } finally { await connection.close() }
   })
 })

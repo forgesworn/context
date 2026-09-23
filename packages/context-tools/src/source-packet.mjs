@@ -166,7 +166,7 @@ async function scopeFor(root, policy, path, cache) {
   }
   return scope;
 }
-async function readSource(root, entry, policy, scopes, total) {
+async function readSource(root, entry, policy, scopes, total, clampToEnd = false) {
   const absolute = resolve(root, entry.path);
   await rejectSymlinkComponents(root, absolute, `source ${entry.path}`);
   const scope = await scopeFor(root, policy, entry.path, scopes);
@@ -177,6 +177,7 @@ async function readSource(root, entry, policy, scopes, total) {
   const text = strictText(bytes, `source ${entry.path}`);
   const lines = text.split('\n');
   const lineCount = text.endsWith('\n') ? lines.length - 1 : lines.length;
+  if (clampToEnd && entry.startLine <= lineCount && entry.endLine > lineCount) entry = { ...entry, endLine: lineCount };
   assert(entry.endLine <= lines.length, `line range exceeds source length: ${entry.path} has ${lineCount} lines; request endLine ${lineCount} or less`);
   const excerpt = [];
   for (let line = entry.startLine; line <= entry.endLine; line++) {
@@ -223,16 +224,18 @@ async function validateAllowedSnapshots(root, allowedFiles) {
   }
 }
 
-export async function buildPacketFromSpec({ root: rootInput, spec: specInput }) {
+export async function buildPacketFromSpec({ root: rootInput, spec: specInput, clampToEnd = false }) {
   const rootInfo = await canonicalRoot(rootInput);
   const root = rootInfo.root;
-  const spec = parseSpec(serialize(specInput));
+  let spec = parseSpec(serialize(specInput));
   const head = await gitHead(root);
   const policy = await NavigationPolicy.load(root);
   const scopes = new Map([['', policy.rootDirectoryScope()]]);
   const total = { value: 0, excerptBytes: 0 };
   const sources = [];
-  for (const entry of spec.sources) sources.push(await readSource(root, entry, policy, scopes, total));
+  for (const entry of spec.sources) sources.push(await readSource(root, entry, policy, scopes, total, clampToEnd));
+  // A clamped range is recorded as read, so verification rebuilds exactly what was returned.
+  if (clampToEnd) spec = { ...spec, sources: spec.sources.map((entry, index) => ({ ...entry, endLine: sources[index].endLine })) };
   const allowedFiles = [];
   for (const file of spec.allowedFiles) allowedFiles.push(await allowedState(root, file, policy, scopes, total));
   const initialManifest = await validatePolicy(root, spec, policy);
@@ -261,10 +264,10 @@ export async function buildPacket({ root: rootInput, spec: specInput }) {
   return buildPacketFromSpec({ root: rootInput, spec: parseSpec(strictText(specBytes, 'spec')) });
 }
 
-export async function buildPacketInline({ root: rootInput, spec: specInput }) {
+export async function buildPacketInline({ root: rootInput, spec: specInput, clampToEnd = false }) {
   const bytes = Buffer.from(serialize(specInput), 'utf8');
   assert(bytes.byteLength <= MAX_SPEC_BYTES, `spec exceeds ${MAX_SPEC_BYTES} bytes`);
-  return buildPacketFromSpec({ root: rootInput, spec: parseSpec(strictText(bytes, 'spec')) });
+  return buildPacketFromSpec({ root: rootInput, spec: parseSpec(strictText(bytes, 'spec')), clampToEnd });
 }
 
 function scriptKind(path) {
@@ -327,7 +330,7 @@ function resolveAnchor(source, path, line) {
   const lastLine = source.getLineAndCharacterOfPosition(source.end).line + 1;
   assert(line <= lastLine, `anchor line exceeds source length: ${path} has ${lastLine} lines`);
   const containing = source.__packetCandidates.filter((candidate) => line >= candidate.startLine && line <= candidate.endLine);
-  assert(containing.length > 0, `no supported syntax block contains ${path}:${line}`);
+  assert(containing.length > 0, `no supported syntax block contains ${path}:${line}; request an exact range with mode build instead`);
   containing.sort((a, b) => (a.end - a.start) - (b.end - b.start) || a.start - b.start || compare(a.kind, b.kind));
   const chosen = containing[0];
   const sameSpan = containing.filter((candidate) => candidate !== chosen && candidate.end - candidate.start === chosen.end - chosen.start);
