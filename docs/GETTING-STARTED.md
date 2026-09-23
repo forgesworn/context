@@ -27,8 +27,8 @@ matching core version:
 mkdir context-install
 cd context-install
 npm init -y
-npm install --ignore-scripts /absolute/path/to/forgesworn-context-0.3.3.tgz \
-  /absolute/path/to/forgesworn-context-tools-0.3.3.tgz
+npm install --ignore-scripts /absolute/path/to/forgesworn-context-0.4.0.tgz \
+  /absolute/path/to/forgesworn-context-tools-0.4.0.tgz
 ```
 
 For that installation, use
@@ -266,7 +266,7 @@ stable checkout to bind.
 | Symptom | Check |
 | --- | --- |
 | No repository tools | Correct project config scope, executable paths, project trust and reconnect |
-| Only three to five tools | Installed/build revision predates `repository_packet` (0.3.0) or `repository_explore` and `repository_coverage` (after 0.3.3), or the client's tool allowlist omits them |
+| Only three to five tools | Installed/build revision predates `repository_packet` (0.3.0) or `repository_explore` and `repository_coverage` (0.4.0), or the client's tool allowlist omits them |
 | Packet tool advertises no arguments | Use a build with the top-level object-schema fix and reconnect |
 | Wrong root | Stop using the binding; correct the exact checkout/worktree path and reconnect |
 | Stale or unknown evidence / generation mismatch | Inspect status, refresh successfully, and use the newly returned generation |
