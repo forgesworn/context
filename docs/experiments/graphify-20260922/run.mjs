@@ -367,7 +367,7 @@ for (const taskId of tasks) {
     const armDir = join(evidence, taskId, order[i])
     mkdirSync(armDir, { recursive: true })
     writeFileSync(join(armDir, 'mcp-empty.json'), '{"mcpServers":{}}')
-    await runArm({ taskId, arm: order[i], orderIndex: i + 1, local, evidence, skipReview: Boolean(a['skip-review']) })
+    await runArm({ taskId, arm: order[i], orderIndex: a['order-index'] ? Number(a['order-index']) : i + 1, local, evidence, skipReview: Boolean(a['skip-review']) })
   }
 }
 log(evidence, 'done')

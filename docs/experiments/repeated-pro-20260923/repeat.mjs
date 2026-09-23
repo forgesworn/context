@@ -23,10 +23,10 @@ for (let rep = 1; rep <= protocol.repetitions; rep += 1) {
   writeFileSync(repLocal, JSON.stringify({ ...local, evidence }, null, 2))
   protocol.tasks.forEach((task, i) => {
     const order = protocol.armOrders[(i + rep - 1) % protocol.armOrders.length]
-    for (const arm of order) {
+    for (const [position, arm] of order.entries()) {
       const receipt = join(evidence, task, arm, 'receipt.json')
       if (!existsSync(receipt)) {
-        const r = spawnSync(process.execPath, [join(here, '../graphify-20260922/run.mjs'), '--local', repLocal, '--protocol', here, '--task', task, '--arms', arm], { stdio: 'inherit' })
+        const r = spawnSync(process.execPath, [join(here, '../graphify-20260922/run.mjs'), '--local', repLocal, '--protocol', here, '--task', task, '--arms', arm, '--order-index', String(position + 1)], { stdio: 'inherit' })
         if (r.status !== 0) { console.log(`STOPPED rep${rep} ${task}/${arm}: run.mjs exited ${r.status}`); process.exit(1) }
       }
       const done = JSON.parse(readFileSync(receipt, 'utf8'))
