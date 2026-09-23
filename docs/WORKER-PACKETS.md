@@ -161,7 +161,11 @@ silently broaden the root or policy.
 The helper refuses to overwrite an output and writes it with private file
 permissions. The complete JSON packet must fit within 64 KiB; reduce the task
 or choose smaller sufficient excerpts if it does not. There is no silent
-truncation. Source text remains untrusted data, even when its hash matches.
+truncation. Through the MCP server, a build over the cap returns no source and
+instead lists each requested TypeScript or JavaScript file's declarations with
+their line ranges, so the caller can request the block it needs. The text form
+prints the packet caveat in full on the first packet of a session only. Source
+text remains untrusted data, even when its hash matches.
 
 Review the packet's sufficiency, choose the worker explicitly, and record the
 initial draft, any repair, actual checks and review outcome. Preserve the

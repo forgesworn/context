@@ -302,6 +302,30 @@ describe('repository packet compact rendering', () => {
       const planned = await connection.client.callTool({ name: 'repository_packet', arguments: { mode: 'plan', spec: spec([{ path: 'alpha.ts', line: 2 }]), expectedGeneration: generation } }) as { isError?: boolean; content?: unknown }
       expect(planned.isError).not.toBe(true)
       expect(text(planned)).toContain('resolved: alpha.ts:2 -> 1-3 (function)\nmerged: alpha.ts:1-3\ncoverage: ')
+      expect(text(planned).split('\n').at(-1)).toBe('caveat: as on the first packet this session')
+    } finally { await connection.close() }
+  })
+
+  it('answers an oversized whole-file build with a declaration outline and no source text', async () => {
+    const value = await root()
+    const body = Array.from({ length: 400 }, (_, index) => `export function helper${index}() {\n  return '${'x'.repeat(120)}'\n}\n`).join('')
+    await writeFile(join(value, 'large.ts'), `export interface Shape {\n  size: number\n}\nexport class Store {\n  get(key: string) {\n    return key\n  }\n}\n${body}`)
+    const connection = await connect(value)
+    try {
+      const refreshed = await connection.client.callTool({ name: 'repository_refresh', arguments: {} }) as { content: unknown }
+      const generation = (JSON.parse(text(refreshed)) as { generation: string }).generation
+      const built = await connection.client.callTool({ name: 'repository_packet', arguments: { mode: 'build', spec: { sources: [{ path: 'large.ts' }] }, expectedGeneration: generation } }) as { isError?: boolean; content?: unknown }
+      expect(built.isError).toBe(true)
+      const lines = text(built).split('\n')
+      expect(lines[0]).toMatch(/exceed.* bytes\. Nothing was fetched\. Request the ranges you need below, or call repository_explore for a symbol\.$/)
+      expect(lines[1]).toMatch(/^outline large\.ts  1208 lines  \d+ bytes  sha256 [a-f0-9]{16}$/)
+      expect(lines.slice(2, 6)).toEqual(['  1-3 interface Shape', '  4-8 class Store', '  5-7 method Store.get', '  9-11 function helper0'])
+      expect(lines).toHaveLength(2 + 200 + 1)
+      expect(lines.at(-1)).toBe('  203 more declarations omitted')
+      expect(text(built)).not.toContain('xxxxxxxx')
+      const block = await connection.client.callTool({ name: 'repository_packet', arguments: { mode: 'build', spec: { sources: [{ path: 'large.ts', startLine: 5, endLine: 7 }] }, expectedGeneration: generation } }) as { isError?: boolean; content?: unknown }
+      expect(block.isError).not.toBe(true)
+      expect(text(block)).toContain('5:   get(key: string) {')
     } finally { await connection.close() }
   })
 })

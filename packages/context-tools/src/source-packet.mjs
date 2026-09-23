@@ -361,6 +361,53 @@ function mergePlanned(resolutions) {
   return merged;
 }
 
+const MAX_OUTLINE_ENTRIES = 200;
+function declarationName(node) {
+  return node.name && (ts.isIdentifier(node.name) || ts.isPrivateIdentifier(node.name) || ts.isStringLiteral(node.name)) ? node.name.text : undefined;
+}
+// Top-level declarations and class members with their line ranges, so an agent
+// that asked for too much can request one block instead of paging the file.
+function outlineEntries(source) {
+  const entries = [];
+  const add = (node, kind, name) => entries.push({ kind, name, startLine: lineOf(source, node.getStart(source, true)), endLine: lineOf(source, Math.max(node.getStart(source, true), node.end - 1)) });
+  for (const statement of source.statements) {
+    if (ts.isFunctionDeclaration(statement) && statement.name) add(statement, 'function', statement.name.text);
+    else if (ts.isInterfaceDeclaration(statement)) add(statement, 'interface', statement.name.text);
+    else if (ts.isTypeAliasDeclaration(statement)) add(statement, 'type', statement.name.text);
+    else if (ts.isEnumDeclaration(statement)) add(statement, 'enum', statement.name.text);
+    else if (ts.isVariableStatement(statement)) {
+      const names = statement.declarationList.declarations.map((item) => (ts.isIdentifier(item.name) ? item.name.text : undefined)).filter(Boolean);
+      if (names.length) add(statement, 'variable', names.join(', '));
+    } else if (ts.isClassDeclaration(statement)) {
+      const owner = statement.name?.text ?? 'default';
+      add(statement, 'class', owner);
+      for (const member of statement.members) {
+        const name = ts.isConstructorDeclaration(member) ? 'constructor' : declarationName(member);
+        if (name !== undefined && (ts.isMethodDeclaration(member) || ts.isConstructorDeclaration(member) || ts.isGetAccessorDeclaration(member) || ts.isSetAccessorDeclaration(member))) add(member, 'method', `${owner}.${name}`);
+      }
+    }
+  }
+  return entries;
+}
+export async function outlineSource({ root: rootInput, path }) {
+  const { root } = await canonicalRoot(rootInput);
+  validRelativePath(path, 'source path');
+  const ext = path.slice(path.lastIndexOf('.') + 1).toLowerCase();
+  assert(SOURCE_EXTENSIONS.has(ext), `source extension is unsupported: ${path}`);
+  const policy = await NavigationPolicy.load(root);
+  const scope = await scopeFor(root, policy, path, new Map([['', policy.rootDirectoryScope()]]));
+  const absolute = resolve(root, path);
+  await rejectSymlinkComponents(root, absolute, `source ${path}`);
+  assert(policy.allows(path, false, scope), `source is excluded by navigation policy: ${path}`);
+  const bytes = await regularBytes(absolute, `source ${path}`);
+  const text = strictText(bytes, `source ${path}`);
+  const lines = text.split('\n');
+  const lineCount = text.endsWith('\n') ? lines.length - 1 : lines.length;
+  let declarations = [];
+  if (PLANNABLE_EXTENSIONS.has(ext)) declarations = outlineEntries(ts.createSourceFile(path, text, ts.ScriptTarget.Latest, true, scriptKind(path)));
+  return { path, sha256: hash(bytes), bytes: bytes.byteLength, lines: lineCount, declarations: declarations.slice(0, MAX_OUTLINE_ENTRIES), omitted: Math.max(0, declarations.length - MAX_OUTLINE_ENTRIES) };
+}
+
 export async function planPacket({ root: rootInput, spec: specInput }) {
   assert(typeof specInput === 'string' && isAbsolute(specInput), 'spec must be an absolute path');
   const planBytes = await regularBytes(specInput, 'spec', MAX_SPEC_BYTES);
