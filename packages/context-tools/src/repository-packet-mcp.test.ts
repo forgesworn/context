@@ -289,3 +289,9 @@ describe('repository packet compact rendering', () => {
     } finally { await connection.close() }
   })
 })
+
+describe('fixture repository isolation', () => {
+  it('runs without inherited Git hook variables', () => {
+    expect(Object.keys(process.env).filter((key) => key.startsWith('GIT_'))).toEqual([])
+  })
+})

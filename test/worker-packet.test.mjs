@@ -91,6 +91,18 @@ test('planner rejects unsupported, malformed, signature-only and ambiguous same-
   await assert.rejects(planPacket({ root, spec: await spec(root, planBase({ sources: [{ path: 'bad.ts', line: 1 }] })) }), /parse errors/);
 });
 
+test('planner selects class, interface, type and enum declarations for lines outside any function', async () => {
+  const root = await fixture();
+  await writeFile(join(root, 'src.ts'), `import { a } from './a';\n/** Doc. */\nexport class Owner extends Base {\n  field = 1;\n  method() {\n    return a;\n  }\n}\ninterface Shape {\n  size: number;\n}\ntype Pair = {\n  left: string;\n};\nenum Mode {\n  On,\n}\n`);
+  const result = await planPacket({ root, spec: await spec(root, planBase({ sources: [
+    { path: 'src.ts', line: 4 }, { path: 'src.ts', line: 6 }, { path: 'src.ts', line: 10 }, { path: 'src.ts', line: 13 }, { path: 'src.ts', line: 16 },
+  ] })) });
+  assert.deepEqual(result.coverage.resolutions.map(({ kind, startLine, endLine }) => ({ kind, startLine, endLine })), [
+    { kind: 'class', startLine: 2, endLine: 8 }, { kind: 'method', startLine: 5, endLine: 7 }, { kind: 'interface', startLine: 9, endLine: 11 }, { kind: 'type', startLine: 12, endLine: 14 }, { kind: 'enum', startLine: 15, endLine: 17 },
+  ]);
+  await assert.rejects(planPacket({ root, spec: await spec(root, planBase({ sources: [{ path: 'src.ts', line: 1 }] })) }), /no supported/);
+});
+
 test('plan CLI writes the v1 packet and reports coverage', async () => {
   const root = await fixture();
   await writeFile(join(root, 'src.ts'), 'const named = () => {\n  return 1;\n};\n');

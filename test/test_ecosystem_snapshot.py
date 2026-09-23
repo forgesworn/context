@@ -13,6 +13,10 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'scripts'))
 import ecosystem_snapshot as snapshot
 
 CLI = Path(snapshot.__file__).resolve()
+# Git exports GIT_DIR and similar into hooks; fixture repositories must not
+# inherit them, or `git -C <tmp>` writes to the repository being pushed.
+for _key in [key for key in os.environ if key.startswith('GIT_')]:
+    del os.environ[_key]
 
 
 class SnapshotBoundaryTests(unittest.TestCase):
