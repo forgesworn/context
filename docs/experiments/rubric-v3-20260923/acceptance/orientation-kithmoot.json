@@ -1,0 +1,48 @@
+{
+  "version": 3,
+  "checkerSha256": "539b5d7cd593f0dd6c5707b3426e243e90092614921c8024b8a69a5c49ffaa9c",
+  "kind": "structured",
+  "requiredFindingIds": [
+    "adapter",
+    "ownership",
+    "storage",
+    "writes",
+    "caller-boundary"
+  ],
+  "reviewerRubric": {
+    "adapter": "Required: ContextVault wraps (extends) the portable context vault and always supplies KithMoot's verifyDelegation, through kithmootContextOptions, whatever the caller passes.",
+    "ownership": "Required, both, attributed to verifyDelegation in src/context.ts: (a) it first rejects a proof whose agent field does not equal options.agent; (b) it then calls verifyAgentOwnership. Fails if: only verifyAgentOwnership's internal checks are described, or the agent check is attributed only to verifyAgentOwnership.",
+    "storage": "Required: ContextFileStore in src/node/context-store.ts extends or wraps the portable file store and constructs it with kithmootContextOptions(options).",
+    "writes": "Required: all five tools are named as entering store.run with the write flag: context_create, context_append, context_import, context_upload and context_set_grants. Fails if: any of the five is missing. Not required: read-only tools.",
+    "caller-boundary": "Required: ContextVaultOptions is PortableOptions with verifyDelegation omitted (Omit<PortableOptions, 'verifyDelegation'>), so callers cannot pass or select the room's trust policy."
+  },
+  "requiredEvidence": [
+    {
+      "path": "src/context.ts",
+      "token": "Omit<PortableOptions, 'verifyDelegation'>"
+    },
+    {
+      "path": "src/context.ts",
+      "token": "return { ...options, verifyDelegation }"
+    },
+    {
+      "path": "src/node/context-store.ts",
+      "token": "kithmootContextOptions(options)"
+    },
+    {
+      "path": "packages/context-tools/src/context-mcp.ts",
+      "token": "store.run(v => v.append"
+    },
+    {
+      "path": "src/context.test.ts",
+      "token": "rejects forged ownership"
+    }
+  ],
+  "basedOn": "d5-20260921/acceptance/orientation-kithmoot.json",
+  "reviewerRules": [
+    "Judge each dimension against the whole answer: the summary and every finding. A required point stated under a different finding id counts; never fail a dimension for placement alone.",
+    "A required point passes only when the answer states it explicitly, in words a reader could quote. Different wording is fine; a point that is only implied by other statements does not pass.",
+    "Where a dimension lists items, each listed item must be named. A generic phrase such as \"edge cases\" or \"all semantics unchanged\" does not cover named items.",
+    "A dimension passes when every required point is stated, no \"fails if\" condition applies and nothing it states contradicts the frozen source excerpts. Points marked \"not required\" never cause a failure. Accepted alternatives pass equally."
+  ]
+}

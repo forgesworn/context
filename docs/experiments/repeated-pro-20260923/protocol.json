@@ -1,0 +1,199 @@
+{
+  "version": 1,
+  "experimentId": "repeated-three-way-deepseek-v4-pro-20260923",
+  "lockedAt": "2026-09-23T00:39:45.578Z",
+  "shellPathRule": "The client's Bash tool rebuilds PATH from the login profile, so every arm receives PATH through the settings env: the Node 24 bin directory plus the runner's PATH. The graphify arm additionally prepends the isolated virtualenv bin so `graphify` resolves. Verified by a probe before lock.",
+  "purpose": "The repeated-run design of REPEATED-RUNS.md on the eight locked tasks: three independent repetitions of every task in every arm on a DeepSeek V4 Pro executor, so per-arm differences can be read against run-to-run spread. Held-out tasks are not included and are reported separately when written.",
+  "taskPack": {
+    "directory": "../d5-20260921",
+    "reused": [
+      "tasks/*.json",
+      "setup/*.patch",
+      "acceptance/*.json",
+      "prepare-arm.mjs",
+      "accept.mjs"
+    ],
+    "note": "The eight locked v1 task definitions, seeded patches, frozen archives and deterministic checker are reused unchanged. v1, v2 and v3 results are not pooled with this experiment."
+  },
+  "tasks": [
+    "orientation-context",
+    "orientation-kithmoot",
+    "diagnosis-context",
+    "diagnosis-kithmoot",
+    "impact-context",
+    "impact-kithmoot",
+    "code-change-context",
+    "code-change-kithmoot"
+  ],
+  "retrievalInstructionRule": "Each arm's task prompt begins with one retrieval instruction of similar length and force, as the locked v1 measurement definition prescribed. Pilot 3 showed that the tools' own always-on text alone was ignored by the model in every arm, which measures nothing about the tools.",
+  "arms": {
+    "plain": {
+      "description": "Built-in Read, Edit, Write and Bash only. No MCP servers, no Graphify on PATH.",
+      "systemPromptAppendix": "Retrieval: use the built-in Read, Grep, Glob and Bash tools for source discovery.",
+      "retrievalInstruction": "you must use only bounded grep or rg and exact file reads for source discovery, confined to the task selection policy."
+    },
+    "graphify": {
+      "description": "Built-in tools plus a Graphify graph prebuilt in graphify-out/ with `graphify update <workspace>` (no model, no API key) and the graphify CLI on PATH. The system prompt appendix is Graphify's own always-on instruction text (always_on/claude-md.md) verbatim. graphify-out/ is hidden from Git through an environment-supplied core.excludesFile so no hashed file changes.",
+      "retrievalInstruction": "a Graphify knowledge graph is prebuilt in graphify-out/ and the graphify CLI is on PATH. Before any grep, find, cat or file read you must run `graphify query \"<question>\"` and `graphify explain \"<symbol>\"` (and `graphify path \"<A>\" \"<B>\"` for relationships) for the concepts in this task, then read only the file locations they return, confined to the task selection policy.",
+      "package": "graphifyy",
+      "packageVersion": "0.9.65",
+      "build": "graphify update <workspace>",
+      "instructionSource": "graphify/always_on/claude-md.md",
+      "instructionSha256": "5a599e9f148ebbf0a8786c4508c3954daf95d0d74b88223d890dbf37aad23ec6",
+      "graphOutExcludedFromGit": true
+    },
+    "context": {
+      "description": "Built-in tools plus the z1p-repository stdio MCP server (repository_status, repository_refresh, repository_explore, repository_coverage, repository_search, repository_packet) bound to the arm workspace, with the task selection policy in .z1p-navigation.json. Search and packet responses render as compact text; repository_explore answers one symbol per call. The system prompt appendix is the project instruction text from docs/GETTING-STARTED.md step 3 verbatim (context-instructions.txt). repository_coverage is a deterministic pre-submit check that lists explored files a draft answer leaves uncited.",
+      "package": "@forgesworn/context-tools",
+      "packageVersion": "source build at the recorded commit: repository_explore, repository_coverage (exact-quote check, symbols beyond eight returned as not checked), literal search, queued packets, packet ranges clamped to the end of file, optional packet handoff metadata; clean working tree, identified by dist digests below",
+      "server": "encrypted-context.mjs navigate <workspace>",
+      "instructionSource": "docs/GETTING-STARTED.md step 3 (context-instructions.txt in this directory)",
+      "retrievalInstruction": "the z1p-repository MCP tools are bound to this workspace. Before any grep, find, cat or file read you must call repository_status (and repository_refresh if it is unavailable, stale or unknown), then call repository_explore for each identifier in this task, use repository_search with pathPrefix only for literals, and obtain the source and tests you cite with repository_packet using the current expectedGeneration, reading files directly only for evidence those tools cannot supply, confined to the task selection policy. Before writing answer.json, call repository_coverage with your draft answer and the task's identifiers, then address each missing file or state why it does not bear on the task.",
+      "instructionSha256": "cb7f696ea84c42f5923cfc0470a5416b1b6053f4df29bb162e80bb8795b9f934",
+      "build": {
+        "headCommit": "3e1cd6a",
+        "workingTreeClean": true,
+        "dist": {
+          "repository-coverage.js": "45416989a1e158b70409665d49813f7cc6c122514db6fb4b33f359041fd63ae9",
+          "repository-explore.js": "54269956eee2297c8318c5fd430c2bdd0417ac16298027b52ce8840fbb9e3249",
+          "repository-navigation.js": "09ef3a2e92081c77f67eeb0b22a4d56c5f93559e33069dd24ea9639c30445a2b",
+          "repository-navigation-mcp.js": "0e7a532448edba00c7668fca5d528d36418afd0489fac6f04ad79b81fb175946",
+          "source-packet.mjs": "674e00406782396839c3f578cd3f0684260aa584a22d3ad888fcb5b661e687eb"
+        }
+      }
+    }
+  },
+  "armOrders": [
+    [
+      "plain",
+      "graphify",
+      "context"
+    ],
+    [
+      "graphify",
+      "context",
+      "plain"
+    ],
+    [
+      "context",
+      "plain",
+      "graphify"
+    ]
+  ],
+  "armOrderRule": "Repetition r (1 to 3) of task i uses armOrders[(i + r - 1) mod 3], so arm order rotates per repetition as well as per task. Each repetition writes its own evidence directory; every arm has its own prepared workspace, fresh headless session and, for the context arm, its own server process.",
+  "executor": {
+    "client": "claude-code",
+    "clientVersion": "2.1.280",
+    "model": "deepseek-v4-pro:cloud",
+    "effort": "medium",
+    "maxTurns": 80,
+    "maxBudgetUsd": null,
+    "settingSources": "project",
+    "settingsOverride": {
+      "enabledPlugins": {
+        "agents-md@builtin": false
+      }
+    },
+    "settingsOverrideReason": "A probe showed the built-in agents-md plugin injects the frozen tree's AGENTS.md into every arm; the Context revision's AGENTS.md instructs use of z1p-repository tools, so it is disabled for all arms. A second probe confirmed no project instruction text remains in context.",
+    "disallowedTools": [
+      "WebFetch",
+      "WebSearch",
+      "Agent",
+      "ToolSearch",
+      "Workflow",
+      "EnterWorktree",
+      "ExitWorktree",
+      "RemoteTrigger",
+      "CronCreate",
+      "CronDelete",
+      "CronList",
+      "ScheduleWakeup",
+      "SendMessage",
+      "PushNotification",
+      "Monitor",
+      "DesignSync",
+      "ListAgents",
+      "TaskStop",
+      "NotebookEdit"
+    ],
+    "builtInToolsObserved": "This Claude Code build exposes Bash, Read, Edit and Write for source work; Grep and Glob are not separate tools, so plain-arm search runs through Bash.",
+    "permissions": "dangerously-skip-permissions inside a disposable frozen workspace",
+    "skills": "disabled",
+    "mcp": "strict; only the arm's --mcp-config",
+    "sessionPersistence": false,
+    "promptDelivery": "identical task prompt on stdin for every arm; the only difference is the arm's system prompt appendix, PATH and MCP config",
+    "modelRoute": "Claude Code 2.1.280 with ANTHROPIC_BASE_URL pointing at the local Ollama 0.34.2 daemon (Anthropic-compatible /v1/messages), which proxies the cloud tag to ollama.com; verified by a smoke test with Bash and MCP tool calls",
+    "env": {
+      "ANTHROPIC_BASE_URL": "http://127.0.0.1:11435",
+      "ANTHROPIC_API_KEY": "ollama",
+      "ANTHROPIC_AUTH_TOKEN": "ollama"
+    },
+    "costNote": "The client reports a list-price estimate for an unrecognised model; it is meaningless here and no budget cap is applied. Provider usage counters (input, cache read, output) are recorded; Ollama Cloud credit consumption is read from the account, not from receipts.",
+    "effortNote": "--effort medium is accepted by the client; whether the route honours it is unknown. The smoke test reported zero thinking tokens."
+  },
+  "reviewer": {
+    "client": "claude-code",
+    "model": "claude-sonnet-5",
+    "effort": "high",
+    "maxTurns": 3,
+    "disallowedTools": [
+      "Bash",
+      "Read",
+      "Edit",
+      "Write",
+      "Grep",
+      "Glob",
+      "TodoWrite"
+    ],
+    "retry": "one further attempt if the structured verdict does not parse; both attempts are recorded and their usage and time are summed",
+    "tools": "none (Bash, Read, Edit, Write, Grep and Glob disallowed as well); receives the answer or diff, the private rubric, the deterministic checker result and bounded excerpts of the cited frozen source",
+    "blind": "does not see the arm name or any other arm's output"
+  },
+  "measures": {
+    "accepted": "code tasks: deterministic checker and scope check passed (no model reviewer); structured tasks: checker passed and the blind reviewer accepted against rubric version 3 with no material issue",
+    "executorToolCalls": "count of tool_use blocks by tool name from the stream",
+    "executorInputTokens": "input_tokens + cache_creation_input_tokens + cache_read_input_tokens from the result usage; uncached = input_tokens + cache_creation_input_tokens",
+    "executorOutputTokens": "output_tokens from the result usage",
+    "costEstimateUsd": "Claude Code total_cost_usd, a list-price estimate, not subscription billing",
+    "executorSeconds": "wall time of the headless session",
+    "armSeconds": "graphify build (arm-specific setup) + executor + checker + reviewer wall time",
+    "reviewerTokens": "reviewer session usage",
+    "setupSeconds": "dependency installation, shared by all arms and excluded",
+    "orderIndex": "position of the arm in its rotated order, passed to run.mjs with --order-index"
+  },
+  "decisionRule": "Cost first, quality as a guard, on this locked set only. Primary: for each task, the ratio of Context's median executor input (three repetitions) to each comparator's; Context is cheaper than a comparator if the geometric mean of the eight ratios is at most 0.8 and the upper end of a 90 percent bootstrap interval (resampling repetitions within task and arm, 10,000 draws, seed 20260923) is below 1. Guard: a task counts as accepted for an arm when two of three repetitions are accepted; Context must accept no fewer tasks than each comparator. Context is better only if both hold against both comparators. Reported, not decisive: per-task medians and spread, tool-result bytes, tool errors, turns, reviewer time, and the Context-repository and KithMoot tasks separately. Input totals only (the route cache accounting is inconsistent). The held-out half of REPEATED-RUNS.md is not evaluated.",
+  "knownAsymmetries": [
+    "Graphify indexes the whole frozen workspace; Context indexes only the task selection policy. Graphify is not disadvantaged by this.",
+    "Graphify's arm-specific build time is counted in armSeconds; Context's refresh happens inside the session and is counted as a tool call.",
+    "Arm instructions are delivered by system prompt appendix rather than a CLAUDE.md file so the frozen tree stays identical across arms.",
+    "Four tasks ask about the navigation code the Context arm runs. Its tools print local-source-unsigned in their metadata and its instruction names the status states, both of which bear on orientation-context answers. Results are reported for the Context-repository and KithMoot tasks separately.",
+    "The Context instruction (the product's documented project instruction) is longer than the other arms' instructions."
+  ],
+  "derivedFrom": "three-way-deepseek-v4.1-flash-smoke-20260923",
+  "codeAcceptance": "checker-and-scope",
+  "rubricDir": "../rubric-v3-20260923",
+  "repetitions": 3,
+  "failureRule": "The driver stops at the first executor, checker or reviewer failure that is not a verdict (provider error, quota, refusal, non-success result) and does not retry; finished cells are kept and a rerun resumes at the first cell without receipt.json.",
+  "changesFromS5": [
+    "Three repetitions with rotated arm order; eight locked tasks.",
+    "Code acceptance by checker plus scope check; structured rubrics version 3.",
+    "Context arm at the recorded build with the Flash smoke and retrieval-analysis fixes; instructions docs/GETTING-STARTED.md step 3."
+  ],
+  "attempts": [
+    {
+      "lockedAt": "2026-09-23T00:10:23.306Z",
+      "rubricDir": "../rubric-v2-20260923",
+      "stoppedAt": "after 2026-09-23T00:19:31. (last logged event)",
+      "cells": "rep1 orientation-context, all three arms, rejected; rep1 orientation-kithmoot plain interrupted",
+      "reason": "All three arms failed orientation-context on rubric points the task prompt does not ask for; rubric version 3 limits required points to the prompt. Evidence of this attempt is kept and not reported with the run."
+    },
+    {
+      "lockedAt": "2026-09-23T00:21:44.863Z",
+      "rubricDir": "../rubric-v3-20260923",
+      "stoppedAt": "before the first cell",
+      "cells": "none",
+      "reason": "An independent methodology review and a model-free retrieval analysis (../retrieval-recall-20260923/) found that every arm usually retrieves the required evidence and that the Context arm's friction was tool errors. The build was updated with those fixes (#27), the decision rule was made cost-first with acceptance as a quality guard, and receipts now record the rotated arm position."
+    }
+  ],
+  "decisionRuleChange": "Changed before any cell of this attempt ran. The previous rule required a 20 percent lower sum of per-task medians, which one task (diagnosis-context, about 37 percent of input) dominated, and no higher median reviewer time, which times the reviewer rather than the tool. The model-free analysis showed acceptance on these tasks reflects synthesis rather than retrieval, so acceptance is kept as a guard and cost is the measure."
+}
