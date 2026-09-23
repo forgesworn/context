@@ -321,6 +321,11 @@ function plannerCandidates(source) {
       add(property, 'property', source.text[property.end] === ',' ? property.end + 1 : property.end);
     }
     if (ts.isExpressionStatement(node) && ts.isCallExpression(node.expression) && node.expression.arguments.some((argument) => ts.isArrowFunction(argument) || ts.isFunctionExpression(argument))) add(node, 'callbackCall');
+    // Declarations own the lines between their members (fields, signatures, enum members).
+    if (ts.isClassDeclaration(node) && node.name) add(node, 'class');
+    if (ts.isInterfaceDeclaration(node)) add(node, 'interface');
+    if (ts.isTypeAliasDeclaration(node)) add(node, 'type');
+    if (ts.isEnumDeclaration(node)) add(node, 'enum');
     ts.forEachChild(node, visit);
   };
   visit(source);
