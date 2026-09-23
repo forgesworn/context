@@ -4,6 +4,63 @@ Latest implementation and adoption results are in the
 [dogfood execution ledger](docs/DOGFOOD-EXECUTION.md). The dated snapshots below
 remain historical evidence; internal pilot acceptance is separate from G0–G4.
 
+## 0.4.0 shipment checks, 23 September 2026
+
+Local navigation gains two tools and loses most of the friction recorded in
+the retrieval experiments:
+
+- `repository_explore` answers one symbol per call: declaration source, scoped
+  references with their enclosing declarations, importers and tests.
+- `repository_coverage` is a deterministic pre-submit check. It lists explored
+  files a draft leaves uncited and quotes that are not verbatim; it checks the
+  first eight symbols and names the rest as not checked.
+- Search takes `pathPrefix` and printable literals whose ends fall on whole
+  tokens, not only identifiers. Search and packet responses render as compact
+  text by default; pass `format: "json"` for the previous structure.
+- Search, explore and coverage build the index on first use; an explicit
+  `repository_refresh` is needed only after edits or branch changes.
+- `repository_packet` queues concurrent calls (up to eight waiting), requires
+  only `sources` through MCP, reads a whole file from a path alone or to the
+  end when `endLine` runs past it, merges overlapping ranges and states file
+  lengths in range errors.
+- Plan mode also selects named classes, interfaces, type aliases and enums, so
+  an anchor on a field or signature line returns its whole declaration.
+- Served tool instructions and schemas are smaller (5,586 bytes for the tool
+  listing).
+- `@forgesworn/context` retrieval ranks by BM25 with a source-label bonus.
+
+Local Node 24.21.0 checks from `npm ci --ignore-scripts` passed 451 tests,
+independent packed-package smoke, navigation stdio smoke, 22 scale tests and
+the 10k postings probe. Both unchanged benchmark gates passed with
+required-source recall 1.0: raw evidence 37.93x, navigation 356.2x.
+Commit-specific CI, archive checksums and registry checks accompany the
+release; this entry does not pre-claim them.
+
+External repository walkthrough (tool level, no model): the packed 0.4.0
+tarballs installed outside the workspace, then `doctor` and a stdio MCP client
+on `sindresorhus/ky` at `0d59458` (89 files, 18,463 locations). Explore built
+the index on first use; a packet given only a path returned the whole file;
+explore resolved `HTTPError` with references and tests; a literal search, a plan anchor on a
+class field (whole class returned) and a read past the end of a file succeeded;
+an edit made navigation stale and packets were refused until refresh, after
+which the new line was found; paths outside the root and under `node_modules`
+were refused; an unknown symbol returned an explicit empty result. This is not
+client, developer or task acceptance on that repository.
+
+Measured benefit: none shown. A locked repeated run on a DeepSeek V4 Pro
+executor (72 cells, eight tasks, three repetitions;
+[results](docs/experiments/repeated-pro-20260923/RESULTS.md)) found the
+pre-release Context arm used more executor input than plain tools (geometric
+mean ratio 1.17, 90% interval 0.79 to 1.36) and Graphify (1.31, 0.94 to 1.64),
+and was accepted on 3 of 8 tasks against 5 for each. Its input followed extra
+turns rather than larger tool results; the first-use build, whole-file packets
+and range merging above remove the deterministic part of that overhead but are
+not yet measured on an executor. No token, subscription or cash saving is
+claimed for this release.
+
+Reconnect existing MCP servers after upgrading. Clients that parsed the JSON
+search or packet output must now request `format: "json"`.
+
 ## 0.3.3 shipment checks, 22 September 2026
 
 The TS/JS scanner now binds calls to scoped compiler symbols over selected source
