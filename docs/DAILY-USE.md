@@ -14,8 +14,9 @@ For explicit client exports, use the [offline daily usage importer](DAILY-USAGE.
 to produce a private request receipt and task summary. It preserves missing
 coverage and reports observed usage rather than claiming savings.
 
-1. Call `repository_status`. If freshness is `unavailable`, `stale` or
-   `unknown`, call `repository_refresh`. `current` only covers the bounded,
+1. Call `repository_status` and confirm its root. If freshness is `stale` or
+   `unknown`, call `repository_refresh`; an `unavailable` index is built by the
+   first search, explore or coverage call. `current` only covers the bounded,
    allowlisted manifest, not every file in the repository.
 2. Search for one exact ASCII identifier, starting small:
 

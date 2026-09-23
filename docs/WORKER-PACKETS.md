@@ -58,9 +58,10 @@ then call `repository_refresh` and retain its `generation`.
 Replace the example paths and anchors with located evidence. Use `mode: "build"`
 and `{path, startLine, endLine}` source entries for reviewed exact ranges,
 including languages without syntax planning. Through MCP only `sources` is
-required: omitted handoff metadata gets a neutral task and acceptance check, and
-an `endLine` past the end of a file reads to its last line (the packet records
-the range actually read). A range starting past the end is still rejected with
+required: omitted handoff metadata gets a neutral task and acceptance check. A
+build source without `startLine` starts at line 1; without `endLine`, or with one
+past the end of the file, it reads to the last line; overlapping or adjacent
+ranges in one file are merged. The packet records the ranges actually read. A range starting past the end is still rejected with
 the file's line count. A plan anchor outside every supported block is rejected
 with a pointer to `mode: "build"`. The CLI keeps the strict spec. The server accepts an inline spec;
 it cannot accept a different root, spec-file path, output path or shell command.

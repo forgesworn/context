@@ -79,7 +79,25 @@ describe('repository navigation MCP adapter', () => {
     }
   })
 
-  it('reports null generation before refresh, errors on early search, then serves after refresh', async () => {
+  it('builds once when several first calls arrive together', async () => {
+    const root = await makeRoot()
+    const { client, serverClose } = await connect(root)
+    try {
+      const results = await Promise.all([
+        client.callTool({ name: 'repository_search', arguments: { term: 'alphaToken' } }),
+        client.callTool({ name: 'repository_search', arguments: { term: 'alphaToken' } }),
+        client.callTool({ name: 'repository_explore', arguments: { symbol: 'alphaToken' } }),
+      ]) as Array<{ isError?: boolean; content: Array<{ type: string; text: string }> }>
+      for (const result of results) expect(result.isError, textOf(result)).not.toBe(true)
+      const generations = new Set(results.map((result) => /generation ([0-9a-f-]{36})/.exec(textOf(result))?.[1]))
+      expect(generations.size).toBe(1)
+      expect(generations.has(undefined)).toBe(false)
+    } finally {
+      await serverClose()
+    }
+  })
+
+  it('reports null generation before first use, builds on an early search, then serves after refresh', async () => {
     const root = await makeRoot()
     const { client, serverClose } = await connect(root)
     try {
@@ -103,7 +121,11 @@ describe('repository navigation MCP adapter', () => {
         name: 'repository_search',
         arguments: { term: 'alphaToken' },
       })) as { content: Array<{ type: string; text: string }>; isError?: boolean }
-      expect(early.isError).toBe(true)
+      expect(early.isError).not.toBe(true)
+      expect(textOf(early)).toMatch(/alphaToken|alphatoken/)
+      const built = JSON.parse(textOf(await client.callTool({ name: 'repository_status', arguments: {} }) as { content: Array<{ type: string; text: string }> })) as { freshness: string; generation: string | null }
+      expect(built.freshness).toBe('current')
+      expect(built.generation).not.toBeNull()
 
       const refreshed = (await client.callTool({
         name: 'repository_refresh',
@@ -400,7 +422,7 @@ describe('repository navigation MCP compact rendering and explore', () => {
     const { client, serverClose } = await connect(root)
     try {
       const early = (await client.callTool({ name: 'repository_explore', arguments: { symbol: 'ownerOptions' } })) as { isError?: boolean }
-      expect(early.isError).toBe(true)
+      expect(early.isError).not.toBe(true)
       const refreshed = JSON.parse(textOf(await client.callTool({ name: 'repository_refresh', arguments: {} }) as { content: unknown })) as { generation: string }
       const explored = (await client.callTool({ name: 'repository_explore', arguments: { symbol: 'ownerOptions', expectedGeneration: refreshed.generation } })) as { content: Array<{ type: string; text: string }>; isError?: boolean }
       expect(explored.isError).not.toBe(true)
