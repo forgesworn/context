@@ -121,8 +121,11 @@ with the task receipt; inspect it before dispatch. Repeated anchors do not repea
 the same source lines in the packet.
 
 The planner selects the smallest enclosing supported function, method,
-constructor, accessor, named arrow/function-expression owner, or statement-level
-call with a direct function callback. A callback call is a syntactic category,
+constructor, accessor, named arrow/function-expression owner, statement-level
+call with a direct function callback, named class, interface, type alias or
+enum. A field or signature line therefore selects its whole declaration, while a
+line inside a method still selects only the method; imports and other top-level
+statements are not planned. A callback call is a syntactic category,
 not a guarantee that it is a test: nested `it(...)` inside `describe(...)` selects
 the `it` call, but an anchor inside a smaller callback-bearing helper may select
 that helper. Anchor the outer declaration/call when its whole block is needed.
