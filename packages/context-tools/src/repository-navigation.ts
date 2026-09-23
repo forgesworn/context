@@ -436,6 +436,11 @@ export class RepositoryNavigation {
     this.rootInput = root;
   }
 
+  /** Whether any generation has been built; cheap, unlike status(). */
+  get built(): boolean {
+    return this.generation !== null;
+  }
+
   async status(signal?: AbortSignal): Promise<NavigationStatus> {
     throwIfAborted(signal);
     const gen = this.generation;

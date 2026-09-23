@@ -254,6 +254,22 @@ describe('repository packet MCP adapter', () => {
     } finally { await connection.close() }
   })
 
+  it('reads a whole file from a path alone and merges overlapping ranges', async () => {
+    const value = await root(); const connection = await connect(value)
+    try {
+      const refreshed = await connection.client.callTool({ name: 'repository_refresh', arguments: {} }) as { content: unknown }
+      const generation = (JSON.parse(text(refreshed)) as { generation: string }).generation
+      const whole = await call(connection.client, { mode: 'build', spec: { sources: [{ path: 'alpha.ts' }] }, expectedGeneration: generation })
+      expect(whole.isError).not.toBe(true)
+      expect(JSON.parse(text(whole)).packet.sources).toMatchObject([{ path: 'alpha.ts', startLine: 1, endLine: 3 }])
+      const overlapping = await call(connection.client, { mode: 'build', spec: { sources: [{ path: 'alpha.ts', startLine: 2, endLine: 3 }, { path: 'alpha.ts', startLine: 1, endLine: 2 }] }, expectedGeneration: generation })
+      expect(overlapping.isError).not.toBe(true)
+      const packet = JSON.parse(text(overlapping)).packet
+      expect(packet.sources).toMatchObject([{ path: 'alpha.ts', startLine: 1, endLine: 3 }])
+      expect(packet.originalSpec.sources).toEqual([{ path: 'alpha.ts', startLine: 1, endLine: 3 }])
+    } finally { await connection.close() }
+  })
+
   it('points a plan anchor outside any block at an exact build range', async () => {
     const value = await root()
     await writeFile(join(value, 'beta.ts'), "import { alpha } from './alpha'\nexport function beta() {\n  return alpha()\n}\n")

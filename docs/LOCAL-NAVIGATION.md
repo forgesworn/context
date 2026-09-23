@@ -69,9 +69,11 @@ node packages/context-tools/bin/encrypted-context.mjs navigate /absolute/reposit
 ```
 
 There is no identity or encrypted-cache argument. Each process owns its own
-index. Call `repository_refresh` before searching and again after source edits;
+index. Search, explore and coverage build it on first use (concurrent first
+calls share one build); call `repository_refresh` again after source edits.
 `repository_status` reports the generation, revision, exclusion counts and
-freshness. Refresh explicitly whenever freshness is `stale` or `unknown`.
+freshness without building. Refresh explicitly whenever freshness is `stale` or
+`unknown`: a built index is never replaced without a refresh call.
 Explore one symbol with `repository_explore`, for example `RepositoryNavigation`
 or `RepositoryNavigation.search`, or search for one identifier with
 `repository_search`.
