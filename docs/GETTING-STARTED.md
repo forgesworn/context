@@ -187,7 +187,8 @@ ForgeSworn-specific goals into an unrelated project.
 Use the configured z1p-repository tools for source discovery. First check that
 repository_status.root is this exact checkout or worktree; stop using a
 mismatched binding. Explore each symbol once, fetch the blocks you rely on with
-repository_packet and cite those lines. Run repository_coverage on the draft and
+repository_packet and cite those lines without reading them again. Run
+repository_coverage on the draft and
 fix what it reports. Read files directly only for evidence the tools cannot
 supply; tiny known-file edits need no scan. Refresh and re-fetch after edits,
 branch switches, pulls, merges or rebases; reconnect after changing the binding
