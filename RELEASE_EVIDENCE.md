@@ -4,6 +4,36 @@ Latest implementation and adoption results are in the
 [dogfood execution ledger](docs/DOGFOOD-EXECUTION.md). The dated snapshots below
 remain historical evidence; internal pilot acceptance is separate from G0–G4.
 
+## 0.4.1 shipment checks, 23 September 2026
+
+A `repository_packet` follow-up from a model-free reading of the 0.4.0 cost
+screen's recorded sessions
+([results](docs/experiments/screen-pro-040-20260923/RESULTS.md)):
+
+- A build over the byte cap now returns, instead of a bare error, each
+  requested TypeScript or JavaScript file's top-level declarations and class
+  methods with their line ranges, and no source text, so the caller can
+  request one block. It is still reported as an error.
+- The text form prints the packet caveat in full on the first packet of a
+  session and a one-line reference after that. JSON output is unchanged.
+- The server instructions and the documented project instruction say not to
+  re-read packet lines with other tools.
+
+`@forgesworn/context` is unchanged apart from its version, kept in step with
+the tools package.
+
+Local Node 24.21.0 checks from `npm ci --ignore-scripts` passed 452 tests,
+independent packed-package smoke, navigation stdio smoke, 22 scale tests and
+the 10k postings probe. Both unchanged benchmark gates passed with
+required-source recall 1.0: raw evidence 36.35x, navigation 360.81x (the
+baseline is this repository's own source, so the figures move with it).
+
+Measured benefit: none shown. The 0.4.0 cost screen on a DeepSeek V4 Pro
+executor did not pass: 1.09 times plain tools' executor input and 1.22 times
+Graphify's. These changes were found on the same locked tasks and have not
+been measured on an executor. No token, subscription or cash saving is
+claimed. Reconnect existing MCP servers after upgrading.
+
 ## 0.4.0 shipment checks, 23 September 2026
 
 Local navigation gains two tools and loses most of the friction recorded in
