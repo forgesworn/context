@@ -17,13 +17,18 @@ const MAX_QUEUED_PACKETS = 8
 const formatSchema = z.enum(['text', 'json']).optional()
 const pathPrefixSchema = z.string().min(1).max(512).optional()
 
+// Handoff metadata is optional here: an interactive read needs only sources, and
+// recorded sessions filled required metadata with placeholders or were rejected.
+const DEFAULT_PACKET_TASK = 'read exact source'
+const DEFAULT_ACCEPTANCE_CHECK = 'cite exact source lines'
+const metadataStrings = z.array(z.string()).transform((items) => items.filter((item) => item.trim().length > 0))
 const packetMetadataSchema = z.object({
-  version: z.literal(1),
-  task: z.string().min(1),
-  acceptanceChecks: z.array(z.string().min(1)).min(1),
-  allowedFiles: z.array(z.string().min(1)).max(32),
-  exclusions: z.array(z.string().min(1)),
-  unresolvedQuestions: z.array(z.string().min(1)),
+  version: z.literal(1).default(1),
+  task: z.string().transform((task) => task.trim() || DEFAULT_PACKET_TASK).default(DEFAULT_PACKET_TASK),
+  acceptanceChecks: metadataStrings.transform((checks) => checks.length ? checks : [DEFAULT_ACCEPTANCE_CHECK]).default([DEFAULT_ACCEPTANCE_CHECK]),
+  allowedFiles: metadataStrings.pipe(z.array(z.string()).max(32)).default([]),
+  exclusions: metadataStrings.default([]),
+  unresolvedQuestions: metadataStrings.default([]),
 }).strict()
 const packetBuildSpecSchema = packetMetadataSchema.extend({
   sources: z.array(z.object({ path: z.string().min(1), startLine: z.number().int().min(1), endLine: z.number().int().min(1) }).strict()).max(32),
@@ -235,7 +240,8 @@ export function createRepositoryNavigationServer(root: string): RepositoryNaviga
     'repository_packet',
     {
       description:
-        'Verbatim source. mode build: exact ranges (sources path, startLine, endLine). ' +
+        'Verbatim source. mode build: exact ranges (sources path, startLine, endLine; ' +
+        'an endLine past the end reads to the end). ' +
         'mode plan: complete TypeScript/JavaScript blocks around anchors (sources path, ' +
         'line). Pass the current generation; stale navigation is rejected. Capped at ' +
         'maxBytes (64 KiB default).',
@@ -260,7 +266,7 @@ export function createRepositoryNavigationServer(root: string): RepositoryNaviga
           const before = await currentPacketNavigation(navigation, input.expectedGeneration, extra.signal)
           throwIfAborted(extra.signal)
           const result = input.mode === 'build'
-            ? { packet: await buildPacketInline({ root, spec: parsedSpec }) }
+            ? { packet: await buildPacketInline({ root, spec: parsedSpec, clampToEnd: true }) }
             : await planPacketInline({ root, spec: parsedSpec })
           throwIfAborted(extra.signal)
           const after = await currentPacketNavigation(navigation, input.expectedGeneration, extra.signal)

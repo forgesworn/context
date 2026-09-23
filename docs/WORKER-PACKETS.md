@@ -57,7 +57,12 @@ then call `repository_refresh` and retain its `generation`.
 
 Replace the example paths and anchors with located evidence. Use `mode: "build"`
 and `{path, startLine, endLine}` source entries for reviewed exact ranges,
-including languages without syntax planning. The server accepts an inline spec;
+including languages without syntax planning. Through MCP only `sources` is
+required: omitted handoff metadata gets a neutral task and acceptance check, and
+an `endLine` past the end of a file reads to its last line (the packet records
+the range actually read). A range starting past the end is still rejected with
+the file's line count. A plan anchor outside every supported block is rejected
+with a pointer to `mode: "build"`. The CLI keeps the strict spec. The server accepts an inline spec;
 it cannot accept a different root, spec-file path, output path or shell command.
 The configured root must be a Git repository with a committed HEAD. Internal
 `git rev-parse` calls read provenance; the tool does not execute acceptance checks.
