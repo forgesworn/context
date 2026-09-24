@@ -1,5 +1,28 @@
 # Context development
 
+Z1P Core is a local, MIT-licensed developer tool that builds signed code graphs
+and bounded evidence for coding agents. It runs locally, needs no account and
+does not send source or records to a hosted service. `packages/context` is the
+browser-safe core (`@forgesworn/context`); `packages/context-tools` adds Node
+persistence, a CLI and an MCP server (`@forgesworn/context-tools`).
+
+## Commands
+
+- Install: `npm ci`
+- Build: `npm run build`
+- Test: `npm test`
+- Full check (build, test, package smoke): `npm run check`
+- Token-reduction benchmark: `npm run benchmark:tokens`
+- Navigation benchmark: `npm run benchmark:navigation`
+
+## Layout
+
+- `packages/context`: browser-safe core.
+- `packages/context-tools`: Node persistence, CLI and MCP.
+- `benchmarks/`: token-reduction and navigation benchmarks, and scale tests.
+- `test/`: worker-packet, task-cost, ecosystem and daily-usage tests.
+- `docs/`: setup, daily use, worker packets, dogfood and execution-plan docs.
+
 Use [the product direction](PRODUCT_DIRECTION.md) for scope: a general-purpose
 MIT developer tool. Keep local indexing, refresh, graph exploration and retrieval
 in the open core. ForgeSworn projects are dogfood cases; Oathrun is an optional
