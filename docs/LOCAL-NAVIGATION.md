@@ -181,7 +181,9 @@ Supported suffixes: `.ts`, `.tsx`, `.js`, `.jsx`, `.mts`, `.cts`, `.mjs`, `.cjs`
 `.h`, `.hh`, `.hpp`, `.hxx`, `.cs`, `.rb`, `.php`, `.dart`, `.md`. This is lexical
 navigation, not language-aware parsing. Hidden
 entries and `node_modules`, `dist`, `build`, `coverage`, `out`, `vendor`, `target` are
-excluded. Lines over 2,048 UTF-8 bytes are excluded and counted. Files without
+excluded. Lines over 2,048 UTF-8 bytes are excluded and counted. Files that are
+not valid UTF-8, such as MPEG transport-stream video saved as `.ts`, are skipped
+and counted as `invalidUtf8` rather than failing the refresh. Files without
 an allowed suffix are excluded. Root and nested `.gitignore` files and optional
 `.z1p-navigation.json` prefix selection narrow this scope. See
 [repository policy](NAVIGATION-POLICY.md) for precedence, bounds and policy-change
