@@ -160,20 +160,22 @@ async function main() {
 
     const preserved = await call(active.client, 'repository_search', { term: 'navToken', maxResults: 1, maxBytes: 4096 });
     assert(typeof preserved.nextCursor === 'string', 'preservation cursor unavailable');
-    await writeFile(join(fixture, 'bad.ts'), Buffer.from([0xff, 0xfe, 0x00, 0x80]), { mode: 0o600 });
+    await writeFile(join(fixture, 'big.ts'), 'x'.repeat(1024 * 1024 + 1), { mode: 0o600 });
     await call(active.client, 'repository_refresh', {}, { expectError: true });
     const unknown = await call(active.client, 'repository_status', {});
-    assert(unknown.generation === secondCurrent.generation, 'failed UTF-8 refresh replaced the prior generation');
+    assert(unknown.generation === secondCurrent.generation, 'failed refresh replaced the prior generation');
     const preservedSearch = await call(active.client, 'repository_search', { term: 'navToken', maxResults: 1, maxBytes: 4096, cursor: preserved.nextCursor });
-    assert(preservedSearch.generation === secondCurrent.generation, 'failed UTF-8 refresh invalidated prior cursor');
-    checks.invalidUtf8PreservesGeneration = true;
+    assert(preservedSearch.generation === secondCurrent.generation, 'failed refresh invalidated prior cursor');
+    checks.failedRefreshPreservesGeneration = true;
 
-    await rm(join(fixture, 'bad.ts'));
+    await rm(join(fixture, 'big.ts'));
+    await writeFile(join(fixture, 'bad.ts'), Buffer.from([0xff, 0xfe, 0x00, 0x80]), { mode: 0o600 });
     const recovered = await call(active.client, 'repository_refresh', {});
-    assert(recovered.freshness === 'current' && recovered.generation !== secondCurrent.generation, 'removing invalid UTF-8 did not recover current index');
+    assert(recovered.freshness === 'current' && recovered.generation !== secondCurrent.generation, 'refresh did not recover a current index');
+    assert(recovered.exclusions.invalidUtf8 === 1, 'invalid UTF-8 file was not skipped and counted');
     const session1Evidence = evidence(await call(active.client, 'repository_search', { term: 'navToken', maxResults: 3, maxBytes: 4096 }));
     assert(session1Evidence.length === 3, 'recovered search lacks expected source evidence');
-    checks.recoveredAfterInvalidUtf8 = true;
+    checks.invalidUtf8SkippedAndCounted = true;
 
     await close(active);
     active = undefined;

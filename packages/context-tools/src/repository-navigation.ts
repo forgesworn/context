@@ -40,6 +40,7 @@ export interface NavigationExclusions {
   ignored: number;
   policy: number;
   unsupported: number;
+  invalidUtf8: number;
   oversizedFiles: number;
   oversizedLines: number;
   maxDepth: number;
@@ -302,6 +303,17 @@ function utf8Len(s: string): number {
   return Buffer.byteLength(s, 'utf8');
 }
 
+/** Strict UTF-8 text, or null when the bytes are not valid UTF-8: a binary file
+ * with a source suffix (an MPEG transport stream saved as `.ts`) or source in a
+ * legacy encoding. Refresh skips and counts these instead of failing. */
+function decodeUtf8(raw: Buffer): string | null {
+  try {
+    return new TextDecoder('utf8', { fatal: true, ignoreBOM: true }).decode(raw);
+  } catch {
+    return null;
+  }
+}
+
 function manifestRevision(files: readonly ManifestFile[]): string {
   return createHash('sha256')
     .update(JSON.stringify(files.map(({ path, sha256, bytes }) => ({ path, sha256, bytes }))))
@@ -479,6 +491,7 @@ export class RepositoryNavigation {
           ignored: 0,
           policy: 0,
           unsupported: 0,
+          invalidUtf8: 0,
           oversizedFiles: 0,
           oversizedLines: 0,
           maxDepth: 0,
@@ -496,7 +509,7 @@ export class RepositoryNavigation {
       revision: gen ? gen.revision : null,
       policy: { ...policy, ...(policy.summary ? { summary: { ...policy.summary } } : {}) },
       completeness:
-        'scoped to allowlisted extensions under explicit root; excludes listed dirs and hidden entries; not exhaustive coverage of repository',
+        'scoped to allowlisted extensions under explicit root; excludes listed dirs, hidden entries and files that are not valid UTF-8; not exhaustive coverage of repository',
       builtAt: gen ? gen.builtAt : null,
       counts: { ...counts },
       exclusions: { ...exclusions },
@@ -1099,8 +1112,11 @@ export class RepositoryNavigation {
       throwIfAborted(signal);
       await yieldNow();
       throwIfAborted(signal);
-      const { raw } = await this.readSource(entry, this.limits.maxFileBytes, signal);
+      const { content, raw } = await this.readSource(entry, this.limits.maxFileBytes, signal);
       throwIfAborted(signal);
+      if (content === null) {
+        continue;
+      }
       if (totalBytes + raw.byteLength > this.limits.maxBytes) {
         throw new Error(`RepositoryNavigation: maxBytes quota exceeded (${this.limits.maxBytes})`);
       }
@@ -1117,8 +1133,8 @@ export class RepositoryNavigation {
 
   private async discoverEligible(root: string, signal?: AbortSignal): Promise<Discovery> {
     const exclusions: NavigationExclusions = {
-      symlinks: 0, ignored: 0, policy: 0, unsupported: 0, oversizedFiles: 0,
-      oversizedLines: 0, maxDepth: 0, visitedCap: 0,
+      symlinks: 0, ignored: 0, policy: 0, unsupported: 0, invalidUtf8: 0,
+      oversizedFiles: 0, oversizedLines: 0, maxDepth: 0, visitedCap: 0,
     };
     const files: DiscoveredFile[] = [];
     const policyDirectories: string[] = [''];
@@ -1250,6 +1266,10 @@ export class RepositoryNavigation {
       }
       const { content, raw } = await this.readSource(entry, limits.maxFileBytes, signal);
       throwIfAborted(signal);
+      if (content === null) {
+        exclusions.invalidUtf8++;
+        continue;
+      }
       const rawBytes = raw.byteLength;
       if (totalBytes + rawBytes > limits.maxBytes) {
         throw new Error(
@@ -1346,7 +1366,7 @@ export class RepositoryNavigation {
     file: DiscoveredFile,
     maxFileBytes: number,
     signal?: AbortSignal,
-  ): Promise<{ content: string; raw: Buffer }> {
+  ): Promise<{ content: string | null; raw: Buffer }> {
     throwIfAborted(signal);
     const handle = await fsp.open(
       file.abs,
@@ -1398,9 +1418,7 @@ export class RepositoryNavigation {
         );
       }
       const raw = buf.subarray(0, pos);
-      const decoder = new TextDecoder('utf8', { fatal: true, ignoreBOM: true });
-      const content = decoder.decode(raw);
-      return { content, raw };
+      return { content: decodeUtf8(raw), raw };
     } finally {
       await handle.close();
     }

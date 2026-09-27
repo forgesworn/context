@@ -201,10 +201,10 @@ describe('RepositoryNavigation', () => {
   it('reports unknown freshness on inspection failure while retaining the prior generation and cursor', async () => {
     const root = await mkFixture();
     await writeFile(root, 'a.ts', 'shared one\nshared two\n');
-    const nav = new RepositoryNavigation(root);
+    const nav = new RepositoryNavigation(root, { maxFileBytes: 1024 });
     const refreshed = await nav.refresh();
     const first = await nav.search({ term: 'shared', maxResults: 1 });
-    await writeFileBuffer(root, 'bad.ts', Buffer.from([0xff, 0xfe]));
+    await writeFile(root, 'big.ts', 'x'.repeat(5000) + '\n');
     const unknown = await nav.status();
     expect(unknown.freshness).toBe('unknown');
     expect(unknown.freshnessError).toBeTruthy();
@@ -815,20 +815,46 @@ describe('RepositoryNavigation', () => {
     expect(res.results[0].sha256).toBe(expected);
   });
 
-  it('failed refresh on invalid UTF-8 preserves previous generation and cursors', async () => {
+  it('skips and counts files that are not valid UTF-8 and keeps freshness exact', async () => {
+    const root = await mkFixture();
+    await writeFile(root, 'good.ts', 'alpha shared\n');
+    // An HLS video segment: MPEG transport stream bytes behind a `.ts` suffix.
+    const segment = Buffer.alloc(188 * 4, 0xff);
+    for (let i = 0; i < segment.length; i += 188) segment[i] = 0x47;
+    await writeFileBuffer(root, 'media/segment-000.ts', segment);
+    const nav = new RepositoryNavigation(root);
+    const st1 = await nav.refresh();
+    expect(st1.counts.files).toBe(1);
+    expect(st1.exclusions.invalidUtf8).toBe(1);
+    expect((await nav.search({ term: 'shared' })).results.map((r) => r.path)).toEqual(['good.ts']);
+    expect((await nav.status()).freshness).toBe('current');
+
+    await writeFile(root, 'media/segment-000.ts', 'shared text\n');
+    expect((await nav.status()).freshness).toBe('stale');
+    const st2 = await nav.refresh();
+    expect(st2.counts.files).toBe(2);
+    expect(st2.exclusions.invalidUtf8).toBe(0);
+
+    await writeFileBuffer(root, 'good.ts', Buffer.from([0xff, 0xfe, 0x00, 0x80]));
+    expect((await nav.status()).freshness).toBe('stale');
+    const st3 = await nav.refresh();
+    expect(st3.exclusions.invalidUtf8).toBe(1);
+    expect((await nav.search({ term: 'shared' })).results.map((r) => r.path)).toEqual(['media/segment-000.ts']);
+  });
+
+  it('failed refresh preserves previous generation and cursors', async () => {
     const root = await mkFixture();
     const lines: string[] = [];
     for (let i = 0; i < 40; i++) lines.push(`alpha shared ${i}`);
     await writeFile(root, 'good.ts', lines.join('\n'));
-    const nav = new RepositoryNavigation(root);
+    const nav = new RepositoryNavigation(root, { maxFileBytes: 1024 });
     const st1 = await nav.refresh();
     const gen1 = st1.generation;
     expect(gen1).toBeTruthy();
     const r = await nav.search({ term: 'shared', maxResults: 2 });
     const cursor = r.nextCursor!;
-    const bad = Buffer.from([0xff, 0xfe, 0x00, 0x80, 0x81, 0x82]);
-    await writeFileBuffer(root, 'bad.ts', bad);
-    await expect(nav.refresh()).rejects.toThrow();
+    await writeFile(root, 'big.ts', 'x'.repeat(5000) + '\n');
+    await expect(nav.refresh()).rejects.toThrow(/maxFileBytes/);
     const st2 = await nav.status();
     expect(st2.generation).toBe(gen1);
     const r2 = await nav.search({ term: 'shared', cursor });
