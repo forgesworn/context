@@ -4,6 +4,35 @@ Latest implementation and adoption results are in the
 [dogfood execution ledger](docs/DOGFOOD-EXECUTION.md). The dated snapshots below
 remain historical evidence; internal pilot acceptance is separate from G0–G4.
 
+## 0.4.3 shipment checks, 27 September 2026
+
+Navigation refresh no longer fails on a source-suffixed file that is not valid
+UTF-8:
+
+- Such a file, for example an MPEG transport-stream video segment saved as
+  `.ts`, is skipped and counted as `invalidUtf8` in the refresh exclusions.
+  The freshness manifest skips the same files, so status stays current, and a
+  file that later becomes valid text makes the index stale as before. The
+  0.4.2 install survey refreshed 267 of 268 local checkouts; the one failure
+  was this case. On that checkout the fixed build indexed 1,920 files, skipped
+  six as `invalidUtf8` and stayed current.
+- `.gitignore` and `.z1p-navigation.json` that are not valid UTF-8 still fail
+  the refresh.
+
+`@forgesworn/context` is unchanged apart from its version, kept in step with
+the tools package.
+
+Local Node 24.21.0 checks from `npm ci --ignore-scripts` passed 457 tests,
+independent packed-package smoke, navigation stdio smoke (now including a
+skipped and counted invalid-UTF-8 source), 22 scale tests and the 10k postings
+probe. Both unchanged benchmark gates passed with required-source recall 1.0:
+raw evidence 37.02x, navigation 364.88x (the baseline is this repository's own
+source, so the figures move with it).
+
+Measured benefit: none shown. This restores coverage for affected checkouts
+and was not measured on an executor. No token, subscription or cash saving is
+claimed. Reconnect existing MCP servers after upgrading.
+
 ## 0.4.2 shipment checks, 27 September 2026
 
 Local navigation widened so one client entry can serve every ordinary
