@@ -64,10 +64,15 @@ not a secret detector, filesystem sandbox or shared-room access grant. Policy
 files and source can change while being read; hashes identify observed bytes,
 not an atomic filesystem snapshot. Keep each client bound to the intended root.
 
-## A bounded pilot on a large repository
+## A repository over the build caps
 
-Start by measuring the actual root. If it exceeds a build quota, use an explicit
-include list for the modules needed by the task and record that limited scope.
-Do not increase quotas or silently drop files to manufacture successful coverage.
-Keep the configuration local until its repository owner adopts it; do not alter
-consumer package versions as part of navigation setup.
+The caps in [local navigation](LOCAL-NAVIGATION.md) fit the ForgeSworn checkouts
+measured on 27 September 2026, including feature worktrees and a Flutter monorepo
+with its Dart source. If a root still exceeds one, the refresh fails and says which cap.
+Measure the root first. Exclude generated or vendored trees, or bulky material
+the work does not need, with `.gitignore` or `.z1p-navigation.json`, and record
+the limited scope. A committed `.z1p-navigation.json` reaches every developer
+through Git, so agree it with the repository owner. Do not silently drop files
+to manufacture successful coverage, and do not alter consumer package versions
+as part of navigation setup. Raising the caps is a release change backed by
+measurements, not a local setting.

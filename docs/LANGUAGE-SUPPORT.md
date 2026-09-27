@@ -2,6 +2,8 @@
 
 Updated for 0.3.2 on 22 September 2026. The original audit used 0.3.1
 (`bb83fa3`); the six suffix eligibility gaps found there are fixed in 0.3.2.
+The `.dart` row changed on 27 September 2026, when navigation and `build` packets
+began accepting Dart.
 This is a selected capability audit, not a complete language manifest. Source
 allowlists establish eligibility; ignores, selection policy and resource bounds
 can still exclude eligible files.
@@ -14,7 +16,7 @@ can still exclude eligible files.
 | `.cc`, `.cxx` | Yes | C++ lexical extraction | Yes | Unsupported |
 | `.h` | Yes | Classified as C; lexical extraction | Yes | Unsupported |
 | `.hh`, `.hpp`, `.hxx` | Yes | C++ lexical extraction | Yes | Unsupported |
-| `.dart` | Excluded | Unsupported | Rejected | Unsupported |
+| `.dart` | Yes | Unsupported | Yes | Unsupported |
 | `.ts` | Yes | Not handled by this scanner; separate TS/JS scanner exists | Yes | TypeScript syntax blocks |
 
 The source contracts are
@@ -45,14 +47,18 @@ TypeScript parsing; rejection is not a parser failure on those languages.
   search and reject packets. Syntax planning still rejects these suffixes.
 - [Broad scanner tests](../packages/context-tools/src/broad-source-scan.test.ts)
   cover declarations and lexical provenance for all six suffixes and uppercase
-  `.HPP`. Dart remains explicitly unsupported in scanning and MCP retrieval.
+  `.HPP`. The broad scanner still infers no Dart declarations, and a test says so.
+- The [MCP packet tests](../packages/context-tools/src/repository-packet-mcp.test.ts)
+  also cover Dart: exact search and `build` packets return it, and `plan` packets
+  reject it with the planner's unsupported-extension error. This is exact-token
+  navigation only; there is no Dart parser, import resolution or pub package evidence.
 - [Installed package smoke](../test/context-package-smoke.mjs) retrieves all six
   suffixes through the installed stdio MCP server outside the workspace.
 - Existing packet tests retain TS/JS syntax support and path/policy boundaries.
   These tests establish source retrieval and lexical coverage, not compiler-level
   understanding or complete evidence for an arbitrary development task.
 
-Dart extraction and deeper Kotlin/C++ parsing remain separate work. A running
+Dart declaration extraction and deeper Kotlin/C++ parsing remain separate work. A running
 MCP server needs a reconnect after upgrading its implementation; refreshing the
 source index alone does not load new server code. Measure benefits on actual
 accepted tasks; no token or subscription saving follows from suffix coverage.

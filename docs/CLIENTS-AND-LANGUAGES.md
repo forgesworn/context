@@ -106,7 +106,7 @@ do not silently scan the parent workspace.
 | Kotlin / Java | Lexical declaration inference; no meaningful compiler-resolved import/type/call graph | Parsed declarations/imports; package/module and Gradle dependency evidence, then explicitly qualified references. Do not execute Gradle scripts during indexing |
 | Python | Lexical declarations and conservative relative-import guesses | Parsed scopes/imports and useful references; explicit environment/package assumptions; no import execution |
 | C / C++ | Lexical declarations and quoted-include guesses; selected suffix gaps aligned in 0.3.2 | Parse declarations/includes; distinguish build-config/preprocessor-dependent and FFI edges |
-| Dart / Flutter | Absent from both the navigation allowlist and broad extractor | Add declared support and fixtures, then parsed imports/exports/parts and declarations with pub package/version evidence; no claim that adding `.dart` is semantic support |
+| Dart / Flutter | Lexical navigation and exact `build` packets; absent from the broad extractor and `plan` packets | Parsed imports/exports/parts and declarations with pub package/version evidence; lexical indexing is not semantic support |
 | Swift | Lexical declarations; no module/type/call resolution | Parsed declarations/imports with selected package/build metadata and explicit unresolved cases |
 | Vue / Svelte, SQL and build/config contracts | Dedicated parsing absent from these source extractors | Confirm use in selected projects; add component/script boundaries or schema/config relationships only against actual tasks |
 | Go, C#, Ruby, PHP | Conservative lexical extraction; some local-import guesses | Retain explicit support level; deepen when an accepted task needs it |

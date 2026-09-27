@@ -66,7 +66,7 @@ CONTEXT_CLI="$CONTEXT_SOURCE/packages/context-tools/bin/encrypted-context.mjs"
 "$CONTEXT_NODE" "$CONTEXT_CLI" --help
 ```
 
-Help must include `navigate <directory>`. This checks the executable, not the
+Help must include `navigate`. This checks the executable, not the
 presence of every MCP tool; step 4 checks that. Installation may download npm
 dependencies; normal repository retrieval does not require network access.
 
@@ -84,6 +84,9 @@ Run these blocks in the same shell so the variables remain available. Keep the
 Context checkout in place: client configuration points at its built files.
 The server command is `NODE CLI navigate REPOSITORY`; it is a stdio service,
 so starting it by hand waits for a client rather than printing a scan report.
+Builds that show `navigate [directory]` in help also accept `NODE CLI navigate`
+with no directory: the process binds the canonical Git top level of the directory
+it is started in, and keeps that root until it exits.
 
 ## 2. Connect your client
 
@@ -152,12 +155,33 @@ in the CLI or the MCP settings in your client. See the
 [official OpenAI MCP documentation](https://developers.openai.com/codex/mcp).
 
 These paths are machine-specific. Keep the local configuration out of commits,
-or use a reviewed team template with per-developer setup. Do not install a global
-binding to one fixed repository and assume it follows every project you open.
+or use a reviewed team template with per-developer setup. A global entry that
+names one directory stays bound to that repository in every project you open.
+The no-directory form relies on the client starting the server in the project's
+directory; Codex documents a `cwd` option but not its default, and this has not
+been checked, so keep explicit roots for Codex.
 
 ### Claude Code
 
-From the selected checkout, using the variables from step 1:
+**One binding for every checkout.** With a build that accepts `navigate` without
+a directory, add one user-scope entry:
+
+```sh
+claude mcp add --scope user --transport stdio z1p-repository -- \
+  "$CONTEXT_NODE" "$CONTEXT_CLI" navigate
+claude mcp get z1p-repository
+```
+
+Claude Code starts stdio servers in the session's working directory, so each
+session binds the checkout or worktree it starts in, including from a
+subdirectory. The server's instructions name the bound root. Outside a Git
+checkout the server exits with an error and shows as failed for that session
+only. A session that moves to another worktree after starting keeps its original
+root; start a new session there. A local- or project-scope entry with the same
+name overrides this one in that project, so remove stale per-project entries.
+
+**One explicit checkout.** From the selected checkout, using the variables from
+step 1:
 
 ```sh
 cd "$CONTEXT_REPO"
@@ -248,11 +272,11 @@ See [source packets](WORKER-PACKETS.md) for the complete contract.
 | Move into a subdirectory of the same checkout | Keep the same repository-root binding |
 | Edit, add or delete relevant source | Refresh before relying on updated evidence; obtain new packets |
 | Switch/create a branch, pull, merge or rebase | Refresh and obtain new packets; the server can stay running at the same root |
-| Create or enter another Git worktree | Configure that worktree's explicit absolute root and use a separate session/server; check for inherited settings still pointing at the original checkout |
-| Change to another repository | Use its own binding; `cd` does not retarget an existing server |
-| Move or rename a checkout | Update the path in the client configuration and reconnect; path-scoped client settings may also need recreating |
+| Create or enter another Git worktree | Start a separate session there. The no-directory entry binds it; with explicit roots, configure that worktree's absolute root and check for inherited settings still pointing at the original checkout |
+| Change to another repository | Start a session there; `cd` does not retarget an existing server. With explicit roots, give it its own binding |
+| Move or rename a checkout | The no-directory entry needs nothing. With explicit roots, update the path in the client configuration and reconnect; path-scoped client settings may also need recreating |
 | Upgrade/rebuild Context | Reconnect so the process loads the new implementation; refreshing source is insufficient |
-| Another developer uses the project | Each developer installs Context and binds their local checkout; no shared filesystem paths or central index are assumed |
+| Another developer uses the project | Each developer installs Context and adds their own entry; the one-line user-scope entry covers all their checkouts. Committed `.gitignore` and `.z1p-navigation.json` files reach them through Git. No shared filesystem paths or central index are assumed |
 
 Navigation freshness covers the bounded file manifest and selection policy,
 not branch names or the whole repository. Identical indexed files on two
@@ -269,15 +293,17 @@ stable checkout to bind.
 | No repository tools | Correct project config scope, executable paths, project trust and reconnect |
 | Only three to five tools | Installed/build revision predates `repository_packet` (0.3.0) or `repository_explore` and `repository_coverage` (0.4.0), or the client's tool allowlist omits them |
 | Packet tool advertises no arguments | Use a build with the top-level object-schema fix and reconnect |
-| Wrong root | Stop using the binding; correct the exact checkout/worktree path and reconnect |
+| Wrong root | Stop using the binding; start the session in the intended checkout, or correct the explicit path, and reconnect |
+| Server failed in one session only | With the no-directory entry, that session started outside a Git checkout; there is nothing to bind |
+| Refresh fails on a build cap | See [a repository over the build caps](NAVIGATION-POLICY.md#a-repository-over-the-build-caps) |
 | Stale or unknown evidence / generation mismatch | Inspect status, refresh successfully, and use the newly returned generation |
 | Excluded or unsupported source | Inspect policy/exclusion metadata and use a bounded direct-read fallback; do not silently broaden scope |
 | Response exceeds budget | Select a smaller sufficient block or split the evidence request |
 | Packet queue is full | Wait for queued packet requests to finish; up to eight wait behind the running one |
 | Git HEAD error | Select a Git checkout with a commit; packet provenance requires it |
 
-There is no automatic watcher, worktree rebinding or configuration-writing setup
-command yet. `doctor` checks a fresh process; it cannot retarget a running client.
+There is no automatic watcher, mid-session rebinding or configuration-writing
+setup command yet. `doctor` checks a fresh process; it cannot retarget a running client.
 Git ignores and selection policy apply; hidden files, symlinks, generated
 directories and unsupported suffixes are excluded. `node_modules` is not indexed,
 and local navigation does not automatically resolve a published package back to
