@@ -7,7 +7,7 @@
 // local.json (private, machine-specific): { evidence, roots: { context, kithmoot }, node, contextCli, graphifyBin, graphifyAlwaysOn }
 import { spawn, spawnSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
-import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { appendFileSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { checkScope } from '../code-acceptance-20260923/scope.mjs'
@@ -348,6 +348,9 @@ async function runArm({ taskId, arm, orderIndex, local, evidence, skipReview }) 
   receipt.armSeconds = (receipt.setup.graphify?.seconds ?? 0) + exec.seconds + checker.seconds + (receipt.reviewerRun?.seconds ?? 0)
   receipt.finishedAt = now()
   writeFileSync(receiptPath, JSON.stringify(receipt, null, 2))
+  // node_modules is untracked and rebuilt by npm ci from the frozen lockfile; keeping it costs ~300 MB per arm.
+  // The answer, the agent's edits and diff.patch stay, so rescoring and review still work.
+  rmSync(join(workspace, 'node_modules'), { recursive: true, force: true })
   return receipt
 }
 
