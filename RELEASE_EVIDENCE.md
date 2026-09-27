@@ -4,6 +4,42 @@ Latest implementation and adoption results are in the
 [dogfood execution ledger](docs/DOGFOOD-EXECUTION.md). The dated snapshots below
 remain historical evidence; internal pilot acceptance is separate from G0–G4.
 
+## 0.4.2 shipment checks, 27 September 2026
+
+Local navigation widened so one client entry can serve every ordinary
+checkout:
+
+- The build caps rise to 600,000 indexed lines, six million postings, 128 MiB
+  of source and 50,000 files. Nine ordinary ForgeSworn checkouts, several of
+  them feature worktrees, had failed on the old 100,000-line cap. Single local
+  runs with no scope files refreshed all nine; the largest indexed 307,510
+  lines and 2.1 million postings at about 385 MiB resident.
+- `.dart` is indexed lexically and returned by `build` packets; `plan`
+  packets still reject it. This is exact-token support, not Dart parsing.
+- `navigate` with no directory binds the canonical Git top level of the
+  directory it starts in, for the life of the process, and exits with an
+  error outside a checkout. `navigate <directory>` is unchanged.
+- The server instructions name the bound root, so a client can compare it
+  with its own checkout without a status call.
+
+`@forgesworn/context` is unchanged apart from its version, kept in step with
+the tools package.
+
+Local Node 24.21.0 checks from `npm ci --ignore-scripts` passed 456 tests,
+independent packed-package smoke (now including Dart and a no-directory
+launch), navigation stdio smoke, 22 scale tests and the 10k postings probe.
+Both unchanged benchmark gates passed with required-source recall 1.0: raw
+evidence 36.88x, navigation 364.57x (the baseline is this repository's own
+source, so the figures move with it).
+
+Client acceptance of the no-directory entry in Claude Code is not yet
+recorded. The setup guide keeps Codex on explicit roots because its default
+server working directory has not been checked.
+
+Measured benefit: none shown. These changes widen coverage and were not
+measured on an executor. No token, subscription or cash saving is claimed.
+Reconnect existing MCP servers after upgrading.
+
 ## 0.4.1 shipment checks, 23 September 2026
 
 A `repository_packet` follow-up from a model-free reading of the 0.4.0 cost
