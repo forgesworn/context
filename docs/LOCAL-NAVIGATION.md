@@ -33,9 +33,14 @@ process memory and may enter operating-system swap or client transcripts. A
 local agent's OS permissions are the access boundary; this is not a multi-user
 service and is never implicitly enabled by room membership.
 
-The first integration must use a separate stdio command with one explicit root,
-no arbitrary path arguments on tools, and no network transport. Existing signed
-`context_*` tools and their cache remain unchanged.
+The integration is a separate stdio command bound to one root for the life of
+the process, with no arbitrary path arguments on tools and no network transport.
+`navigate <directory>` names that root. `navigate` with no directory binds the
+canonical Git top level of the directory the client starts it in, so one client
+entry serves each checkout or worktree a session starts in; outside a checkout it
+exits with an error. Either way the root never changes after start, and the
+server's instructions name it so the client can compare it with its own checkout.
+Existing signed `context_*` tools and their cache remain unchanged.
 
 ## Acceptance
 
@@ -157,15 +162,24 @@ cursor usable. At most 128 independent continuations may be active per process,
 but advancing one chain replaces its slot, so there is no 128-page ceiling.
 Restarting the process or successfully refreshing invalidates all cursors.
 
-The build caps are 10,000 files, 32 MiB raw input, 1 MiB per file, 100,000 indexed
-lines, one million token postings, depth 16 and 100,000 directory entries.
+The build caps are 50,000 files, 128 MiB raw input, 1 MiB per file, 600,000
+indexed lines, six million token postings, depth 16 and 100,000 directory entries.
 Quota overflow or an unexpected read/decode failure rejects the entire refresh
 and retains the previous generation. These are bounded-input limits, not a
 promise that every repository of that size fits process memory.
 
+The caps were raised from 10,000 files, 32 MiB, 100,000 lines and one million
+postings after nine ordinary ForgeSworn checkouts, several of them feature
+worktrees, hit the old line cap. Single runs on 27 September 2026, with no scope
+files, measured the largest at 307,510 indexed lines, 2.1 million postings and
+17.5 MiB of source, with a navigate process of about 420 MiB resident after
+refresh; an idle process is about 185 MiB. Each client session holds its own
+index, so concurrent sessions on one large checkout each pay that memory.
+
 Supported suffixes: `.ts`, `.tsx`, `.js`, `.jsx`, `.mts`, `.cts`, `.mjs`, `.cjs`,
-`.py`, `.rs`, `.go`, `.java`, `.kt`, `.swift`, `.c`, `.cpp`, `.h`, `.cs`, `.rb`,
-`.php`, `.md`. This is lexical navigation, not language-aware parsing. Hidden
+`.py`, `.rs`, `.go`, `.java`, `.kt`, `.kts`, `.swift`, `.c`, `.cc`, `.cpp`, `.cxx`,
+`.h`, `.hh`, `.hpp`, `.hxx`, `.cs`, `.rb`, `.php`, `.dart`, `.md`. This is lexical
+navigation, not language-aware parsing. Hidden
 entries and `node_modules`, `dist`, `build`, `coverage`, `out`, `vendor`, `target` are
 excluded. Lines over 2,048 UTF-8 bytes are excluded and counted. Files without
 an allowed suffix are excluded. Root and nested `.gitignore` files and optional

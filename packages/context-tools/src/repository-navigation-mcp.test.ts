@@ -1,10 +1,17 @@
 import { afterEach, describe, expect, it } from 'vitest'
-import { mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { execFile } from 'node:child_process'
+import { mkdir, mkdtemp, realpath, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { fileURLToPath } from 'node:url'
+import { promisify } from 'node:util'
 import { Client } from '@modelcontextprotocol/sdk/client/index.js'
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js'
-import { createRepositoryNavigationServer } from './repository-navigation-mcp.js'
+import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js'
+import { createRepositoryNavigationServer, resolveCheckoutRoot } from './repository-navigation-mcp.js'
+
+const exec = promisify(execFile)
+const CLI = fileURLToPath(new URL('../bin/encrypted-context.mjs', import.meta.url))
 
 const created: string[] = []
 
@@ -54,12 +61,16 @@ afterEach(async () => {
 describe('repository navigation MCP adapter', () => {
   it('keeps the per-session instructions and tool listing within a fixed byte budget', async () => {
     // Every client session carries this text before any work; it was 8207 bytes
-    // before the trim recorded in docs/SAVINGS-PLAN.md.
+    // before the trim recorded in docs/SAVINGS-PLAN.md. The bound root varies by
+    // machine, so its own bytes are outside the fixed budget.
     const root = await makeRoot()
     const { client, serverClose } = await connect(root)
     try {
       const { tools } = await client.listTools()
-      const bytes = Buffer.byteLength(client.getInstructions() ?? '') +
+      const instructions = client.getInstructions() ?? ''
+      const canonical = await realpath(root)
+      expect(instructions).toContain(`one checkout: ${canonical}.`)
+      const bytes = Buffer.byteLength(instructions) - Buffer.byteLength(canonical) +
         tools.reduce((sum, tool) => sum + Buffer.byteLength(JSON.stringify(tool)), 0)
       expect(bytes).toBeLessThanOrEqual(6200)
     } finally {
@@ -520,4 +531,61 @@ describe('repository navigation MCP compact rendering and explore', () => {
       await serverClose()
     }
   })
+})
+
+describe('navigate without a directory', () => {
+  async function checkout(): Promise<string> {
+    const parent = await realpath(await mkdtemp(join(tmpdir(), 'repo-nav-root-')))
+    created.push(parent)
+    const root = join(parent, 'main checkout')
+    await mkdir(join(root, 'src', 'nested'), { recursive: true })
+    await writeFile(join(root, 'src', 'alpha.ts'), 'export const alphaToken = 1\n')
+    await exec('git', ['init', '-q', root])
+    await exec('git', ['-C', root, 'add', '.'])
+    await exec('git', ['-C', root, '-c', 'user.name=Root fixture', '-c', 'user.email=root@example.invalid',
+      '-c', 'commit.gpgsign=false', '-c', 'core.hooksPath=/dev/null', 'commit', '-qm', 'Fixture'])
+    return root
+  }
+
+  it('binds the Git top level of a subdirectory, and a linked worktree to itself', async () => {
+    const root = await checkout()
+    expect(await resolveCheckoutRoot(join(root, 'src', 'nested'))).toBe(root)
+    const linked = join(root, '..', 'linked worktree')
+    await exec('git', ['-C', root, 'worktree', 'add', '-q', '--detach', linked, 'HEAD'])
+    expect(await resolveCheckoutRoot(join(linked, 'src'))).toBe(linked)
+  })
+
+  it('ignores an inherited GIT_DIR, as packets do', async () => {
+    const root = await checkout()
+    const other = await checkout()
+    process.env.GIT_DIR = join(other, '.git')
+    try {
+      expect(await resolveCheckoutRoot(join(root, 'src'))).toBe(root)
+    } finally {
+      delete process.env.GIT_DIR
+    }
+  })
+
+  it('refuses a directory outside any checkout', async () => {
+    const outside = await realpath(await mkdtemp(join(tmpdir(), 'repo-nav-outside-')))
+    created.push(outside)
+    await expect(resolveCheckoutRoot(outside)).rejects.toThrow(/not inside a Git checkout/)
+    await expect(exec(process.execPath, [CLI, 'navigate'], { cwd: outside })).rejects.toMatchObject({
+      code: 1, stderr: expect.stringMatching(/not inside a Git checkout/),
+    })
+  }, 20000)
+
+  it('serves the checkout containing the working directory over stdio', async () => {
+    const root = await checkout()
+    const client = new Client({ name: 'session-root-test', version: '0.0.0' })
+    await client.connect(new StdioClientTransport({ command: process.execPath, args: [CLI, 'navigate'], cwd: join(root, 'src', 'nested'), stderr: 'pipe' }))
+    try {
+      expect(client.getInstructions()).toContain(`one checkout: ${root}.`)
+      const refreshed = (await client.callTool({ name: 'repository_refresh', arguments: {} })) as { isError?: boolean; content: Array<{ text: string }> }
+      expect(refreshed.isError).not.toBe(true)
+      expect(JSON.parse(refreshed.content[0].text).root).toBe(root)
+    } finally {
+      await client.close()
+    }
+  }, 20000)
 })

@@ -75,7 +75,7 @@ export const view = await vault.create({ title: 'Independent consumer', scope: '
   const packetRoot = join(toolsConsumer, 'packet-repository')
   mkdirSync(packetRoot)
   writeFileSync(join(packetRoot, 'example.ts'), 'export function example() {\n  return 1\n}\n')
-  for (const extension of ['kts', 'cc', 'cxx', 'hh', 'hpp', 'hxx']) {
+  for (const extension of ['kts', 'cc', 'cxx', 'hh', 'hpp', 'hxx', 'dart']) {
     writeFileSync(join(packetRoot, 'example.' + extension), 'class InstalledSuffixMarker {}\n')
   }
   const git = args => execFileSync('git', ['-C', packetRoot, ...args], { stdio: 'pipe', env: Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith('GIT_'))) })
@@ -93,6 +93,7 @@ export const view = await vault.create({ title: 'Independent consumer', scope: '
   assert.ok(!JSON.stringify(doctor).includes('export function'))
   execFileSync(process.execPath, ['--input-type=module', '-e', `
     import assert from 'node:assert/strict'
+    import { realpathSync } from 'node:fs'
     import { writeFile } from 'node:fs/promises'
     import { Client } from '@modelcontextprotocol/sdk/client/index.js'
     import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js'
@@ -126,8 +127,8 @@ export const view = await vault.create({ title: 'Independent consumer', scope: '
       assert.equal(value.packet.sources[0].endLine, 3)
       const found = await client.callTool({ name: 'repository_search', arguments: { term: 'InstalledSuffixMarker', format: 'json' } })
       assert.notEqual(found.isError, true, text(found))
-      assert.deepEqual(JSON.parse(text(found)).results.map(item => item.path).sort(), ['cc', 'cxx', 'hh', 'hpp', 'hxx', 'kts'].map(extension => 'example.' + extension))
-      for (const extension of ['kts', 'cc', 'cxx', 'hh', 'hpp', 'hxx']) {
+      assert.deepEqual(JSON.parse(text(found)).results.map(item => item.path).sort(), ['cc', 'cxx', 'dart', 'hh', 'hpp', 'hxx', 'kts'].map(extension => 'example.' + extension))
+      for (const extension of ['kts', 'cc', 'cxx', 'hh', 'hpp', 'hxx', 'dart']) {
         const path = 'example.' + extension
         const result = await client.callTool({ name: 'repository_packet', arguments: {
           mode: 'build', expectedGeneration: status.generation,
@@ -156,6 +157,15 @@ export const view = await vault.create({ title: 'Independent consumer', scope: '
       const refreshed = JSON.parse(text(await client.callTool({ name: 'repository_refresh', arguments: {} })))
       const result = await client.callTool({ name: 'repository_packet', arguments: { mode: 'plan', expectedGeneration: refreshed.generation, spec } })
       assert.notEqual(result.isError, true, text(result))
+    } finally { await client.close() }
+    // Without a directory, the server binds the checkout it is started in.
+    client = new Client({ name: 'packed-session-root-check', version: '1' })
+    await client.connect(new StdioClientTransport({ command: process.execPath, args: [cli, 'navigate'], cwd: root, stderr: 'pipe' }))
+    try {
+      const canonical = realpathSync(root)
+      assert.ok(client.getInstructions().includes('one checkout: ' + canonical + '.'))
+      const refreshed = JSON.parse(text(await client.callTool({ name: 'repository_refresh', arguments: {} })))
+      assert.equal(refreshed.root, canonical)
     } finally { await client.close() }
   `, cli, packetRoot], { cwd: toolsConsumer, stdio: 'pipe', timeout: 60000 })
   const ecosystem = join(toolsConsumer, 'ecosystem')

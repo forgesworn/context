@@ -107,7 +107,7 @@ describe('repository packet MCP adapter', () => {
     } finally { await connection.close() }
   })
 
-  it('continues to exclude Dart from navigation and reject its build and plan packets', async () => {
+  it('indexes Dart lexically: search and build packets return it, plan packets reject it', async () => {
     const value = await root()
     await writeFile(join(value, 'sample.dart'), 'class DartMarker {}\n')
     const connection = await connect(value)
@@ -116,13 +116,14 @@ describe('repository packet MCP adapter', () => {
       const expectedGeneration = JSON.parse(text(refreshed)).generation
       const found = await connection.client.callTool({ name: 'repository_search', arguments: { format: 'json', term: 'DartMarker' } })
       expect(found.isError).not.toBe(true)
-      expect(JSON.parse(text(found)).results).toEqual([])
-      for (const mode of ['build', 'plan']) {
-        const source = mode === 'build' ? { path: 'sample.dart', startLine: 1, endLine: 1 } : { path: 'sample.dart', line: 1 }
-        const result = await call(connection.client, { mode, expectedGeneration, spec: { ...spec([source]), allowedFiles: ['sample.dart'] } })
-        expect(result.isError).toBe(true)
-        expect(text(result)).toMatch(/extension is unsupported/)
-      }
+      expect(JSON.parse(text(found)).results.map((result: { path: string; line: number }) => [result.path, result.line])).toEqual([['sample.dart', 1]])
+      const fixtureSpec = (sources: unknown[]) => ({ ...spec(sources), allowedFiles: ['sample.dart'] })
+      const built = await call(connection.client, { mode: 'build', expectedGeneration, spec: fixtureSpec([{ path: 'sample.dart', startLine: 1, endLine: 1 }]) })
+      expect(built.isError).not.toBe(true)
+      expect(JSON.parse(text(built)).packet.sources[0].lines).toEqual([{ line: 1, content: 'class DartMarker {}' }])
+      const planned = await call(connection.client, { mode: 'plan', expectedGeneration, spec: fixtureSpec([{ path: 'sample.dart', line: 1 }]) })
+      expect(planned.isError).toBe(true)
+      expect(text(planned)).toMatch(/planner source extension is unsupported/)
     } finally { await connection.close() }
   })
 

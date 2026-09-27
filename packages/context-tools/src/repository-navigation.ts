@@ -116,11 +116,11 @@ export interface NavigationSearchOptions {
 }
 
 const DEFAULT_LIMITS: NavigationLimits = {
-  maxFiles: 10_000,
-  maxBytes: 32 * 1024 * 1024,
+  maxFiles: 50_000,
+  maxBytes: 128 * 1024 * 1024,
   maxFileBytes: 1024 * 1024,
-  maxLocations: 100_000,
-  maxPostings: 1_000_000,
+  maxLocations: 600_000,
+  maxPostings: 6_000_000,
   maxDepth: 16,
 };
 
@@ -128,7 +128,7 @@ const EXTENSIONS = new Set([
   '.ts', '.tsx', '.js', '.jsx', '.mts', '.cts', '.mjs', '.cjs',
   '.py', '.rs', '.go', '.java', '.kt', '.kts', '.swift',
   '.c', '.cc', '.cpp', '.cxx', '.h', '.hh', '.hpp', '.hxx',
-  '.cs', '.rb', '.php', '.md',
+  '.cs', '.rb', '.php', '.dart', '.md',
 ]);
 
 const EXCLUDED_DIRS = new Set([

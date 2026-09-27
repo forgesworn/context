@@ -58,7 +58,8 @@ complete syntax alone does not establish complete task evidence.
 
 Refresh after relevant edits, branch switches, pulls, merges or rebases, and
 obtain new packets. A shell directory change does not retarget the server. A
-different repository or worktree needs its own explicit binding; a moved checkout
+different repository or worktree needs its own binding: a session started there
+with the no-directory entry, or its own explicit root; a moved explicit checkout
 needs its configured path updated. Reconnect after binding or server implementation
 changes; source refresh alone cannot reload server code. Fall back to bounded
 `rg`/file reads for unavailable tools, excluded, unsupported or missing evidence.
