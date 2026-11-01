@@ -1,5 +1,9 @@
 # Local repository navigation bridge
 
+The fixed-root, in-memory bridge described below remains available. For optional
+encrypted persistence, file-preparation reuse and multi-agent activity in the
+global session, see [shared workspace](SHARED-WORKSPACE.md).
+
 Design: 21 September 2026. Implementation and acceptance are tracked below.
 
 Repository capacity and response size are different controls. Signed v1 remains

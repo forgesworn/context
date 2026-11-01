@@ -6,6 +6,9 @@ Every request explicitly selects a checkout; source stays local to the tools.
 
 Local code graphs and bounded evidence for coding agents.
 
+[Shared workspace](docs/SHARED-WORKSPACE.md): encrypted reusable indexes, resumable
+batch warm-up, and advisory agent activity and addressed notes across worktrees.
+
 **Use Context on your own machine and repositories:** follow the
 [Codex and Claude Code setup guide](docs/GETTING-STARTED.md), including current
 source-build availability, worktrees and first-request verification.

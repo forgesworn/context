@@ -346,8 +346,15 @@ test('rejects symlinks, oversized files and invalid UTF-8', async () => {
   await assert.rejects(buildPacket({ root, spec: await spec(root, base({ sources: [{ path: 'link.ts', startLine: 1, endLine: 1 }] })) }), /symlink/);
   await writeFile(join(root, 'bad.ts'), Buffer.from([0xff]));
   await assert.rejects(buildPacket({ root, spec: await spec(root, base({ sources: [{ path: 'bad.ts', startLine: 1, endLine: 1 }] })) }), /UTF-8/);
-  await writeFile(join(root, 'large.ts'), 'x'.repeat(1024 * 1024 + 1));
+  await writeFile(join(root, 'large.ts'), 'x'.repeat(2 * 1024 * 1024 + 1));
   await assert.rejects(buildPacket({ root, spec: await spec(root, base({ sources: [{ path: 'large.ts', startLine: 1, endLine: 1 }] })) }), /exceeds/);
+});
+
+test('retrieves bounded evidence from a legitimate source file between one and two MiB', async () => {
+  const root = await fixture();
+  await writeFile(join(root, 'large-source.ts'), 'export const largeSourceMarker = 1;\n' + '// bounded fixture filler\n'.repeat(50000));
+  const packet = await buildPacket({ root, spec: await spec(root, base({ allowedFiles: ['large-source.ts'], sources: [{ path: 'large-source.ts', startLine: 1, endLine: 1 }] })) });
+  assert.equal(packet.sources[0].lines[0].content, 'export const largeSourceMarker = 1;');
 });
 
 test('enforces source quota', async () => {

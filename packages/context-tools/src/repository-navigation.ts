@@ -1,4 +1,5 @@
 import { createHash, randomUUID } from 'node:crypto';
+import { workspaceKey, type WorkspaceStore } from './workspace-store.js';
 import { constants as fsConstants, promises as fsp } from 'node:fs';
 import * as path from 'node:path';
 import {
@@ -66,6 +67,7 @@ export interface NavigationStatus {
   exclusions: NavigationExclusions;
   limits: NavigationLimits;
   cursors: number;
+  reuse?: { restored: boolean; reusedFiles: number; parsedFiles: number; removedFiles: number };
 }
 
 export type NavigationFreshness = 'unavailable' | 'current' | 'stale' | 'unknown';
@@ -119,7 +121,7 @@ export interface NavigationSearchOptions {
 const DEFAULT_LIMITS: NavigationLimits = {
   maxFiles: 50_000,
   maxBytes: 128 * 1024 * 1024,
-  maxFileBytes: 1024 * 1024,
+  maxFileBytes: 2 * 1024 * 1024,
   maxLocations: 600_000,
   maxPostings: 6_000_000,
   maxDepth: 16,
@@ -163,6 +165,7 @@ const VISITED_ENTRIES_CAP = 100_000;
 const YIELD_CHUNK = 100;
 
 interface IndexedLocation {
+  tokens: string[];
   path: string;
   line: number;
   text: string;
@@ -170,6 +173,7 @@ interface IndexedLocation {
 }
 
 interface IndexedFile {
+  oversizedLines: number;
   path: string;
   sha256: string;
   bytes: number;
@@ -177,6 +181,7 @@ interface IndexedFile {
 }
 
 interface Generation {
+  reuse?: { restored: boolean; reusedFiles: number; parsedFiles: number; removedFiles: number };
   id: string;
   builtAt: number;
   rootIdentity: RootIdentity;
@@ -437,15 +442,67 @@ export class RepositoryNavigation {
   private generation: Generation | null = null;
   private canonicalRoot: string | null = null;
   private refreshInFlight = false;
+  private cachedFiles: IndexedFile[] = [];
+  private reuse = { restored: false, reusedFiles: 0, parsedFiles: 0, removedFiles: 0 };
   private readonly cursors = new Map<string, Cursor>();
 
-  constructor(root: string, limits?: Partial<NavigationLimits>) {
+  constructor(root: string, limits?: Partial<NavigationLimits>, private readonly cache?: WorkspaceStore) {
     if (typeof root !== 'string' || root.length === 0) {
       throw new Error('RepositoryNavigation: root must be a non-empty string');
     }
     const resolved = resolveLimits(limits);
     this.limits = resolved.limits;
     this.rootInput = root;
+  }
+
+  /** Restore only after checking the selected root, limits, policy and live hashes.
+   * Cached cursors/IDs never cross processes. Stale file preparations can still
+   * be reused by the next explicit/lazy refresh after their hash is checked. */
+  async restoreFromCache(signal?: AbortSignal): Promise<boolean> {
+    if (!this.cache || this.generation) return false;
+    const rootIdentity = await this.resolveRoot(signal);
+    const saved = this.cache.get<any>(workspaceKey('index', rootIdentity.path));
+    if (!saved || saved.format !== 'navigation-files-v1' || !saved.rootIdentity ||
+        !sameRootIdentity(rootIdentity, saved.rootIdentity) ||
+        JSON.stringify(saved.limits) !== JSON.stringify(this.limits)) return false;
+    try {
+      if (!Array.isArray(saved.files) || saved.files.length > this.limits.maxFiles ||
+          !Array.isArray(saved.policyDirectories) || saved.policyDirectories.length > VISITED_ENTRIES_CAP ||
+          typeof saved.policyRevision !== 'string' || typeof saved.revision !== 'string') return false;
+      const locations: IndexedLocation[] = [], byToken = new Map<string, number[]>();
+      let postings = 0, bytes = 0;
+      const seen = new Set<string>();
+      for (const file of saved.files as IndexedFile[]) {
+        if (typeof file.path !== 'string' || !file.path || !isInsideRoot(rootIdentity.path, path.resolve(rootIdentity.path, file.path)) ||
+            path.isAbsolute(file.path) || seen.has(file.path) || !/^[a-f0-9]{64}$/.test(file.sha256) ||
+            !Number.isSafeInteger(file.bytes) || file.bytes < 0 || file.bytes > this.limits.maxFileBytes ||
+            !Number.isSafeInteger(file.oversizedLines) || file.oversizedLines < 0 || !Array.isArray(file.locations)) return false;
+        seen.add(file.path); bytes += file.bytes;
+        if (bytes > this.limits.maxBytes) return false;
+        let previousLine = 0;
+        for (const loc of file.locations) {
+          if (loc.path !== file.path || loc.sha256 !== file.sha256 || !Number.isSafeInteger(loc.line) || loc.line <= previousLine ||
+              typeof loc.text !== 'string' || utf8Len(loc.text) > MAX_LINE_BYTES || !Array.isArray(loc.tokens) ||
+              loc.tokens.length > MAX_LINE_BYTES || loc.tokens.some(t => typeof t !== 'string' || !/^[a-z_][a-z0-9_]{0,127}$/.test(t))) return false;
+          previousLine = loc.line;
+          if (locations.length >= this.limits.maxLocations) return false;
+          const index = locations.length; locations.push(loc);
+          for (const token of loc.tokens) {
+            if (++postings > this.limits.maxPostings) return false;
+            const list = byToken.get(token) ?? []; list.push(index); byToken.set(token, list);
+          }
+        }
+      }
+      const generation: Generation = { ...saved, id: randomUUID(), rootIdentity,
+        files: saved.files, locations, byToken, counts: { files: saved.files.length, bytes, locations: locations.length, postings } };
+      const freshness = await this.inspectFreshness(generation, signal);
+      throwIfAborted(signal);
+      this.cachedFiles = generation.files;
+      if (freshness.freshness !== 'current' || freshness.policy.freshness !== 'current') return false;
+      this.canonicalRoot = rootIdentity.path; this.generation = generation;
+      this.reuse = { restored: true, reusedFiles: generation.files.length, parsedFiles: 0, removedFiles: 0 };
+      return true;
+    } catch (error) { if (signal?.aborted) throw error; return false; }
   }
 
   /** Whether any generation has been built; cheap, unlike status(). */
@@ -515,6 +572,7 @@ export class RepositoryNavigation {
       exclusions: { ...exclusions },
       limits: { ...this.limits },
       cursors: this.cursors.size,
+      ...(this.cache ? { reuse: { ...this.reuse } } : {}),
     });
   }
 
@@ -541,9 +599,15 @@ export class RepositoryNavigation {
       }
       throwIfAborted(signal);
 
+      if (this.cache) {
+        const { byToken: _tokens, locations: _locations, ...snapshot } = gen;
+        this.cache.put(workspaceKey('index', rootIdentity.path), 'index', { ...snapshot, format: 'navigation-files-v1' });
+      }
       // Publish atomically. Successful refresh invalidates all cursors.
       this.canonicalRoot = rootIdentity.path;
       this.generation = gen;
+      this.reuse = gen.reuse!;
+      this.cachedFiles = [];
       this.cursors.clear();
       return this.makeStatus(gen, 'current', undefined, {
         freshness: 'current', digest: gen.policyRevision, summary: gen.policySummary,
@@ -1209,6 +1273,9 @@ export class RepositoryNavigation {
         if (!stat.isFile()) { exclusions.unsupported++; continue; }
         if (!policy.allows(rel, false, frame.scope)) { exclusions.policy++; continue; }
         if (!isSupportedPath(full)) { exclusions.unsupported++; continue; }
+        // Explicit generated-bundle naming policy, independent of file contents.
+        // Count large bundle/minified outputs instead of failing their entire source checkout.
+        if (stat.size > this.limits.maxFileBytes && /(?:\.min\.js|\.bundle\.js|-bundle\.js)$/i.test(name)) { exclusions.oversizedFiles++; continue; }
         const real = await fsp.realpath(full);
         throwIfAborted(signal);
         if (!isInsideRoot(root, real)) { exclusions.symlinks++; continue; }
@@ -1255,6 +1322,10 @@ export class RepositoryNavigation {
     const byToken = new Map<string, number[]>();
     let postings = 0;
     let totalBytes = 0;
+    const previous = this.generation && sameRootIdentity(rootIdentity, this.generation.rootIdentity)
+      ? this.generation.files : this.cachedFiles;
+    const previousByPath = new Map(previous.map(file => [file.path, file]));
+    let reusedFiles = 0, parsedFiles = 0;
 
     for (const entry of discovered) {
       if (signal?.aborted) {
@@ -1278,69 +1349,49 @@ export class RepositoryNavigation {
       }
       totalBytes += rawBytes;
       const sha256 = createHash('sha256').update(raw).digest('hex');
-      const lines = splitLines(content);
-      const fileLocs: IndexedLocation[] = [];
-      for (let i = 0; i < lines.length; i++) {
-        if (i % YIELD_CHUNK === 0) {
-          await yieldNow();
-          if (signal?.aborted) {
-            throw new Error('RepositoryNavigation: aborted');
-          }
+      const old = previousByPath.get(entry.rel);
+      let prepared: IndexedFile;
+      if (old?.sha256 === sha256 && old.bytes === rawBytes) {
+        prepared = old; reusedFiles++;
+      } else {
+        parsedFiles++;
+        const lines = splitLines(content), fileLocs: IndexedLocation[] = [];
+        let oversizedLines = 0;
+        for (let i = 0; i < lines.length; i++) {
+          if (i % YIELD_CHUNK === 0) { await yieldNow(); throwIfAborted(signal); }
+          const text = lines[i];
+          if (!text) continue;
+          if (utf8Len(text) > MAX_LINE_BYTES) { oversizedLines++; continue; }
+          const tokens = [...new Set(tokenizeLine(text))];
+          if (!tokens.length) continue;
+          if (fileLocs.length + locations.length >= limits.maxLocations) throw new Error(`RepositoryNavigation: maxLocations quota exceeded (${limits.maxLocations})`);
+          fileLocs.push({ path: entry.rel, line: i + 1, text, sha256, tokens });
         }
-        const text = lines[i];
-        if (text.length === 0) {
-          continue;
-        }
-        if (utf8Len(text) > MAX_LINE_BYTES) {
-          exclusions.oversizedLines++;
-          continue;
-        }
-        const tokens = new Set(tokenizeLine(text));
-        if (tokens.size === 0) {
-          continue;
-        }
-        if (locations.length >= limits.maxLocations) {
-          throw new Error(
-            `RepositoryNavigation: maxLocations quota exceeded (${limits.maxLocations})`,
-          );
-        }
-        if (postings + tokens.size > limits.maxPostings) {
-          throw new Error(
-            `RepositoryNavigation: maxPostings quota exceeded (${limits.maxPostings})`,
-          );
-        }
-        const loc: IndexedLocation = {
-          path: entry.rel,
-          line: i + 1,
-          text,
-          sha256,
-        };
-        const locIndex = locations.length;
-        locations.push(loc);
-        fileLocs.push(loc);
-        for (const token of tokens) {
+        prepared = { path: entry.rel, sha256, bytes: rawBytes, locations: fileLocs, oversizedLines };
+      }
+      exclusions.oversizedLines += prepared.oversizedLines;
+      for (let i = 0; i < prepared.locations.length; i++) {
+        if (i % YIELD_CHUNK === 0) { await yieldNow(); throwIfAborted(signal); }
+        const loc = prepared.locations[i];
+        if (locations.length >= limits.maxLocations) throw new Error(`RepositoryNavigation: maxLocations quota exceeded (${limits.maxLocations})`);
+        if (postings + loc.tokens.length > limits.maxPostings) throw new Error(`RepositoryNavigation: maxPostings quota exceeded (${limits.maxPostings})`);
+        const index = locations.length; locations.push(loc);
+        for (const token of loc.tokens) {
           let list = byToken.get(token);
-          if (list === undefined) {
-            list = [];
-            byToken.set(token, list);
-          }
-          list.push(locIndex);
-          postings++;
+          if (!list) { list = []; byToken.set(token, list); }
+          list.push(index); postings++;
         }
       }
-      indexedFiles.push({
-        path: entry.rel,
-        sha256,
-        bytes: rawBytes,
-        locations: fileLocs,
-      });
+      indexedFiles.push(prepared);
     }
 
     if (signal?.aborted) {
       throw new Error('RepositoryNavigation: aborted');
     }
 
+    const newPaths = new Set(indexedFiles.map(file => file.path));
     return {
+      reuse: { restored: false, reusedFiles, parsedFiles, removedFiles: previous.filter(file => !newPaths.has(file.path)).length },
       id: randomUUID(),
       builtAt: Date.now(),
       rootIdentity,
