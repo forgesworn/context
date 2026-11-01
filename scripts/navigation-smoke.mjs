@@ -160,7 +160,7 @@ async function main() {
 
     const preserved = await call(active.client, 'repository_search', { term: 'navToken', maxResults: 1, maxBytes: 4096 });
     assert(typeof preserved.nextCursor === 'string', 'preservation cursor unavailable');
-    await writeFile(join(fixture, 'big.ts'), 'x'.repeat(1024 * 1024 + 1), { mode: 0o600 });
+    await writeFile(join(fixture, 'big.ts'), 'x'.repeat(2 * 1024 * 1024 + 1), { mode: 0o600 });
     await call(active.client, 'repository_refresh', {}, { expectError: true });
     const unknown = await call(active.client, 'repository_status', {});
     assert(unknown.generation === secondCurrent.generation, 'failed refresh replaced the prior generation');

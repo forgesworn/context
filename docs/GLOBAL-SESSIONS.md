@@ -24,6 +24,12 @@ still verify their exact root, HEAD and source selection before returning state.
 Use the same base across hosts for continuation. No keys or provider login are
 needed, and no signed context or project conversation history is imported.
 
+For a shared encrypted cache, catalogue/batch warm-up and advisory agent activity
+and notes, follow [shared workspace setup](SHARED-WORKSPACE.md). Add its explicit
+`--cache-dir` option to all host entries. It adds three tools; with private
+handovers enabled, the server advertises eleven. Without a cache, the original
+six/eight-tool mode remains unchanged.
+
 ## Host configuration
 
 - **Codex:** merge a user-level `[mcp_servers.z1p-repository]` entry into

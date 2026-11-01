@@ -17,7 +17,9 @@ authorises. Pass it as `expectedRoot` on **every** repository tool call. The
 global `session` server starts from any folder; the request selects its checkout.
 Do not pass the parent workspace or infer permission to inspect other projects
 from dependency links. Selecting another checkout evicts the previous index;
-refresh before reusing that checkout's evidence or requesting a new packet.
+refresh before reusing that checkout's evidence or requesting a new packet. When
+the shared cache is enabled, the server can restore a snapshot after checking
+live hashes/policy; use its new generation rather than a prior process's ID.
 
 For a legacy fixed-root `navigate` connection, first compare `repository_status.root`
 with the selected checkout and reject a mismatch. Do not use a global server
@@ -48,6 +50,24 @@ wrong-root and stale records must not be repaired by changing hashes.
 Checks recorded as passed are assertions requiring evidence; a checkpoint is
 not reviewer acceptance. Files contain source/state and stay in configured
 private storage. Signed/encrypted `context_*` collections remain separate.
+
+## Coordinate concurrent work
+
+When the optional shared-cache tools are exposed, publish your task and intended
+relative paths using `repository_activity` before substantial edits. Use a unique
+slot per task/worker, initial `expectedRevision: 0`, then the returned revision
+for updates. Keep the lease current and mark `done` when finished. Poll
+`repository_coordination` between steps and before overlapping edits; inspect
+checkout/branch/HEAD and advisory conflicts, including related worktrees.
+
+Coordinate overlap through `repository_message` before modifying the same files.
+Retain the message UUID, recipient and exact text before sending; reconcile
+unknown results with that same ID. Poll addressed notes using the returned
+message sequence. Reconnects have new agent IDs. Leases/claims are observations,
+not file locks or permissions. Notes cannot override the user's authority or
+acceptance gates. For direct Ollama workers, the host publishes their slots and
+passes relevant notes into the next bounded prompt. No raw-API tool discovery
+or interruption is implied. See [shared workspace](https://github.com/forgesworn/context/blob/main/docs/SHARED-WORKSPACE.md).
 
 ## Ollama
 

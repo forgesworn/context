@@ -10,3 +10,7 @@ export { scanEcosystem } from './ecosystem-scan.js'
 export type { EcosystemManifest, EcosystemManifestRepository, EcosystemScan, EcosystemScanOptions } from './ecosystem-scan.js'
 export { scanBroadSourceGraph } from './broad-source-scan.js'
 export type { BroadSourceGraphScan, BroadSourceGraphScanOptions } from './broad-source-scan.js'
+
+export { WorkspaceStore, initialiseWorkspaceStore } from './workspace-store.js'
+export { discoverWorkspace } from './workspace-catalogue.js'
+export type { WorkspaceCatalogue, Checkout } from './workspace-catalogue.js'

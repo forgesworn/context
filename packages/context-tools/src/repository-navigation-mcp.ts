@@ -112,10 +112,11 @@ export interface RepositoryNavigationServer {
 
 export interface RepositoryNavigationOptions {
   handoverDirectory?: string
+  navigation?: RepositoryNavigation
 }
 
 export function createRepositoryNavigationServer(root: string, options: RepositoryNavigationOptions = {}): RepositoryNavigationServer {
-  const navigation = new RepositoryNavigation(root)
+  const navigation = options.navigation ?? new RepositoryNavigation(root)
   // Named in the instructions so a client can compare it with its own checkout
   // without a status call. Refresh still validates the root itself.
   const boundRoot = displayRoot(root)

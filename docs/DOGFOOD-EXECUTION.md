@@ -1360,3 +1360,72 @@ Hosted CI, release bytes and the final installed binding are tracked with the
 PR/release; native calls above exercised the candidate build. A configured entry
 does not retrofit tools into an already-running conversation: reconnect or start
 a new session once after installation.
+
+
+## 1 November: shared encrypted workspace and concurrent agents
+
+The owner authorised a reusable workspace catalogue/cache across all checkouts,
+then added concurrent activity and communication across Kimi, Ollama, Codex and
+Claude. Context 0.7.0 implements the optional local SQLite store with compressed
+AES-256-GCM payloads and a dedicated private cache key. This changes local
+persistence, not the publisher/operator role: no hosted service, network runtime,
+model routing, automatic executor or authenticated multi-user service is added.
+The source selection, same-owner boundary and storage/retention limits are in
+[shared workspace](SHARED-WORKSPACE.md).
+
+The first fleet pass processed 366 discovered checkouts/worktrees: 344 indexed,
+22 failed. Twenty had legitimate source files around 1.1 MiB blocked by the
+existing 1 MiB file ceiling. Navigation and packets now permit 2 MiB, with a
+positive regression and unchanged response/aggregate bounds. The other two held
+large planner bundles. Bundle-named/minified JS above the ceiling is deliberately
+excluded and counted; other oversized source still fails. No checkout/source
+files or existing ignore policies were edited by the batch.
+
+A subsequent full pass processed **370/370** discovered checkouts/worktrees with
+zero failures. The initial 512 MiB payload budget evicted earlier snapshots;
+measurement justified a 2 GiB bounded budget. A missing-only refill retained
+all **370** catalogue roots, with about **797 MB** of encrypted payloads. The
+catalogue and batch are observations over a changing workspace: discovery is
+bounded, skipped/pruned/outside-workspace paths remain explicit, and current
+source freshness is checked when tools use a snapshot.
+
+One cold-index/warm-index pair each, with OS caches left intact and matching
+source revisions, measured Context 461/405 ms, KithMoot 939/905 ms and Oathrun
+817/636 ms. The warm runs reused all 195, 388 and 240 prepared files respectively,
+with zero files parsed again. These are small local observations, not a locked
+performance study, whole-task token/billing savings or broader scale completion.
+
+Real Codex, Claude and Kimi sessions started from the parent workspace, published
+advisory activity, sent UUID-addressed notes, observed receiver ACKs and marked
+their leases done. Each used five MCP calls. Codex/Claude observed a restored,
+current index; Kimi safely reported unavailable while the source was changing,
+and its activity/notes still worked. Direct Ollama workers remain represented
+by host-published slots and verified packets; raw inference is not an MCP host.
+All four skill environments share the usage guidance. Acceptance logs and the
+local receiver's three acknowledgements remain in private dated evidence.
+
+Independent read-only review found three P2 defects: the spawn/PID crash window,
+fatal candidate discovery errors, and repeated trailing path separators missing
+an overlap. Fixes publish a startup ticket before spawn, let the worker register
+its PID transactionally, add an independent IPC watchdog, record candidate errors
+and reject ambiguous path spelling. Follow-up review found no blocking defect,
+with static-review limits recorded. Additional regressions protect repository
+replacement at the same path and reject prototype-property recipient names.
+
+Deterministic package probes use separate installed MCP processes for concurrent
+claims/notes, cross-worktree overlap and project isolation; they exercise batch
+resume, stale worker tickets, a blocked orphan's hard watchdog, SQLite writer
+crash recovery, plaintext absence, live source invalidation and deleted-root
+cache removal. Full checks and unchanged benchmark gates are recorded separately
+from hosted CI, published-byte readback and final client configuration. Formal
+OS2 savings, wider OS5 qualification and G0–G4 remain open.
+
+
+The unchanged source-navigation gate caught an additional regression as the
+corpus grew: generic workspace matches could outrank a queried exported symbol.
+Graph ranking now reuses retrieval's BM25 scoring and prioritises exact
+code-shaped query identifiers over incidental words/filenames. Two counterexample
+tests were observed failing before their fixes. The original benchmark queries,
+71.5x thresholds, record/response budgets and recall gate remain unchanged and
+pass, as does the token-reduction gate. No collection/grant or traversal authority
+changes accompany the ordering fix.

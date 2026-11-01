@@ -70,6 +70,8 @@ export const view = await vault.create({ title: 'Independent consumer', scope: '
   const toolsConsumer = install('tools-consumer', [core, tools])
   checkNotices(toolsConsumer, '@forgesworn/context-tools')
   const cli = join(toolsConsumer, 'node_modules/@forgesworn/context-tools/bin/encrypted-context.mjs')
+  writeFileSync(join(toolsConsumer, 'workspace-probe.mjs'), readFileSync(join(checkout, 'test/workspace-package-probe.mjs')))
+  execFileSync(process.execPath, ['workspace-probe.mjs', cli], { cwd: toolsConsumer, stdio: 'pipe', timeout: 120000 })
   assert.match(execFileSync(process.execPath, [cli, '--help'], { encoding: 'utf8' }), /encrypted-context mcp/)
   // Exercise the installed stdio server: no checkout scripts or source imports.
   const packetRoot = join(toolsConsumer, 'packet-repository')

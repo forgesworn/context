@@ -16,6 +16,11 @@ export interface ContextCliOptions {
   configureVault?: (options: ContextVaultOptions) => ContextVaultOptions
 }
 export async function main(options: ContextCliOptions = {}): Promise<void> {
+  if (process.argv[2] === 'workspace') {
+    const { runWorkspaceCli } = await import('./workspace-cli.js')
+    process.stdout.write(JSON.stringify(await runWorkspaceCli(process.argv.slice(3)), null, 2) + '\n')
+    return
+  }
   if (process.argv[2] === 'handover') {
     const { runHandoverCli, formatHandoverError } = await import('./task-handover.mjs')
     try { await runHandoverCli(process.argv.slice(3)) }
@@ -33,11 +38,13 @@ export async function main(options: ContextCliOptions = {}): Promise<void> {
     term: { type: 'string' },
     'handover-dir': { type: 'string' },
     'handover-base': { type: 'string' },
+    'cache-dir': { type: 'string' },
   } })
   if (values.help) {
     process.stdout.write((options.name ?? 'encrypted-context') + ' mcp|call <tool> --identity <existing agent hex-key file> --expect-pubkey <agent hex pubkey> --state <encrypted cache> --room <room hex id> [--server <HTTPS origin> ...]\n' +
       (options.name ?? 'encrypted-context') + ' navigate [directory] [--handover-dir <existing private directory>]   (no directory: the Git checkout containing the working directory)\n' +
-      (options.name ?? 'encrypted-context') + ' session [--handover-base <existing private directory>]   (any working folder; expectedRoot required on every call)\n' +
+      (options.name ?? 'encrypted-context') + ' session [--handover-base <existing private directory>] [--cache-dir <initialised private directory>]   (any working folder; expectedRoot required on every call)\n' +
+      (options.name ?? 'encrypted-context') + ' workspace init|discover ROOT|warm ROOT|status ROOT|index ROOT|forget-index ROOT --cache-dir ABS [--resume|--missing-only] [--priority ABS] [--max-repositories N] [--timeout-ms N]\n' +
       (options.name ?? 'encrypted-context') + ' handover save --root ABS --packet ABS --state ABS --out ABS | handover resume --root ABS --handover ABS\n' +
       (options.name ?? 'encrypted-context') + ' doctor <repository-root> --term <known-identifier>\n' +
       (options.name ?? 'encrypted-context') + ' scan <directory> [--max-packages 64] [--max-depth 4] [--observed-at <epoch-seconds>]\n' +
@@ -48,11 +55,12 @@ export async function main(options: ContextCliOptions = {}): Promise<void> {
   }
   const integer = (value: string | undefined): number | undefined => value === undefined ? undefined : Number(value)
   if (positionals[0] === 'session') {
-    if (positionals.length !== 1 || Object.keys(values).some(key => key !== 'handover-base')) throw new Error('session only accepts --handover-base. See --help.')
+    if (positionals.length !== 1 || Object.keys(values).some(key => key !== 'handover-base' && key !== 'cache-dir')) throw new Error('session only accepts --handover-base and --cache-dir. See --help.')
     const { serveRepositorySessionMcp } = await import('./repository-session-mcp.js')
-    await serveRepositorySessionMcp({ handoverBase: values['handover-base'] })
+    await serveRepositorySessionMcp({ handoverBase: values['handover-base'], cacheDirectory: values['cache-dir'] })
     return
   }
+  if (values['cache-dir'] !== undefined) throw new Error('--cache-dir is only supported by session and workspace. See --help.')
   if (values['handover-base'] !== undefined) throw new Error('--handover-base is only supported by session. See --help.')
   if (positionals[0] === 'doctor') {
     if (positionals.length !== 2 || !values.term || Object.keys(values).some(key => key !== 'term')) {

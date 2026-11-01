@@ -1,6 +1,6 @@
 # Use Context in your own projects
 
-For Context 0.6.0 and newer, prefer the [global session setup](GLOBAL-SESSIONS.md)
+For Context 0.7.0 and newer, prefer the [global session setup](GLOBAL-SESSIONS.md)
 across Codex, Claude, Kimi and Ollama coding hosts. It starts from any folder and
 requires the selected canonical checkout as `expectedRoot` on each call. The
 fixed-root setup below remains available for deliberately restricted connections.
@@ -32,8 +32,8 @@ matching core version:
 mkdir context-install
 cd context-install
 npm init -y
-npm install --ignore-scripts /absolute/path/to/forgesworn-context-0.6.0.tgz \
-  /absolute/path/to/forgesworn-context-tools-0.6.0.tgz
+npm install --ignore-scripts /absolute/path/to/forgesworn-context-0.7.0.tgz \
+  /absolute/path/to/forgesworn-context-tools-0.7.0.tgz
 ```
 
 For that installation, use
