@@ -1,5 +1,5 @@
 /** Offline, unsigned task continuity over verified source packets. */
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { constants, promises as fs } from 'node:fs';
 import { dirname, isAbsolute, parse, resolve, join } from 'node:path';
 import { buildPacketFromSpec, serializePacket } from './source-packet.mjs';
@@ -93,8 +93,24 @@ export async function saveHandoverRecord({ root, packet, state, out, signal }) {
   assert(Buffer.byteLength(bytes) <= MAX_HANDOVER, 'handover too large');
   await ordinaryPath(out, true);
   signal?.throwIfAborted();
-  const file = await fs.open(out, constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | constants.O_NOFOLLOW, 0o600);
-  try { await file.writeFile(bytes, 'utf8'); await file.sync(); } finally { await file.close(); }
+  // Publish only a complete synced record. link() is atomic and refuses an
+  // existing destination, unlike rename(), which would replace it.
+  const temporary = join(dirname(out), '.checkpoint-' + randomUUID() + '.tmp');
+  let file;
+  try {
+    file = await fs.open(temporary, constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | constants.O_NOFOLLOW, 0o600);
+    signal?.throwIfAborted();
+    await file.writeFile(bytes, 'utf8');
+    await file.sync();
+    await file.close();
+    file = undefined;
+    await ordinaryPath(out, true);
+    signal?.throwIfAborted();
+    await fs.link(temporary, out);
+  } finally {
+    try { if (file) await file.close().catch(() => {}); }
+    finally { await fs.unlink(temporary).catch(() => {}); }
+  }
   return { format: FORMAT, status: state.status, bytes: Buffer.byteLength(bytes), packetSha256: record.packetSha256 };
 }
 

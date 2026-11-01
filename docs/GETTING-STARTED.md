@@ -27,8 +27,8 @@ matching core version:
 mkdir context-install
 cd context-install
 npm init -y
-npm install --ignore-scripts /absolute/path/to/forgesworn-context-0.4.3.tgz \
-  /absolute/path/to/forgesworn-context-tools-0.4.3.tgz
+npm install --ignore-scripts /absolute/path/to/forgesworn-context-0.5.0.tgz \
+  /absolute/path/to/forgesworn-context-tools-0.5.0.tgz
 ```
 
 For that installation, use
@@ -232,6 +232,14 @@ Codex also add `repository_handover_save` and `repository_handover_resume` to
 `enabled_tools`. Restart/reconnect each affected client. This explicitly enables
 checkpoint file operations; ordinary navigation retains its existing scope.
 See [task handovers](TASK-HANDOVERS.md) for save/resume and rejection cases.
+
+Create storage with `mkdir -m 700 /absolute/private/checkpoints`. It must have
+no group/other permission bits on POSIX. Configure its canonical path; macOS
+`/tmp` and `/var` are aliases. Print the path with Node before using it:
+
+```sh
+node -e 'console.log(require("node:fs").realpathSync(process.argv[1]))' /absolute/private/checkpoints
+```
 
 ## 3. Add a small instruction to your project
 

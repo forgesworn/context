@@ -1,4 +1,5 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
+import { lstatSync, realpathSync } from 'node:fs'
 import { join, isAbsolute, resolve } from 'node:path'
 import { z } from 'zod'
 import { formatHandoverError, resumeHandover, saveHandoverRecord } from './task-handover.mjs'
@@ -12,10 +13,18 @@ const saveSchema = identitySchema.extend({
 
 /** Explicitly enabled file operations, separate from read-only repository discovery. */
 export function registerRepositoryHandovers(server: McpServer, root: string, directory: string): void {
-  if (!isAbsolute(directory) || resolve(directory) !== directory) throw new Error('handover directory must be a canonical absolute path')
+  const checkDirectory = () => {
+    try {
+      const info = lstatSync(directory)
+      if (!isAbsolute(directory) || resolve(directory) !== directory || realpathSync(directory) !== directory ||
+        !info.isDirectory() || info.isSymbolicLink() || (process.platform !== 'win32' && (info.mode & 0o077))) throw new Error()
+    } catch { throw new Error('handover directory must be an existing canonical private directory (mode 0700 on POSIX)') }
+  }
+  checkDirectory()
   const location = (expectedRoot: string, name: string, signal: AbortSignal) => {
     signal.throwIfAborted()
     if (expectedRoot !== root) throw new Error('task-handover: repository binding does not match expectedRoot')
+    checkDirectory()
     return join(directory, name)
   }
   const response = (value: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(value) }] })

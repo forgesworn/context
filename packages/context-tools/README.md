@@ -6,12 +6,12 @@ ESM, Node 24+. Separate from the browser-safe core: filesystem and MCP
 dependencies never enter its root import. No KithMoot or NanoClaw runtime
 dependency.
 
-The 0.3.2 release tarballs include the setup doctor and require the matching core
+The 0.5.0 release tarballs include the setup doctor and require the matching core
 package. Follow the [installation guide](../../docs/GETTING-STARTED.md) to install
 both archives together. npm publication is pending; once published, use:
 
 ```sh
-npm install @forgesworn/context-tools@0.3.2
+npm install @forgesworn/context-tools@0.5.0
 ```
 
 The source is maintained in the public Z1P Core workspace. Build with
@@ -74,15 +74,18 @@ JSON with `format: "json"`. See the
 
 ## Check a repository installation
 
-Development builds add optional `expectedRoot` to all six navigation requests.
+Version 0.5.0 adds optional `expectedRoot` to all six navigation requests.
 Pass the canonical active checkout root to reject a mismatched connection before
 retrieval. Older callers remain compatible when the field is omitted.
 
-Development builds also package `encrypted-context handover save|resume` and
+Version 0.5.0 also packages `encrypted-context handover save|resume` and
 export `saveHandover`/`resumeHandover` from the package root. Start navigation with
 `--handover-dir /absolute/private/checkpoints` to enable the two bounded
 `repository_handover_save`/`repository_handover_resume` operations. The directory
-must already exist and checkpoint names cannot contain paths. Default navigation
+must already exist, have mode 0700 on POSIX and use its real path, with no symlink
+components. Create it with `mkdir -m 700`, and resolve its path with Node's
+`fs.realpathSync` (important for macOS `/tmp` and `/var` aliases). Checkpoint
+names cannot contain paths. Default navigation
 does not gain file-write tools. See [task handovers](../../docs/TASK-HANDOVERS.md).
 These additions are not in the previously released 0.4.3 tarballs.
 

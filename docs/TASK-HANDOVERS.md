@@ -5,7 +5,7 @@
 does not depend on Oathrun. Use Node 24+ and an installation containing the
 handover commands. In a source checkout use `.nvmrc` and `npm run build` first.
 
-CLI and MCP support are available in this development revision; the previously
+CLI and MCP support are included from version 0.5.0; the previously
 released 0.4.3 package does not include them. The original
 `node scripts/task-handover.mjs` remains a compatibility entrypoint.
 The person or agent doing the work supplies the state. A fresh session
@@ -64,9 +64,19 @@ encrypted-context handover resume \
 ```
 
 Use canonical absolute paths without symbolic-link components. Save refuses
-existing outputs and creates a file with mode `0600`. Keep it outside version
+existing outputs and creates a file with mode `0600`. Records are written and
+synced privately, then published with an exclusive hard link, so a failed write
+or sync/close cannot expose a partial checkpoint. Storage must support same-directory
+hard links. Cancellation is checked before publication; cancellation after an
+operation may have published still requires readback before any retry. Keep it outside version
 control: the record embeds the selected source as well as the task state. Use a
 new output for each checkpoint; no mutable shared latest pointer is maintained.
+
+A killed process or power loss can leave private `.checkpoint-*.tmp` files.
+They are never published checkpoints and cannot be resumed through MCP. Remove
+only confirmed orphan files after checking no save is using them; startup does
+not sweep them because another client may still be writing. Filesystem crash
+durability and hostile concurrent writers are outside this contract.
 
 ## Use handovers through MCP
 

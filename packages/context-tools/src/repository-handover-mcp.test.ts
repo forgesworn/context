@@ -1,6 +1,7 @@
-import { afterEach, expect, it } from 'vitest'
+import { afterEach, expect, it, vi } from 'vitest'
+import { constants, promises as fs } from 'node:fs'
 import { execFile } from 'node:child_process'
-import { mkdir, mkdtemp, realpath, readFile, readdir, rm, stat, symlink, writeFile } from 'node:fs/promises'
+import { chmod, mkdir, mkdtemp, realpath, readFile, readdir, rm, stat, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { promisify } from 'node:util'
@@ -12,7 +13,7 @@ import { saveHandoverRecord } from './task-handover.mjs'
 
 const exec = promisify(execFile)
 const roots: string[] = []
-afterEach(async () => { await Promise.all(roots.splice(0).map(root => rm(root, { recursive: true, force: true }))) })
+afterEach(async () => { vi.restoreAllMocks(); await Promise.all(roots.splice(0).map(root => rm(root, { recursive: true, force: true }))) })
 
 async function fixture() {
   const base = await realpath(await mkdtemp(join(tmpdir(), 'portable-handover-')))
@@ -108,13 +109,57 @@ it('refuses path escapes, symlinks, oversized records and false review readiness
   } finally { await c.close() }
 })
 
-it('cancellation during source verification prevents checkpoint creation', async () => {
+it('cancellation after opening a file prevents checkpoint publication and removes scratch', async () => {
   const f = await fixture(), controller = new AbortController()
-  const cancelled = setTimeout(() => controller.abort(), 0)
-  try {
-    await expect(saveHandoverRecord({ root: f.root, packet: f.packet, state: f.state,
-      out: join(f.directory, 'cancelled.json'), signal: controller.signal })).rejects.toThrow()
-    expect(controller.signal.aborted).toBe(true)
-    expect(await readdir(f.directory)).toEqual([])
-  } finally { clearTimeout(cancelled) }
+  const open = fs.open.bind(fs)
+  vi.spyOn(fs, 'open').mockImplementation(async (...args) => {
+    const handle = await open(...args)
+    if (String(args[0]).startsWith(f.directory + '/') && typeof args[1] === 'number' && (args[1] & constants.O_CREAT)) controller.abort()
+    return handle
+  })
+  await expect(saveHandoverRecord({ root: f.root, packet: f.packet, state: f.state,
+    out: join(f.directory, 'cancelled.json'), signal: controller.signal })).rejects.toThrow()
+  expect(controller.signal.aborted).toBe(true)
+  expect(await readdir(f.directory)).toEqual([])
+})
+
+it.each(['writeFile', 'sync', 'close'] as const)('%s failure never publishes a partial checkpoint', async method => {
+  const f = await fixture(), open = fs.open.bind(fs)
+  vi.spyOn(fs, 'open').mockImplementation(async (...args) => {
+    const handle = await open(...args)
+    if (String(args[0]).startsWith(f.directory + '/') && typeof args[1] === 'number' && (args[1] & constants.O_CREAT)) {
+      const write = handle.writeFile.bind(handle)
+      const close = handle.close.bind(handle)
+      vi.spyOn(handle, method).mockImplementationOnce(async () => {
+        if (method === 'writeFile') await write('partial record')
+        if (method === 'close') await close()
+        throw new Error('injected storage failure')
+      })
+    }
+    return handle
+  })
+  await expect(saveHandoverRecord({ root: f.root, packet: f.packet, state: f.state,
+    out: join(f.directory, 'failed.json') })).rejects.toThrow('injected storage failure')
+  expect(await readdir(f.directory)).toEqual([])
+})
+
+it('concurrent saves publish one complete checkpoint without overwriting or leaving scratch', async () => {
+  const f = await fixture(), out = join(f.directory, 'concurrent.json')
+  const results = await Promise.allSettled([1, 2].map(() => saveHandoverRecord({ root: f.root, packet: f.packet, state: f.state, out })))
+  expect(results.filter(r => r.status === 'fulfilled')).toHaveLength(1)
+  expect(results.filter(r => r.status === 'rejected')).toHaveLength(1)
+  expect(await readdir(f.directory)).toEqual(['concurrent.json'])
+  expect(JSON.parse(await readFile(out, 'utf8')).state).toEqual(f.state)
+})
+
+it('rejects missing, non-directory, symlinked and non-private handover storage at startup', async () => {
+  const f = await fixture(), alias = join(f.root, 'alias')
+  await symlink(f.directory, alias)
+  for (const directory of [join(f.root, 'absent'), join(f.root, 'example.ts'), alias]) {
+    expect(() => createRepositoryNavigationServer(f.root, { handoverDirectory: directory })).toThrow(/handover directory/)
+  }
+  if (process.platform !== 'win32') {
+    await chmod(f.directory, 0o755)
+    expect(() => createRepositoryNavigationServer(f.root, { handoverDirectory: f.directory })).toThrow(/handover directory/)
+  }
 })
