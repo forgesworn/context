@@ -11,20 +11,21 @@ const saveSchema = identitySchema.extend({
   state: z.record(z.string(), z.unknown()),
 }).strict()
 
+export function checkHandoverDirectory(directory: string): void {
+  try {
+    const info = lstatSync(directory)
+    if (!isAbsolute(directory) || resolve(directory) !== directory || realpathSync(directory) !== directory ||
+      !info.isDirectory() || info.isSymbolicLink() || (process.platform !== 'win32' && (info.mode & 0o077))) throw new Error()
+  } catch { throw new Error('handover directory must be an existing canonical private directory (mode 0700 on POSIX)') }
+}
+
 /** Explicitly enabled file operations, separate from read-only repository discovery. */
 export function registerRepositoryHandovers(server: McpServer, root: string, directory: string): void {
-  const checkDirectory = () => {
-    try {
-      const info = lstatSync(directory)
-      if (!isAbsolute(directory) || resolve(directory) !== directory || realpathSync(directory) !== directory ||
-        !info.isDirectory() || info.isSymbolicLink() || (process.platform !== 'win32' && (info.mode & 0o077))) throw new Error()
-    } catch { throw new Error('handover directory must be an existing canonical private directory (mode 0700 on POSIX)') }
-  }
-  checkDirectory()
+  checkHandoverDirectory(directory)
   const location = (expectedRoot: string, name: string, signal: AbortSignal) => {
     signal.throwIfAborted()
     if (expectedRoot !== root) throw new Error('task-handover: repository binding does not match expectedRoot')
-    checkDirectory()
+    checkHandoverDirectory(directory)
     return join(directory, name)
   }
   const response = (value: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(value) }] })

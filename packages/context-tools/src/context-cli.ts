@@ -32,10 +32,12 @@ export async function main(options: ContextCliOptions = {}): Promise<void> {
     'max-repositories': { type: 'string' },
     term: { type: 'string' },
     'handover-dir': { type: 'string' },
+    'handover-base': { type: 'string' },
   } })
   if (values.help) {
     process.stdout.write((options.name ?? 'encrypted-context') + ' mcp|call <tool> --identity <existing agent hex-key file> --expect-pubkey <agent hex pubkey> --state <encrypted cache> --room <room hex id> [--server <HTTPS origin> ...]\n' +
       (options.name ?? 'encrypted-context') + ' navigate [directory] [--handover-dir <existing private directory>]   (no directory: the Git checkout containing the working directory)\n' +
+      (options.name ?? 'encrypted-context') + ' session [--handover-base <existing private directory>]   (any working folder; expectedRoot required on every call)\n' +
       (options.name ?? 'encrypted-context') + ' handover save --root ABS --packet ABS --state ABS --out ABS | handover resume --root ABS --handover ABS\n' +
       (options.name ?? 'encrypted-context') + ' doctor <repository-root> --term <known-identifier>\n' +
       (options.name ?? 'encrypted-context') + ' scan <directory> [--max-packages 64] [--max-depth 4] [--observed-at <epoch-seconds>]\n' +
@@ -45,6 +47,13 @@ export async function main(options: ContextCliOptions = {}): Promise<void> {
     return
   }
   const integer = (value: string | undefined): number | undefined => value === undefined ? undefined : Number(value)
+  if (positionals[0] === 'session') {
+    if (positionals.length !== 1 || Object.keys(values).some(key => key !== 'handover-base')) throw new Error('session only accepts --handover-base. See --help.')
+    const { serveRepositorySessionMcp } = await import('./repository-session-mcp.js')
+    await serveRepositorySessionMcp({ handoverBase: values['handover-base'] })
+    return
+  }
+  if (values['handover-base'] !== undefined) throw new Error('--handover-base is only supported by session. See --help.')
   if (positionals[0] === 'doctor') {
     if (positionals.length !== 2 || !values.term || Object.keys(values).some(key => key !== 'term')) {
       throw new Error('Choose one repository root and --term <known-identifier>. doctor takes no other flags. See --help.')
