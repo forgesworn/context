@@ -190,7 +190,7 @@ export const view = await vault.create({ title: 'Independent consumer', scope: '
     const secondRoot = root + '-second'
     await mkdir(secondRoot)
     await writeFile(secondRoot + '/other.ts', 'export const other = 42')
-    execFileSync('git', ['init', '--quiet', secondRoot])
+    execFileSync('git', ['init', '--quiet', secondRoot], { env: Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith('GIT_'))) })
     async function openGlobal() {
       const c = new Client({ name: 'packed-global-session', version: '1' })
       await c.connect(new StdioClientTransport({ command: process.execPath, args: [cli, 'session', '--handover-base', globalBase], cwd: process.cwd(), stderr: 'pipe' }))
