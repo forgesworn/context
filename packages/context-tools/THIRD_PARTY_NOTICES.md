@@ -1,6 +1,6 @@
 # Third-party notices
 
-These notices accompany `@forgesworn/context-tools@0.7.0`. The package itself is
+These notices accompany `@forgesworn/context-tools@0.8.0`. The package itself is
 MIT licensed, Copyright (c) 2026 TheCryptoDonkey; see `LICENSE`.
 
 Runtime dependencies are installed separately by the package manager, not
@@ -9,9 +9,9 @@ notices below cover direct runtime dependencies; retain the licence files
 from transitive dependencies as well when redistributing an installation or
 bundle. Dependency versions and source links refer to this release.
 
-## @forgesworn/context@0.7.0
+## @forgesworn/context@0.8.0
 
-Declared licence: MIT. Source package: the matching core tarball in https://github.com/forgesworn/context/releases/tag/v0.7.0 and source at https://github.com/forgesworn/context/tree/v0.7.0/packages/context
+Declared licence: MIT. Source package: the matching core tarball in https://github.com/forgesworn/context/releases/tag/v0.8.0 and source at https://github.com/forgesworn/context/tree/v0.8.0/packages/context
 
 ```text
 MIT License

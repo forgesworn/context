@@ -135,6 +135,49 @@ the host publishes their slots, supplies relevant notes in the next bounded
 prompt and reviews their results. It cannot interrupt raw text inference through
 these tools.
 
+### Owner view: `workspace activity`
+
+The owner can list published activity across every checkout in the saved
+catalogue without joining the board:
+
+```sh
+NODE CLI workspace activity /absolute/workspace --cache-dir /absolute/private/z1p-cache
+NODE CLI workspace activity /absolute/workspace --cache-dir /absolute/private/z1p-cache \
+  --all --repo /absolute/workspace/project --limit 200 --max-bytes 131072 --timeout-ms 10000
+NODE CLI workspace activity /absolute/workspace --cache-dir /absolute/private/z1p-cache --json
+```
+
+The workspace must be a canonical absolute path with a saved catalogue (run
+`workspace discover` first; this command never discovers). `--repo` narrows the
+view to one exact canonical checkout root from that catalogue. By default only
+active rows appear; `--all` adds finished and expired (inactive) leases still retained.
+`--limit` caps rows (default 100, 1 to 500), `--max-bytes` caps the encoded
+snapshot (default 65536, 2048 to 262144) and `--timeout-ms` is a soft deadline
+(default 30000, 1 to 30000).
+
+The default output is columns: agent label and slot, state, task, checkout,
+reported branch@HEAD, intended files, last update (UTC) and lease expiry. Every
+displayed string is untrusted metadata: control, bidi, invisible and line-break
+characters are shown as visible escapes such as `\e`, `\n` or `\u{202e}`, and long
+fields or path lists end in `…` or `+N more`. `--json` prints the snapshot as
+compact JSON; its byte budget includes the final newline. Included row fields
+are untruncated, but snapshot limits can omit later rows. JSON escapes C0 controls,
+so bidi and other format
+characters remain in its strings; treat them as data before displaying them.
+
+Active means an unexpired advisory lease. It is not proof that a process is
+running, that source is current or that work is accepted. Branch and HEAD are
+what each agent last published, not the checkout's current state. When the view
+stops early it is marked `INCOMPLETE` with the stop reason (row limit, byte
+budget, deadline or unreadable checkout boards), any minimum byte requirement
+and per-checkout issues. An empty or incomplete view does not show that nobody
+is working. The command is one-shot: there is no watch mode or daemon. It does
+not publish or renew activity, read inbox notes, discover, warm or run source.
+It opens an existing cache database read-only; a missing database is an error,
+and the command does not initialise or repair it. Fatal CLI diagnostics are also
+escaped and capped at 4096 UTF-8 bytes. Source packets and inbox polling remain
+separate operations in the selected coding host.
+
 A board retains at most 128 agents and 256 notes. Old agent records (24 hours
 after lease expiry) and notes (seven days) are pruned on the board's next write.
 Full boards return a capacity error. Notes/task text are data, not instructions

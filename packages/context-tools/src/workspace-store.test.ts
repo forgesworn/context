@@ -33,3 +33,21 @@ it('rejects non-private storage and changed keys instead of silently creating pl
  await writeFile(join(dir,'key'),Buffer.alloc(32,7),{mode:0o600})
  const other=new WorkspaceStore(dir);try{expect(()=>other.get('index:x')).toThrow(/authenticate/)}finally{other.close()}
 })
+
+it('opens an existing cache read-only without creating or modifying database state', async () => {
+ const dir=await directory();await initialiseWorkspaceStore(dir)
+ const writer=new WorkspaceStore(dir);writer.put('board:read-only','board',{revision:3});writer.close()
+ const before=await readFile(join(dir,'workspace.sqlite')),names=await readdir(dir)
+ const reader=new WorkspaceStore(dir,undefined,{readOnly:true})
+ try {
+  expect(reader.get('board:read-only')).toEqual({revision:3})
+  expect(()=>reader.put('board:read-only','board',{revision:4})).toThrow(/read-only/)
+  expect(()=>reader.remove('board:read-only')).toThrow(/read-only/)
+  expect(()=>reader.transaction(()=>undefined)).toThrow(/read-only/)
+ }finally{reader.close()}
+ expect(await readFile(join(dir,'workspace.sqlite'))).toEqual(before)
+ expect(await readdir(dir)).toEqual(names)
+ await rm(join(dir,'workspace.sqlite'))
+ expect(()=>new WorkspaceStore(dir,undefined,{readOnly:true})).toThrow()
+ expect(await readdir(dir)).toEqual(['key'])
+})

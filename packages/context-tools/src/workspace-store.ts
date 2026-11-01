@@ -34,7 +34,7 @@ export class WorkspaceStore {
  private readonly key: Buffer
  private transactionOpen=false
  readonly directory: string
- constructor(directory: string, readonly budgetBytes=WORKSPACE_CACHE_BYTES) {
+ constructor(directory: string, readonly budgetBytes=WORKSPACE_CACHE_BYTES, private readonly options: { readOnly?: boolean } = {}) {
   if(!Number.isSafeInteger(budgetBytes)||budgetBytes<1024||budgetBytes>WORKSPACE_CACHE_BYTES)throw new Error('invalid workspace cache budget')
   privatePath(directory,true);this.directory=directory
   const keyPath=join(directory,'key');privatePath(keyPath)
@@ -43,13 +43,15 @@ export class WorkspaceStore {
   try{this.key=readFileSync(keyFd)}finally{closeSync(keyFd)}
   if(this.key.length!==32)throw new Error('workspace cache key must contain exactly 32 bytes')
   const file=join(directory,'workspace.sqlite')
-  try{const fd=openSync(file,constants.O_CREAT|constants.O_EXCL|constants.O_WRONLY,0o600);closeSync(fd)}catch(e){if((e as NodeJS.ErrnoException).code!=='EEXIST')throw e}
+  if(!options.readOnly){try{const fd=openSync(file,constants.O_CREAT|constants.O_EXCL|constants.O_WRONLY,0o600);closeSync(fd)}catch(e){if((e as NodeJS.ErrnoException).code!=='EEXIST')throw e}}
   privatePath(file)
-  this.db=new DatabaseSync(file)
+  this.db=new DatabaseSync(file,{readOnly:options.readOnly===true})
   try {
-   this.db.exec('PRAGMA busy_timeout=1000; PRAGMA journal_mode=DELETE; PRAGMA synchronous=FULL; PRAGMA auto_vacuum=FULL; PRAGMA max_page_count=1048576; CREATE TABLE IF NOT EXISTS documents (key TEXT PRIMARY KEY, kind TEXT NOT NULL, value BLOB NOT NULL, updated INTEGER NOT NULL)')
+   if(options.readOnly)this.db.exec('PRAGMA busy_timeout=1000; PRAGMA query_only=ON')
+   else this.db.exec('PRAGMA busy_timeout=1000; PRAGMA journal_mode=DELETE; PRAGMA synchronous=FULL; PRAGMA auto_vacuum=FULL; PRAGMA max_page_count=1048576; CREATE TABLE IF NOT EXISTS documents (key TEXT PRIMARY KEY, kind TEXT NOT NULL, value BLOB NOT NULL, updated INTEGER NOT NULL)')
   }catch(e){this.db.close();throw e}
  }
+ private writable(){if(this.options.readOnly)throw new Error('workspace store is read-only')}
  private check(){privatePath(this.directory,true);privatePath(join(this.directory,'key'));privatePath(join(this.directory,'workspace.sqlite'))}
  get<T=unknown>(key: string): T | undefined {
   this.check()
@@ -63,7 +65,7 @@ export class WorkspaceStore {
   } catch { throw new Error('cannot authenticate or decode workspace cache; preserve the key and inspect/reset this disposable entry') }
  }
  put(key: string, kind: 'index'|'board'|'catalogue'|'warm', value: unknown) {
-  this.check()
+  this.writable();this.check()
   const plain=Buffer.from(JSON.stringify(value));if(plain.length>MAX_PLAIN)throw new Error('workspace cache snapshot exceeds decoded byte limit')
   const nonce=randomBytes(12),cipher=createCipheriv('aes-256-gcm',this.key,nonce)
   cipher.setAAD(Buffer.concat([FORMAT,Buffer.from(key)]))
@@ -82,12 +84,12 @@ export class WorkspaceStore {
   if(this.transactionOpen)update();else this.transaction(update)
  }
  transaction<T>(action:()=>T):T {
-  this.check();if(this.transactionOpen)throw new Error('nested workspace transactions are unsupported')
+  this.writable();this.check();if(this.transactionOpen)throw new Error('nested workspace transactions are unsupported')
   this.db.exec('BEGIN IMMEDIATE');this.transactionOpen=true
   try{const value=action();this.db.exec('COMMIT');return value}catch(e){this.db.exec('ROLLBACK');throw e}finally{this.transactionOpen=false}
  }
  has(key:string){this.check();return this.db.prepare('SELECT 1 FROM documents WHERE key=?').get(key)!==undefined}
- remove(key:string){this.check();this.db.prepare('DELETE FROM documents WHERE key=?').run(key)}
+ remove(key:string){this.writable();this.check();this.db.prepare('DELETE FROM documents WHERE key=?').run(key)}
  info(){return this.db.prepare("SELECT count(*) AS entries, coalesce(sum(length(value)),0) AS bytes, coalesce(sum(kind='index'),0) AS indexes FROM documents").get() as {entries:number,bytes:number,indexes:number}}
  close(){this.db.close();this.key.fill(0)}
 }

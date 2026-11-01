@@ -14,3 +14,6 @@ export type { BroadSourceGraphScan, BroadSourceGraphScanOptions } from './broad-
 export { WorkspaceStore, initialiseWorkspaceStore } from './workspace-store.js'
 export { discoverWorkspace } from './workspace-catalogue.js'
 export type { WorkspaceCatalogue, Checkout } from './workspace-catalogue.js'
+
+export { readWorkspaceActivity } from './workspace-activity.js'
+export type { WorkspaceActivityOptions, WorkspaceActivityRow, WorkspaceActivitySnapshot } from './workspace-activity-types.js'
