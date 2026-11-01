@@ -40,11 +40,13 @@ export async function main(options: ContextCliOptions = {}): Promise<void> {
     'handover-dir': { type: 'string' },
     'handover-base': { type: 'string' },
     'cache-dir': { type: 'string' },
+    task: { type: 'string' }, label: { type: 'string' }, path: { type: 'string', multiple: true },
   } })
   if (values.help) {
     process.stdout.write((options.name ?? 'encrypted-context') + ' mcp|call <tool> --identity <existing agent hex-key file> --expect-pubkey <agent hex pubkey> --state <encrypted cache> --room <room hex id> [--server <HTTPS origin> ...]\n' +
       (options.name ?? 'encrypted-context') + ' navigate [directory] [--handover-dir <existing private directory>]   (no directory: the Git checkout containing the working directory)\n' +
       (options.name ?? 'encrypted-context') + ' session [--handover-base <existing private directory>] [--cache-dir <initialised private directory>]   (any working folder; expectedRoot required on every call)\n' +
+      (options.name ?? 'encrypted-context') + ' connect ROOT [--handover-base ABS] [--cache-dir ABS --label HOST --task TEXT [--path REL ...]]   (task-scoped JSON-lines shell connection; newline per request)\n' +
       (options.name ?? 'encrypted-context') + ' workspace init|discover ROOT|warm ROOT|status ROOT|index ROOT|forget-index ROOT --cache-dir ABS [--resume|--missing-only] [--priority ABS] [--max-repositories N] [--timeout-ms N]\n' +
       (options.name ?? 'encrypted-context') + ' workspace activity ROOT --cache-dir ABS [--all] [--json] [--repo ABS] [--limit 1-500] [--max-bytes 2048-262144] [--timeout-ms 1-30000]   (one-shot advisory leases; not process liveness or acceptance)\n' +
       (options.name ?? 'encrypted-context') + ' handover save --root ABS --packet ABS --state ABS --out ABS | handover resume --root ABS --handover ABS\n' +
@@ -56,6 +58,17 @@ export async function main(options: ContextCliOptions = {}): Promise<void> {
     return
   }
   const integer = (value: string | undefined): number | undefined => value === undefined ? undefined : Number(value)
+  if (positionals[0] === 'connect') {
+    if (positionals.length !== 2 || Object.keys(values).some(key => !['handover-base', 'cache-dir', 'task', 'label', 'path'].includes(key))) throw new Error('connect requires one canonical checkout root and only its documented options. See --help.')
+    if (values.task === undefined && (values.label !== undefined || values.path !== undefined)) throw new Error('connect --label and --path require --task')
+    if (values.task !== undefined && (!values.task || !values.label || !values['cache-dir'])) throw new Error('connect --task requires --label and --cache-dir')
+    const { runRepositoryShell } = await import('./repository-shell.js')
+    await runRepositoryShell({ root: positionals[1], handoverBase: values['handover-base'], cacheDirectory: values['cache-dir'],
+      task: values.task === undefined ? undefined : { label: values.label!, task: values.task, paths: values.path ?? [] },
+    }, process.stdin, process.stdout)
+    return
+  }
+  if (values.task !== undefined || values.label !== undefined || values.path !== undefined) throw new Error('--task, --label and --path are only supported by connect. See --help.')
   if (positionals[0] === 'session') {
     if (positionals.length !== 1 || Object.keys(values).some(key => key !== 'handover-base' && key !== 'cache-dir')) throw new Error('session only accepts --handover-base and --cache-dir. See --help.')
     const { serveRepositorySessionMcp } = await import('./repository-session-mcp.js')
