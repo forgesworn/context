@@ -1429,3 +1429,72 @@ tests were observed failing before their fixes. The original benchmark queries,
 71.5x thresholds, record/response budgets and recall gate remain unchanged and
 pass, as does the token-reduction gate. No collection/grant or traversal authority
 changes accompany the ordering fix.
+
+## 1 November: owner activity view and a real two-agent feature
+
+Context 0.8.0 adds `workspace activity` over the saved encrypted catalogue.
+The human view shows agent/task, intended files, checkout, reported branch/HEAD
+and lease times; compact JSON retains included fields within its byte budget.
+Exact checkout filtering, active/history selection and incomplete results are
+documented in [shared workspace](SHARED-WORKSPACE.md#owner-view-workspace-activity).
+The observer opens an existing database read-only, verifies live Git/common-dir
+physical identity and projects agent metadata without accessing inbox fields.
+It does not warm source, publish activity or change the publisher/operator role.
+
+The feature itself was split between actual native Codex and Claude sessions.
+Codex owned the activity service/tests; Claude owned CLI/rendering/docs; the
+coordinator owned shared types, package integration, review and delivery. Both
+workers published unique slots, polled coordination, exchanged implementation
+notes and finished their leases. They retained the hosts' existing model/effort
+defaults. A late Claude note was rejected after Codex's lease became inactive;
+the coordinator received that outcome. This proves useful explicit polling and
+separate-file coordination, not automatic interruption or a durable task inbox.
+Kimi and direct Ollama did not implement this feature; their prior shared-board
+acceptance and host-mediated packet path remain separately scoped above.
+
+The recorded definition preceded the outcomes and classifies this as ordinary
+use, with no control arm. Raw prompts, native logs, coordination snapshots,
+counterexamples, usage and a receipt remain in the owner's dated private
+acceptance directory. Reported usage is:
+
+| Participant | Input accounting | Output accounting |
+| --- | --- | --- |
+| Codex implementation | 647,633 input, including 599,936 cached | 13,332 output, including 3,957 reasoning |
+| Claude implementation | 54 uncached + 95,320 cache creation + 2,213,921 cache read | 24,650 output, including 3,965 thinking |
+| Claude's native advisor | 92,517 input, no cache reported | 5,459 output |
+
+Claude reported 388,343 ms wall time and USD 2.8930142 list-price equivalent
+including its advisor. That is not attributable billing. Codex's cached input
+and both reasoning/thinking figures are subsets, not additional tokens. Root
+preparation/integration usage, whole-task review time and attributable billing
+are unknown; independent review usage is retained separately in the receipt.
+There is no whole-task cost or savings claim.
+
+All attempts remain recorded: Codex corrected a Vitest config path; Claude
+repaired literal Unicode escapes and a renderer column width, and replaced one
+denied shell smoke command with a narrower successful run. Package integration
+exposed pretty JSON exceeding `--max-bytes`; compact transport fixed the
+observed failing assertion. Independent review found writable database opening
+and unsanitised fatal errors. Missing-database and hostile-path counterexamples
+were observed before their fixes, then passed. A first full local check hit an
+existing 5-second graph-test timeout under concurrent fleet inspection; the
+quiet rerun passed without changing its timeout or acceptance criteria.
+Follow-up static review found no blocking defect within seven bounded read-only
+calls; it inspected tests without executing them and did not independently
+reproduce the fleet measurement.
+
+The first full-workspace activity read hit its soft deadline after 154/368
+catalogued roots and returned no rows. Four bounded metadata workers, two Git
+identity queries per root and skipping absent boards let the next read inspect
+368/368 roots and return seven retained rows. It correctly remained incomplete:
+49 saved worktree paths were outside the selected workspace and three roots
+were unavailable or had changed identity. This single local observation is not
+a latency guarantee, source-freshness proof or evidence that every agent used
+the board.
+
+The final local check passed 36 core and 232 tools tests, the remaining existing
+Node/Python suites and independent tarball consumers, including two MCP writers
+and a separate activity CLI reader. Focused new-boundary checks passed 23/23;
+unchanged token, navigation, scale and postings gates passed. Hosted CI,
+published-byte verification and the installed owner command are release gates
+recorded with the PR/release, rather than inferred from these local checks.

@@ -10,15 +10,35 @@ import { isAbsolute, resolve } from 'node:path'
 import { WorkspaceStore, initialiseWorkspaceStore, workspaceKey } from './workspace-store.js'
 import { discoverWorkspace, describeCheckout, gitEnvironment, type WorkspaceCatalogue } from './workspace-catalogue.js'
 import { RepositoryNavigation } from './repository-navigation.js'
+import type { WorkspaceActivitySnapshot } from './workspace-activity-types.js'
+import { renderWorkspaceActivity } from './workspace-activity-render.js'
 const exec=promisify(execFile)
+const ACTIVITY_ONLY=['all','json','repo','limit','max-bytes'] as const
+/** A workspace result written as plain text rather than JSON (activity's default view). */
+export class WorkspaceCliText {constructor(readonly text:string){}}
+/** Compact transport keeps the activity snapshot inside its encoded byte budget. */
+export class WorkspaceCliJson {constructor(readonly value:WorkspaceActivitySnapshot){}}
 interface WarmRun {version:1;mode?:'fresh'|'missing-only';runId:string;ownerPid:number;ownerHost:string;workerPid?:number;workerTicket?:string;pendingRoot?:string;workspace:string;startedAt:number;finishedAt?:number;roots:string[];results:Record<string,{outcome:'indexed'|'failed';verifiedAt:number;durationMs:number;result?:unknown;error?:string}>}
 export async function runWorkspaceCli(args:string[]){
- const {positionals,values}=parseArgs({args,allowPositionals:true,options:{'cache-dir':{type:'string'},resume:{type:'boolean'},'missing-only':{type:'boolean'},'max-repositories':{type:'string'},'timeout-ms':{type:'string'},priority:{type:'string',multiple:true},'warm-workspace':{type:'string'},'warm-ticket':{type:'string'}}})
+ const {positionals,values}=parseArgs({args,allowPositionals:true,options:{'cache-dir':{type:'string'},resume:{type:'boolean'},'missing-only':{type:'boolean'},'max-repositories':{type:'string'},'timeout-ms':{type:'string'},priority:{type:'string',multiple:true},'warm-workspace':{type:'string'},'warm-ticket':{type:'string'},all:{type:'boolean'},json:{type:'boolean'},repo:{type:'string'},limit:{type:'string'},'max-bytes':{type:'string'}}})
  const [operation,input]=positionals
  const directory=values['cache-dir']
- if(!directory||positionals.length>(operation==='init'?1:2)||!['init','discover','warm','status','index','forget-index'].includes(operation))throw new Error('workspace init|discover ROOT|warm ROOT|status ROOT|index ROOT|forget-index ROOT --cache-dir ABS [--resume] [--priority ABS] [--max-repositories N] [--timeout-ms N]')
+ if(!directory||positionals.length>(operation==='init'?1:2)||!['init','discover','warm','status','index','forget-index','activity'].includes(operation))throw new Error('workspace init|discover ROOT|warm ROOT|status ROOT|index ROOT|forget-index ROOT|activity ROOT --cache-dir ABS [--resume] [--priority ABS] [--max-repositories N] [--timeout-ms N] | activity: [--all] [--json] [--repo ABS] [--limit N] [--max-bytes N] [--timeout-ms N]')
+ if(operation!=='activity'&&ACTIVITY_ONLY.some(flag=>values[flag]!==undefined))throw new Error('--all, --json, --repo, --limit and --max-bytes are only supported by workspace activity')
+ if(operation==='activity'&&Object.keys(values).some(key=>key!=='cache-dir'&&key!=='timeout-ms'&&!(ACTIVITY_ONLY as readonly string[]).includes(key)))throw new Error('workspace activity accepts only --cache-dir, --all, --json, --repo, --limit, --max-bytes and --timeout-ms')
  if(operation==='init') {if(input)throw new Error('workspace init takes no root');await initialiseWorkspaceStore(directory);return {initialised:true,cacheDirectory:directory}}
  if(!input||!isAbsolute(input)||resolve(input)!==input||(operation!=='forget-index'&&await realpath(input)!==input))throw new Error('workspace operation requires a canonical absolute root')
+ if(operation==='activity'){
+  const integer=(name:'limit'|'max-bytes'|'timeout-ms')=>{const raw=values[name];if(raw===undefined)return undefined;if(!/^[0-9]+$/.test(raw))throw new Error(`--${name} must be a whole number`);return Number(raw)}
+  const repositoryRoot=values.repo
+  if(repositoryRoot!==undefined&&(!isAbsolute(repositoryRoot)||resolve(repositoryRoot)!==repositoryRoot))throw new Error('--repo requires an absolute canonical checkout root from the saved catalogue')
+  const options={includeInactive:values.all===true,repositoryRoot,limit:integer('limit'),maxBytes:integer('max-bytes'),timeoutMs:integer('timeout-ms')}
+  const { readWorkspaceActivity }=await import('./workspace-activity.js')
+  const store=new WorkspaceStore(directory,undefined,{readOnly:true})
+  let snapshot
+  try{snapshot=await readWorkspaceActivity(input,store,options)}finally{store.close()}
+  return values.json?new WorkspaceCliJson(snapshot):new WorkspaceCliText(renderWorkspaceActivity(snapshot,{includeInactive:options.includeInactive,maxRows:500}))
+ }
  const store=new WorkspaceStore(directory)
  try{
   if(operation==='discover'){const catalogue=await discoverWorkspace(input,store);return {...catalogue,repositories:catalogue.repositories.map(repo=>({...repo,commonDirectory:undefined}))}}

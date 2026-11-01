@@ -35,7 +35,7 @@ const call=async(client,name,root,args={})=>{const result=await client.callTool(
 const first=await open(),second=await open()
 try{
  assert.equal((await first.listTools()).tools.length,9)
- const publish={slot:'agent',label:'test agent',task:'Edit source',paths:['source.ts'],state:'working',expectedRevision:0,ttlSeconds:900}
+ const publish={slot:'agent',label:'test agent',task:'Edit source '+ 'fixture metadata '.repeat(30),paths:['source.ts'],state:'working',expectedRevision:0,ttlSeconds:900}
  const [x,y]=await Promise.all([call(first,'repository_activity',a,publish),call(second,'repository_activity',wt,publish)])
  const board=await call(first,'repository_coordination',a)
  assert.equal(board.agents.length,2);assert.ok(board.agents.some(row=>row.checkout.root===wt))
@@ -46,6 +46,40 @@ try{
  const inbox=await call(second,'repository_coordination',wt);assert.equal(inbox.messages[0].text,note.text)
  assert.equal((await call(second,'repository_coordination',b)).agents.length,0)
  assert.equal((await call(second,'repository_coordination',b)).messages.length,0)
+ // Owner-visible read-only activity: actual installed CLI, not source imports.
+ const beforeView=await call(first,'repository_coordination',a)
+ const view=run(['activity',parent,'--json'])
+ assert.equal(view.rows.length,2)
+ assert.equal(new Set(view.rows.map(row=>row.agentId)).size,2)
+ assert.ok(view.rows.every(row=>row.active))
+ assert.ok(!JSON.stringify(view).includes(note.text),'activity must not disclose addressed notes')
+ assert.ok(!JSON.stringify(view).includes('commonDirectory'),'only owner-visible checkout fields are returned')
+ const printedBudget=Buffer.byteLength(JSON.stringify(view))+64
+ const boundedJson=execFileSync(process.execPath,[cli,'workspace','activity',parent,'--cache-dir',cache,'--json','--max-bytes',String(printedBudget)],{encoding:'utf8',stdio:['ignore','pipe','pipe']})
+ assert.ok(Buffer.byteLength(boundedJson)<=printedBudget,'activity JSON stdout must fit the requested byte budget')
+ const single=run(['activity',parent,'--json','--repo',a]);assert.equal(single.rows.length,1);assert.equal(single.rows[0].checkoutRoot,a)
+ const limited=run(['activity',parent,'--json','--limit','1']);assert.equal(limited.rows.length,1);assert.equal(limited.complete,false)
+ const human=execFileSync(process.execPath,[cli,'workspace','activity',parent,'--cache-dir',cache],{encoding:'utf8',stdio:['ignore','pipe','pipe']})
+ assert.match(human,/test agent/);assert.match(human,/Edit source/);assert.match(human,/advisory/i)
+ const afterView=await call(first,'repository_coordination',a);assert.equal(afterView.boardRevision,beforeView.boardRevision)
+ await call(first,'repository_activity',a,{...publish,state:'done',expectedRevision:1})
+ assert.equal(run(['activity',parent,'--json']).rows.length,1)
+ const history=run(['activity',parent,'--json','--all']);assert.equal(history.rows.length,2);assert.equal(history.rows.filter(row=>!row.active).length,1)
+ assert.throws(()=>run(['activity',parent,'--json','--repo',parent]))
+ const badRoot=join(parent,'missing\u001b[31m\nFORGED\u202e')
+ let failure
+ try{run(['activity',badRoot])}catch(error){failure=error}
+ assert.ok(failure)
+ const diagnostic=String(failure.stderr)
+ assert.ok(!/[\u001b\u202e]/u.test(diagnostic),'activity error output must be terminal-safe')
+ assert.equal(diagnostic.trimEnd().split('\n').length,1,'activity error must not forge terminal lines')
+ assert.ok(Buffer.byteLength(diagnostic)<=4096)
+ const absentCache=join(parent,'existing-key-missing-db');await mkdir(absentCache,{mode:0o700})
+ await writeFile(join(absentCache,'key'),await readFile(join(cache,'key')),{mode:0o600})
+ assert.throws(()=>execFileSync(process.execPath,[cli,'workspace','activity',parent,'--cache-dir',absentCache],{stdio:'pipe'}))
+ assert.deepEqual(await readdir(absentCache),['key'],'the activity viewer must not initialise a lost database')
+
+
  const status=await call(first,'repository_status',a);assert.equal(status.reuse.restored,true)
  await writeFile(join(a,'source.ts'),'export const newerPrivateMarker = 8\n')
  const old=await call(first,'repository_status',a);assert.equal(old.freshness,'stale')

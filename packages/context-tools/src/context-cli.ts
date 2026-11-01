@@ -17,8 +17,9 @@ export interface ContextCliOptions {
 }
 export async function main(options: ContextCliOptions = {}): Promise<void> {
   if (process.argv[2] === 'workspace') {
-    const { runWorkspaceCli } = await import('./workspace-cli.js')
-    process.stdout.write(JSON.stringify(await runWorkspaceCli(process.argv.slice(3)), null, 2) + '\n')
+    const { runWorkspaceCli, WorkspaceCliText, WorkspaceCliJson } = await import('./workspace-cli.js')
+    const result = await runWorkspaceCli(process.argv.slice(3))
+    process.stdout.write(result instanceof WorkspaceCliText ? result.text : result instanceof WorkspaceCliJson ? JSON.stringify(result.value) + '\n' : JSON.stringify(result, null, 2) + '\n')
     return
   }
   if (process.argv[2] === 'handover') {
@@ -45,6 +46,7 @@ export async function main(options: ContextCliOptions = {}): Promise<void> {
       (options.name ?? 'encrypted-context') + ' navigate [directory] [--handover-dir <existing private directory>]   (no directory: the Git checkout containing the working directory)\n' +
       (options.name ?? 'encrypted-context') + ' session [--handover-base <existing private directory>] [--cache-dir <initialised private directory>]   (any working folder; expectedRoot required on every call)\n' +
       (options.name ?? 'encrypted-context') + ' workspace init|discover ROOT|warm ROOT|status ROOT|index ROOT|forget-index ROOT --cache-dir ABS [--resume|--missing-only] [--priority ABS] [--max-repositories N] [--timeout-ms N]\n' +
+      (options.name ?? 'encrypted-context') + ' workspace activity ROOT --cache-dir ABS [--all] [--json] [--repo ABS] [--limit 1-500] [--max-bytes 2048-262144] [--timeout-ms 1-30000]   (one-shot advisory leases; not process liveness or acceptance)\n' +
       (options.name ?? 'encrypted-context') + ' handover save --root ABS --packet ABS --state ABS --out ABS | handover resume --root ABS --handover ABS\n' +
       (options.name ?? 'encrypted-context') + ' doctor <repository-root> --term <known-identifier>\n' +
       (options.name ?? 'encrypted-context') + ' scan <directory> [--max-packages 64] [--max-depth 4] [--observed-at <epoch-seconds>]\n' +

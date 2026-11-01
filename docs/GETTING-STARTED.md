@@ -32,8 +32,8 @@ matching core version:
 mkdir context-install
 cd context-install
 npm init -y
-npm install --ignore-scripts /absolute/path/to/forgesworn-context-0.7.0.tgz \
-  /absolute/path/to/forgesworn-context-tools-0.7.0.tgz
+npm install --ignore-scripts /absolute/path/to/forgesworn-context-0.8.0.tgz \
+  /absolute/path/to/forgesworn-context-tools-0.8.0.tgz
 ```
 
 For that installation, use
