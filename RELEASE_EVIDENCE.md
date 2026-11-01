@@ -4,6 +4,33 @@ Latest implementation and adoption results are in the
 [dogfood execution ledger](docs/DOGFOOD-EXECUTION.md). The dated snapshots below
 remain historical evidence; internal pilot acceptance is separate from G0–G4.
 
+## 0.9.0 portable session lifecycle, 1 November 2026
+
+Adds `connect ROOT`, a task-scoped JSON-lines shell transport over the existing
+repository MCP server. It keeps root binding, source generations, private
+handovers and addressed-note identity within one process. Optional task startup
+reads coordination and publishes intended paths; explicit work steps renew its
+lease when due. Clean close/EOF and handled input errors attempt per-slot finish,
+with unknown outcomes reported without automatic replay. The shared skill now
+describes startup, work steps and handover for native and shell hosts.
+
+Ten focused tests cover the shell lifecycle. Three observed failing cleanup
+regressions cover per-slot transport failure, abnormal input termination and
+closed output while waiting for backpressure. Independent installed
+package checks exercise the actual CLI, source generation, root isolation and
+finished activity. Native Kimi continuation and the host-mediated Ollama packet
+path supplied concrete review findings; Codex and Claude independently found
+the output-closure defect. The failed first Ollama claim was
+retained and rejected. Final native reviews and release gates are recorded in
+the [execution ledger](docs/DOGFOOD-EXECUTION.md).
+
+This transport does not inject native tools into an existing conversation,
+install hooks, create a daemon, change providers or establish universal agent
+adoption. Browser-safe core behaviour is unchanged; its version stays aligned
+with the tools package. GitHub release tarballs and matching CI/install readback
+are distribution gates. npm publication, native Windows qualification and
+measured whole-task savings remain separate.
+
 ## 0.5.0 release preparation, 1 November 2026
 
 Adds installed CLI/API task handovers and opt-in MCP save/resume with explicit

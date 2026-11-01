@@ -1498,3 +1498,80 @@ and a separate activity CLI reader. Focused new-boundary checks passed 23/23;
 unchanged token, navigation, scale and postings gates passed. Hosted CI,
 published-byte verification and the installed owner command are release gates
 recorded with the PR/release, rather than inferred from these local checks.
+
+
+## 1 November: portable session lifecycle and four-host coordination
+
+Context 0.9.0 adds a task-scoped `connect ROOT` shell transport over the existing
+repository MCP server. It pins the checkout, retains source generations and
+addressed-note identity, and exposes the same source and private handover tools.
+Optional startup metadata publishes a unique activity slot after reading status
+and coordination. Repository work steps renew the primary lease when due; clean
+close/EOF, handled input errors and output disappearance attempt to finish tracked
+slots. Each finish outcome is reported independently. Unknown writes are not
+replayed. The shared skill describes startup, polling, handover and finish for
+native MCP and shell-capable hosts. It installs no hook or daemon.
+
+The primary conversation's available tool catalogue contained no Z1P repository
+operations, while `codex mcp get z1p-repository --json` showed the enabled existing
+stdio entry. Official OpenAI MCP guidance distinguishes local configuration from
+what a running conversation exposes. That entry and the native providers/models
+were preserved; actual shell source refresh/packet and coordination supplied the
+local path. This is shell acceptance, not injected native tools or universal
+host discovery. See [global setup](GLOBAL-SESSIONS.md#shell-connection).
+
+A prospectively recorded ordinary-use definition, prompts, raw native logs,
+verified packets, failed attempts and receipts are retained in the owner's
+private dated acceptance directory. Native Kimi resumed the shell-created
+checkpoint, published activity, read a refreshed source packet, sent its finding,
+received an acknowledgement and marked done. It ran the initial six focused
+tests and identified skipped cleanup on abnormal input. Exact returned Kimi
+model/effort and usage were unavailable; existing defaults were retained.
+
+Direct Ollama remained host-mediated through the existing ForgeSworn adapter
+and explicit M4 endpoint. The host published its worker slot and independently
+verified the source packet before dispatch. Flash/off's first claim contradicted
+the explicit returned-revision assignment and the passing renewal test, so it
+was rejected. A focused repair identified per-slot finish exception isolation;
+that finding was accepted after an observed failing regression. Provider receipts
+reported 8,282 prompt/1,033 completion tokens for the rejected attempt and 8,419
+prompt/376 completion tokens for the repair. This proves the bounded packet and
+review path; it does not make raw Ollama an MCP or shell client.
+
+Native Codex and Claude resumed a second current checkpoint, inspected source,
+published review slots, exchanged explicit notes with the shell coordinator and
+marked done. Both independently identified output closing while awaiting drain
+as another cleanup hang. Codex reported 289,996 input tokens including 262,400
+cached, plus 2,575 output including 952 reasoning. Claude reported 18 uncached
+input, 60,262 cache-creation input, 492,035 cache-read input and 6,153 output
+including 2,258 thinking; USD 0.703635 was list-price equivalent, not attributable
+billing. Neither result was treated as clean code acceptance while its finding
+remained. Follow-up review, final tests and release gates are recorded separately.
+Root preparation/integration/review totals and attributable billing are unknown;
+there is no controlled comparison or whole-task savings claim.
+
+Three observed failing regressions cover per-slot finish exceptions, abnormal
+input termination and output closure under backpressure. The final focused set
+also covers two-agent notes/deduplication, CAS renewal, cross-connection handover,
+stale source, root isolation, bounded input recovery and idle-output cleanup.
+The installed-package probe now exercises `connect`, matching source generations,
+wrong-root rejection and finished leases through the actual packed CLI.
+
+An initial full check omitted Git LFS from its restricted PATH, causing 19
+worktree-fixture failures; restoring the existing executable fixed that setup.
+A later concurrent run hit the unchanged 5-second large-pagination timeout.
+A serial-worker rerun passed the prior eight-test revision without changing
+assertions or timeouts. The first output-fix run exposed an input-error race
+between the ready event and iterator startup; explicit early stream handlers
+fixed it. These attempts remain recorded. Final source, package and hosted gates
+must be read from their exact revision rather than inferred from these earlier
+runs. Native Windows qualification and broader savings/product gates remain open.
+
+A final bounded native Codex review found a lower-severity listener retention
+case when a writable suppresses `close` or disables automatic destruction. An
+observed failing listener-count assertion was fixed by releasing the frame
+listeners on the error event as well as close. The final focused set covers both
+stream options. That review reported 82,338 input tokens including 64,640 cached,
+plus 2,133 output including 1,795 reasoning; these are separate review usage,
+not whole-task totals. The full local pre-push gate passed the initial ten-test
+revision; the follow-up commit is independently gated again before shipment.

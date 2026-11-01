@@ -5,6 +5,10 @@ across Codex, Claude, Kimi and Ollama coding hosts. It starts from any folder an
 requires the selected canonical checkout as `expectedRoot` on each call. The
 fixed-root setup below remains available for deliberately restricted connections.
 
+For a shell-capable session whose native MCP tools are absent, releases from
+0.9.0 include the [task-scoped shell connection](GLOBAL-SESSIONS.md#shell-connection).
+It uses the same repository tools without changing the host's configuration.
+
 Connect Context to Codex or Claude Code to retrieve bounded source evidence from
 your own checkout. Keep using your chosen model and your project's normal tests
 and review process. Context does not choose models or require a ForgeSworn

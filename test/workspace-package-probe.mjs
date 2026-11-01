@@ -62,9 +62,27 @@ try{
  const human=execFileSync(process.execPath,[cli,'workspace','activity',parent,'--cache-dir',cache],{encoding:'utf8',stdio:['ignore','pipe','pipe']})
  assert.match(human,/test agent/);assert.match(human,/Edit source/);assert.match(human,/advisory/i)
  const afterView=await call(first,'repository_coordination',a);assert.equal(afterView.boardRevision,beforeView.boardRevision)
+ // A shell-only host uses the installed package and a stable task connection.
+ const shellInput=[
+  {id:1,name:'repository_refresh'},
+  {id:2,name:'repository_search',arguments:{term:'sharedPrivateMarker',format:'json'}},
+  {id:3,name:'repository_status',arguments:{expectedRoot:b}},
+  {id:4,name:'close'},
+ ].map(value=>JSON.stringify(value)).join('\n')+'\n'
+ const shellOutput=execFileSync(process.execPath,[cli,'connect',a,'--cache-dir',cache,'--label','installed shell host','--task','Inspect installed source','--path','source.ts'],{input:shellInput,encoding:'utf8',stdio:['pipe','pipe','pipe'],timeout:30000})
+ const shellFrames=shellOutput.trimEnd().split('\n').map(line=>JSON.parse(line))
+ assert.equal(shellFrames.length,5);assert.equal(shellFrames[0].event,'ready');assert.equal(shellFrames[0].nativeToolDiscovery,false)
+ assert.equal(shellFrames[0].activity.agent.checkout.root,a)
+ assert.equal(shellFrames[1].isError,false);assert.equal(shellFrames[2].result.generation,shellFrames[1].result.generation)
+ assert.ok(shellFrames[2].result.results[0].text.includes('sharedPrivateMarker'))
+ assert.equal(shellFrames[3].isError,true);assert.equal(shellFrames[4].isError,false)
+ const shellAgentId=shellFrames[0].activity.agent.agentId
+ const afterShell=await call(first,'repository_coordination',a)
+ assert.equal(afterShell.agents.find(row=>row.agentId===shellAgentId).state,'done')
+ assert.equal(afterShell.agents.find(row=>row.agentId===shellAgentId).active,false)
  await call(first,'repository_activity',a,{...publish,state:'done',expectedRevision:1})
  assert.equal(run(['activity',parent,'--json']).rows.length,1)
- const history=run(['activity',parent,'--json','--all']);assert.equal(history.rows.length,2);assert.equal(history.rows.filter(row=>!row.active).length,1)
+ const history=run(['activity',parent,'--json','--all']);assert.equal(history.rows.length,3);assert.equal(history.rows.filter(row=>!row.active).length,2)
  assert.throws(()=>run(['activity',parent,'--json','--repo',parent]))
  const badRoot=join(parent,'missing\u001b[31m\nFORGED\u202e')
  let failure

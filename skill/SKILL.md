@@ -10,6 +10,30 @@ continuation benefits the task. This applies to any selected coding project,
 including sessions opened at a parent workspace. No ForgeSworn account, model
 switch or inference service is required by the tools.
 
+## Start, work and finish
+
+For a substantial coding task, verify the selected checkout and actual tool
+availability at startup. Read `repository_status` and, when shared coordination
+is configured, `repository_coordination`; publish the task and intended paths
+before edits. Inspect overlaps before changing shared files. Between work steps,
+poll addressed notes and renew activity before its lease expires. Before handing
+over, save current evidence, decisions, actual checks and the next action under
+a new checkpoint name; mark finished task slots `done`.
+
+If this host exposes no native repository tools but the installed CLI includes
+`connect`, use its task-scoped shell transport with the existing private cache
+and handover directories. Keep that process open for the task; send newline-ended
+JSON requests using the same repository tool names and arguments. It pins and
+supplies `expectedRoot`, retains generations and addressed-note identity, and
+rejects another root. Native MCP and shell connections have separate identities;
+do not transfer activity revisions or generation IDs between them. Clean close
+finishes tracked leases; process death leaves them to expire. This is shell use,
+not native tool discovery. See [shell connection](https://github.com/forgesworn/context/blob/main/docs/GLOBAL-SESSIONS.md#shell-connection).
+
+Use bounded local reads when neither transport is available. Keep tiny known-file
+edits lightweight. This workflow does not schedule work or ensure that every
+agent follows it; verify adoption in the actual host.
+
 ## Select the task's checkout
 
 Determine the canonical Git top-level path for the repository/worktree the task
