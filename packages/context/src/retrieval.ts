@@ -40,7 +40,7 @@ const K1 = 1.2
 const B = 0.75
 const SOURCE_WEIGHT = 1
 interface Indexed { row: RecordView; text: Map<string, number>; length: number; source: Set<string> }
-function rank(rows: RecordView[], terms: Set<string>): { row: RecordView; score: number }[] {
+export function rankContextRecords(rows: RecordView[], terms: Set<string>): { row: RecordView; score: number }[] {
   const indexed: Indexed[] = rows.map(row => {
     const text = counts(row.text)
     let length = 0
@@ -83,7 +83,7 @@ export function retrieveView(view: ContextView, options: ContextRetrievalOptions
   if (typeof includeRelated !== 'boolean' || observedSince !== undefined && (!Number.isSafeInteger(observedSince) || observedSince < 0)) throw new Error('Invalid context retrieval options.')
   const rows = view.records.filter(r => observedSince === undefined || r.observedAt >= observedSince)
   const terms = words(query)
-  const direct = rank(rows, terms)
+  const direct = rankContextRecords(rows, terms)
     .filter(r => r.score > 0).sort((a, b) => b.score - a.score || b.row.observedAt - a.row.observedAt || a.row.id.localeCompare(b.row.id))
   const links: ContextLink[] = []
   if (includeRelated) {

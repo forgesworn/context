@@ -1419,3 +1419,13 @@ crash recovery, plaintext absence, live source invalidation and deleted-root
 cache removal. Full checks and unchanged benchmark gates are recorded separately
 from hosted CI, published-byte readback and final client configuration. Formal
 OS2 savings, wider OS5 qualification and G0–G4 remain open.
+
+
+The unchanged source-navigation gate caught an additional regression as the
+corpus grew: generic workspace matches could outrank a queried exported symbol.
+Graph ranking now reuses retrieval's BM25 scoring and prioritises exact
+code-shaped query identifiers over incidental words/filenames. Two counterexample
+tests were observed failing before their fixes. The original benchmark queries,
+71.5x thresholds, record/response budgets and recall gate remain unchanged and
+pass, as does the token-reduction gate. No collection/grant or traversal authority
+changes accompany the ordering fix.

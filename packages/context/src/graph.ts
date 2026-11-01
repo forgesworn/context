@@ -1,3 +1,4 @@
+import { rankContextRecords } from './retrieval.js'
 import type { ContextProvenance, ContextRecord, ContextRelationKind, ContextView } from './index.js'
 
 export interface ContextGraphOptions {
@@ -98,8 +99,14 @@ export function graphView(view: ContextView, options: ContextGraphOptions): Cont
   limits(maxBytes, maxDepth, 4)
   if (!Number.isSafeInteger(maxNodes) || maxNodes < 1 || maxNodes > 40) throw new Error('Context graph allows 1 to 40 nodes.')
   const terms = words(query)
-  const ranked = view.records.map(record => ({ record, score: [...terms].filter(term => words(`${record.text}\n${record.source}`).has(term)).length }))
-    .filter(item => item.score > 0).sort((a, b) => b.score - a.score || b.record.observedAt - a.record.observedAt || a.record.id.localeCompare(b.record.id))
+  // Code-shaped exact identifiers are stronger intent than incidental natural
+  // language or a short filename. Ordinary queries retain the shared BM25 rank.
+  const identifiers = new Set((query.normalize('NFKC').match(/[A-Za-z_][A-Za-z0-9_]*/g) ?? [])
+    .filter(token => /[a-z][A-Z]|_[A-Za-z0-9]|[A-Za-z][0-9]|[A-Z]{2}[a-z]/.test(token)).map(token => token.toLowerCase()))
+  const ranked = rankContextRecords(view.records, terms).map(({ row, score }) => {
+    const named = new Set((`${row.text}\n${row.source}`.normalize('NFKC').match(/[A-Za-z_][A-Za-z0-9_]*/g) ?? []).map(token => token.toLowerCase()))
+    return { record: row, score, identifiers: [...identifiers].filter(token => named.has(token)).length }
+  }).filter(item => item.score > 0).sort((a, b) => b.identifiers - a.identifiers || b.score - a.score || b.record.observedAt - a.record.observedAt || a.record.id.localeCompare(b.record.id))
   const allEdges = edges(view.records)
   const selected = new Map<string, { record: RecordView; depth: number; match: 'query' | 'related' }>()
   const queue: { id: string; depth: number }[] = []

@@ -15,6 +15,22 @@ async function fixture() {
 }
 
 describe('bounded authorised context graph', () => {
+  it('prioritises rare exact identifiers over several common workspace terms', async () => {
+    const f = await fixture()
+    const target = await f.add('Exported function resolveCheckoutEvidence in the source parser', undefined, 'repo://parser.ts')
+    for (let i = 0; i < 12; i++) await f.add('Workspace package manifests and metadata', undefined, `repo://workspace-${i}.ts`)
+    const graph = f.vault.graph(f.view().id, { query: 'resolveCheckoutEvidence workspace package manifests', maxNodes: 1, maxDepth: 0 })
+    expect(graph.nodes[0].id).toBe(target.id)
+  })
+
+  it('keeps an exact code identifier ahead of a short incidental encrypted filename', async () => {
+    const f = await fixture()
+    const target = await f.add('Exported dispatchArtifact alongside ' + 'other declaration metadata '.repeat(40), undefined, 'repo://artifacts.ts')
+    await f.add('Small CLI wrapper', undefined, 'repo://encrypted-command.mjs')
+    const graph = f.vault.graph(f.view().id, { query: 'dispatchArtifact encrypted payload', maxNodes: 1, maxDepth: 0 })
+    expect(graph.nodes[0].id).toBe(target.id)
+  })
+
   it('atomically signs forward links and cycles without exposing a partial snapshot', async () => {
     const f = await fixture()
     const first = '01'.repeat(32), second = '02'.repeat(32)
