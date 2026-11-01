@@ -74,6 +74,18 @@ JSON with `format: "json"`. See the
 
 ## Check a repository installation
 
+Development builds add optional `expectedRoot` to all six navigation requests.
+Pass the canonical active checkout root to reject a mismatched connection before
+retrieval. Older callers remain compatible when the field is omitted.
+
+Development builds also package `encrypted-context handover save|resume` and
+export `saveHandover`/`resumeHandover` from the package root. Start navigation with
+`--handover-dir /absolute/private/checkpoints` to enable the two bounded
+`repository_handover_save`/`repository_handover_resume` operations. The directory
+must already exist and checkpoint names cannot contain paths. Default navigation
+does not gain file-write tools. See [task handovers](../../docs/TASK-HANDOVERS.md).
+These additions are not in the previously released 0.4.3 tarballs.
+
 ```sh
 encrypted-context doctor /absolute/path/to/repository --term knownIdentifier
 ```

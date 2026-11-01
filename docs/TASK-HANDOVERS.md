@@ -1,12 +1,16 @@
 # Resume a task without repeating discovery
 
-`scripts/task-handover.mjs` saves a compact progress record with an existing
+`encrypted-context handover` saves a compact progress record with an existing
 [source packet](WORKER-PACKETS.md). It runs locally, makes no model calls and
-does not depend on Oathrun. Use Node from `.nvmrc` and `npm run build` first.
+does not depend on Oathrun. Use Node 24+ and an installation containing the
+handover commands. In a source checkout use `.nvmrc` and `npm run build` first.
 
-This is a checkout helper, not a published CLI, automatic client hook or an
-Oathrun runtime integration. The person or agent doing the work supplies the
-state. A fresh session explicitly runs `resume` before using it.
+CLI and MCP support are available in this development revision; the previously
+released 0.4.3 package does not include them. The original
+`node scripts/task-handover.mjs` remains a compatibility entrypoint.
+The person or agent doing the work supplies the state. A fresh session
+explicitly runs `resume` before using it; no automatic client hook or job
+execution is introduced.
 
 ## Save at a useful stopping point
 
@@ -48,13 +52,13 @@ questions in either the packet or state, or pending effects. There is deliberate
 no `complete` or `accepted` status: those decisions belong to the actual reviewer.
 
 ```sh
-node scripts/task-handover.mjs save \
+encrypted-context handover save \
   --root /absolute/repository \
   --packet /private/task/source-packet.json \
   --state /private/task/state.json \
   --out /private/task/handover-001.json
 
-node scripts/task-handover.mjs resume \
+encrypted-context handover resume \
   --root /absolute/repository \
   --handover /private/task/handover-001.json
 ```
@@ -63,6 +67,34 @@ Use canonical absolute paths without symbolic-link components. Save refuses
 existing outputs and creates a file with mode `0600`. Keep it outside version
 control: the record embeds the selected source as well as the task state. Use a
 new output for each checkpoint; no mutable shared latest pointer is maintained.
+
+## Use handovers through MCP
+
+Navigation exposes only its six existing tools by default. To enable the two
+file operations, create a private directory outside version control, resolve
+its canonical path, and configure the server explicitly:
+
+```sh
+encrypted-context navigate /absolute/repository --handover-dir /absolute/private/checkpoints
+```
+
+Reconnect the client. `repository_handover_save` takes `expectedRoot`, a simple
+checkpoint `name` such as `checkpoint-001.json`, the complete `packet` returned
+by a fresh `repository_packet` call, and the `state` object above. It verifies
+the packet against the server's bound checkout before writing a new mode-0600
+file. It accepts no directory, input filename, command or alternate root.
+
+`repository_handover_resume` takes `expectedRoot` and `name`. A new client bound
+to the same checkout and configured checkpoint directory can resume it. Names
+cannot contain directories; symlink paths and overwrites are refused. Different
+clients need not share conversation history or credentials. Each still applies
+its own tool permissions. A mismatch with the canonical `expectedRoot` is
+rejected before any checkpoint read or write.
+
+These are local persistence tools, separate from signed `context_*` collections.
+Enabling them grants no signing, uploading, execution or review authority.
+Applications can also import `saveHandover` and `resumeHandover` from
+`@forgesworn/context-tools`; the file-based API matches the CLI.
 
 ## Continue from the compact result
 

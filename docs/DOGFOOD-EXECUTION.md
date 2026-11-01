@@ -1205,3 +1205,67 @@ credits (rate not read for this run); 24 reviewer sessions 679,064 input and
 165,239 output on the subscription, no retries. Wall time 116 minutes against
 66 for v2; no arm reached the 80-turn cap. Not pooled with v1 or v2. Nothing
 is published; version stays 0.3.3.
+
+
+## 1 November 2026 — portable handover candidate and three client bindings
+
+Owner authorised the first slice after the shared engineering skill release:
+make the existing task-handover helper installable and improve project-bound
+Codex, Claude and Kimi setup. Candidate branch: `feat/portable-task-handovers`,
+starting at `d725fbc`. This is local implementation and protocol evidence, not a
+new published package, native model-driven client acceptance or measured savings.
+Final SHA-256 prefixes are `9378ffcd20bf` for `task-handover.mjs`,
+`be20a481696a` for `repository-handover-mcp.ts` and `2a32b55995ec` for
+`repository-navigation-mcp.ts`, all under `packages/context-tools/src`.
+
+The handover implementation now lives in the Node tools package, exported as
+`saveHandover`/`resumeHandover` and available through
+`encrypted-context handover save|resume`. The checkout script remains a thin
+compatibility entrypoint. No signed formats or collection grants change.
+
+Navigation keeps its six tools by default. Explicit `--handover-dir` configuration
+adds save/resume tools restricted to simple checkpoint names in that existing
+private directory. Their `expectedRoot` is required. All six navigation requests
+also accept optional `expectedRoot` for compatible wrong-checkout rejection before
+indexing or retrieval. Tool declarations stay within the existing 6,200-byte
+navigation budget by shortening descriptions rather than raising the gate.
+
+Validation:
+
+- `npm run check` passed the full workspace suite and independent tarball smoke.
+- After the cancellation-before-write refinement, the four new MCP/binding tests,
+  all 13 existing handover regressions and isolated tarball smoke passed again.
+  Focused doctor tests also passed after its schema-aware request binding change.
+- Packed-package checks exercised CLI and exported API save/resume, private
+  mode-0600 files, new stdio connections and wrong-root rejection. No checkout
+  helper fallback was available inside that installation.
+- Both unchanged benchmark checks passed with minimum required-source recall 1.0.
+  These synthetic gates do not establish whole-task savings.
+- The existing Codex project entry omitted explore/coverage from its allowlist;
+  it now enables all eight tools with explicit checkout and handover storage.
+  Its separate signed-context entry was preserved. Claude received a local
+  repository override, and Kimi a project-local MCP entry. User credentials,
+  provider/model choices and tool-approval settings were not changed. These
+  machine-specific files remain outside commits.
+- MCP SDK probes loaded each actual saved repository binding, discovered eight
+  tools, verified the root and rejected a mismatched root. A checkpoint saved
+  through the Codex binding was resumed through the Claude and Kimi bindings.
+  After a selected source edit, all three refused the old checkpoint. This
+  exercises saved commands and protocol behaviour, **not the native models**.
+
+The private illustrative checkpoint is named
+`portable-handovers-1793530497171.json` beneath the configured task-handover
+storage. It is deliberately stale after the later source refinement and must
+not be used as current implementation evidence. No source, transcript or
+credential from that private record is copied here.
+
+The final task still needs native sessions started in the selected checkout to
+qualify discovery, actual tool use and continuation in each host. Codex CLI
+0.166.0 and Kimi Code 2.3.2 were present; their presence/configuration is not a
+passing model-driven task. Independent review, hosted CI and package publication
+were not performed for this candidate. Existing G release gates and the
+OpenCode qualification plan remain open.
+
+Temporary package installs, fixture repositories and probe files were removed;
+all probe transports were closed. The private configured handover directory and
+illustrative checkpoint are retained. No task-created server remains running.

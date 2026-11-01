@@ -12,10 +12,10 @@ of that client's conversation and may be sent to its model provider.
 
 ## Availability and prerequisites
 
-The four-tool workflow below is included in this source tree. Build a pinned
+The six-tool workflow below is included in this source tree. Build a pinned
 revision containing `repository_packet` and verify discovery in step 4.
 The public npm packages may lag the source release; do not assume an older npm
-installation includes all four tools. Source and release assets are available at
+installation includes all six tools. Source and release assets are available at
 [forgesworn/context](https://github.com/forgesworn/context).
 
 For GitHub releases containing both package tarballs, download the core and tools
@@ -98,8 +98,8 @@ file; replace `yourKnownIdentifier` below:
 "$CONTEXT_NODE" "$CONTEXT_CLI" doctor "$CONTEXT_REPO" --term yourKnownIdentifier
 ```
 
-The command launches this installation's repository server and exercises all four
-tools over stdio: status, refresh, search and a one-line source packet. It checks
+The command launches this installation's repository server and exercises all six
+tools over stdio: status, refresh, search, explore, coverage and a one-line source packet. It checks
 the canonical Git root, HEAD, generation and matching source hash. It prints JSON
 with `ok: true`, the executable/arguments to configure, exclusion counts and the
 evidence location/hash. It does not print source text, write client configuration,
@@ -201,6 +201,38 @@ Actual Codex packet use has passed locally. Claude Code is a supported setup
 target, but a real Claude model-driven packet task remains an open acceptance
 gate in this pilot. A `Connected` status alone does not close that gate.
 
+### Kimi Code
+
+Kimi supports project-local `.kimi-code/mcp.json`. In a trusted target checkout,
+merge this entry with any existing `mcpServers`; use the same pinned executable
+and explicit repository root as the other clients:
+
+```json
+{
+  "mcpServers": {
+    "z1p-repository": {
+      "command": "/absolute/path/to/node",
+      "args": ["/absolute/path/to/encrypted-context.mjs", "navigate", "/absolute/path/to/your-project"]
+    }
+  }
+}
+```
+
+Keep machine-specific configuration private. Start a new Kimi session after
+adding a server; existing sessions do not register newly added configuration.
+Use `/mcp` to inspect connection status, then perform step 4 in that client.
+Do not infer Kimi task acceptance from another client or the CLI doctor.
+See [Kimi's MCP documentation](https://www.kimi.com/code/docs/en/kimi-code-cli/customization/mcp).
+
+### Optional private handover storage
+
+For builds whose help includes `handover`, add `--handover-dir` followed by an
+existing canonical private directory to the navigation command's `args`. In
+Codex also add `repository_handover_save` and `repository_handover_resume` to
+`enabled_tools`. Restart/reconnect each affected client. This explicitly enables
+checkpoint file operations; ordinary navigation retains its existing scope.
+See [task handovers](TASK-HANDOVERS.md) for save/resume and rejection cases.
+
 ## 3. Add a small instruction to your project
 
 Merge this into your project's `AGENTS.md` for Codex and `CLAUDE.md` for Claude.
@@ -210,7 +242,9 @@ ForgeSworn-specific goals into an unrelated project.
 ```text
 Use the configured z1p-repository tools for source discovery. First check that
 repository_status.root is this exact checkout or worktree; stop using a
-mismatched binding. Explore each symbol once, fetch the blocks you rely on with
+mismatched binding. When the installed schema supports expectedRoot, pass this
+checkout's canonical root on requests to reject a wrong binding before retrieval.
+Explore each symbol once, fetch the blocks you rely on with
 repository_packet and cite those lines without reading them again. Run
 repository_coverage on the draft and
 fix what it reports. Read files directly only for evidence the tools cannot
@@ -244,6 +278,7 @@ shell command:
 ```json
 {
   "mode": "build",
+  "expectedRoot": "/absolute/path/to/your-project",
   "expectedGeneration": "generation returned by repository_refresh",
   "maxBytes": 8192,
   "spec": {

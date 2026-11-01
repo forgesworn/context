@@ -6,7 +6,7 @@ import { join, resolve } from 'node:path'
 import assert from 'node:assert/strict'
 
 const checkout = process.cwd()
-const temp = mkdtempSync(join(tmpdir(), 'context-package-check-'))
+const temp = realpathSync(mkdtempSync(join(tmpdir(), 'context-package-check-')))
 const npm = (args, cwd = checkout) => execFileSync('npm', args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] })
 function pack(name) {
   const result = JSON.parse(npm(['pack', '--workspace', name, '--json', '--pack-destination', temp]))[0]
@@ -94,15 +94,18 @@ export const view = await vault.create({ title: 'Independent consumer', scope: '
   execFileSync(process.execPath, ['--input-type=module', '-e', `
     import assert from 'node:assert/strict'
     import { realpathSync } from 'node:fs'
-    import { writeFile } from 'node:fs/promises'
+    import { writeFile, mkdir, stat } from 'node:fs/promises'
+    import { execFileSync } from 'node:child_process'
     import { Client } from '@modelcontextprotocol/sdk/client/index.js'
     import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js'
     const cli = process.argv[1], root = process.argv[2]
     const spec = { version: 1, task: 'Inspect example', acceptanceChecks: ['Complete function returned'], allowedFiles: ['example.ts'], sources: [{ path: 'example.ts', line: 2 }], exclusions: [], unresolvedQuestions: [] }
     const text = result => result.content.find(item => item.type === 'text').text
-    async function open() {
+    const handoverDirectory = root + '-private'
+    await mkdir(handoverDirectory, { mode: 0o700 })
+    async function open(handovers = false) {
       const client = new Client({ name: 'packed-packet-check', version: '1' })
-      await client.connect(new StdioClientTransport({ command: process.execPath, args: [cli, 'navigate', root], stderr: 'pipe' }))
+      await client.connect(new StdioClientTransport({ command: process.execPath, args: [cli, 'navigate', root, ...(handovers ? ['--handover-dir', handoverDirectory] : [])], stderr: 'pipe' }))
       return client
     }
     let client = await open()
@@ -110,7 +113,7 @@ export const view = await vault.create({ title: 'Independent consumer', scope: '
       const packetTool = (await client.listTools()).tools.find(tool => tool.name === 'repository_packet')
       assert.ok(packetTool)
       assert.equal(packetTool.inputSchema.type, 'object')
-      assert.deepEqual(Object.keys(packetTool.inputSchema.properties).sort(), ['expectedGeneration', 'format', 'maxBytes', 'mode', 'spec'])
+      assert.deepEqual(Object.keys(packetTool.inputSchema.properties).sort(), ['expectedGeneration', 'expectedRoot', 'format', 'maxBytes', 'mode', 'spec'])
       assert.deepEqual([...packetTool.inputSchema.required].sort(), ['expectedGeneration', 'mode', 'spec'])
       assert.equal(packetTool.inputSchema.additionalProperties, false)
       const early = await client.callTool({ name: 'repository_packet', arguments: { mode: 'plan', expectedGeneration: 'unrefreshed', spec } })
@@ -125,6 +128,29 @@ export const view = await vault.create({ title: 'Independent consumer', scope: '
       assert.equal(value.packet.sources.length, 1)
       assert.equal(value.packet.sources[0].startLine, 1)
       assert.equal(value.packet.sources[0].endLine, 3)
+      const state = { version: 1, status: 'in_progress', completed: [], decisions: [], checks: [{ index: 0, outcome: 'not_run', evidence: null }], unresolvedQuestions: [], pendingEffects: [], nextAction: 'Inspect example.ts' }
+      const packetFile = handoverDirectory + '/packet.json', stateFile = handoverDirectory + '/state.json', checkpoint = handoverDirectory + '/cli.json'
+      await writeFile(packetFile, JSON.stringify(value.packet)); await writeFile(stateFile, JSON.stringify(state))
+      execFileSync(process.execPath, [cli, 'handover', 'save', '--root', root, '--packet', packetFile, '--state', stateFile, '--out', checkpoint])
+      const resumed = JSON.parse(execFileSync(process.execPath, [cli, 'handover', 'resume', '--root', root, '--handover', checkpoint], { encoding: 'utf8' }))
+      assert.equal(resumed.state.nextAction, state.nextAction)
+      assert.equal((await stat(checkpoint)).mode & 0o777, 0o600)
+      const { resumeHandover } = await import('@forgesworn/context-tools')
+      assert.equal((await resumeHandover({ root, handover: checkpoint })).state.nextAction, state.nextAction)
+      const handoverClient = await open(true)
+      try {
+        const saved = await handoverClient.callTool({ name: 'repository_handover_save', arguments: { expectedRoot: root, name: 'mcp.json', packet: value.packet, state } })
+        assert.notEqual(saved.isError, true, text(saved))
+      } finally { await handoverClient.close() }
+      const secondClient = await open(true)
+      try {
+        const continued = await secondClient.callTool({ name: 'repository_handover_resume', arguments: { expectedRoot: root, name: 'mcp.json' } })
+        assert.notEqual(continued.isError, true, text(continued))
+        assert.equal(JSON.parse(text(continued)).state.nextAction, state.nextAction)
+        const wrong = await secondClient.callTool({ name: 'repository_search', arguments: { expectedRoot: handoverDirectory, term: 'example' } })
+        assert.equal(wrong.isError, true)
+      } finally { await secondClient.close() }
+
       const found = await client.callTool({ name: 'repository_search', arguments: { term: 'InstalledSuffixMarker', format: 'json' } })
       assert.notEqual(found.isError, true, text(found))
       assert.deepEqual(JSON.parse(text(found)).results.map(item => item.path).sort(), ['cc', 'cxx', 'dart', 'hh', 'hpp', 'hxx', 'kts'].map(extension => 'example.' + extension))
@@ -217,6 +243,7 @@ export const view = await vault.create({ title: 'Independent consumer', scope: '
   console.log('Packed core: independent Node import, declarations and browser bundle passed.')
   console.log('Packed Node tools: independent CLI create, append and restart recovery passed.')
   console.log('Packed repository MCP: complete source packet, stale rejection, refresh and restart passed.')
+  console.log('Packed handovers: CLI/API save and resume, private writes, fresh MCP connection and wrong-root rejection passed.')
 } finally {
   rmSync(temp, { recursive: true, force: true })
 }

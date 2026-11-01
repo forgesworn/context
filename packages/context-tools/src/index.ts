@@ -1,6 +1,7 @@
 export { ContextFileStore } from './context-store.js'
 export { callContextTool, registerContextTools, serveContextMcp } from './context-mcp.js'
 export type { ContextTool } from './context-mcp.js'
+export { saveHandover, resumeHandover } from './task-handover.mjs'
 export { scanPackageEcosystem } from './repository-scan.js'
 export type { RepositoryScan, RepositoryScanOptions } from './repository-scan.js'
 export { scanSourceGraph } from './source-scan.js'
