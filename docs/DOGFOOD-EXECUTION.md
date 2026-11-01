@@ -1205,3 +1205,120 @@ credits (rate not read for this run); 24 reviewer sessions 679,064 input and
 165,239 output on the subscription, no retries. Wall time 116 minutes against
 66 for v2; no arm reached the 80-turn cap. Not pooled with v1 or v2. Nothing
 is published; version stays 0.3.3.
+
+
+## 1 November 2026 — portable handover candidate and three client bindings
+
+Owner authorised the first slice after the shared engineering skill release:
+make the existing task-handover helper installable and improve project-bound
+Codex, Claude and Kimi setup. Candidate branch: `feat/portable-task-handovers`,
+starting at `d725fbc`. This is local implementation and protocol evidence, not a
+new published package, native model-driven client acceptance or measured savings.
+Initial candidate SHA-256 prefixes are `9378ffcd20bf` for `task-handover.mjs`,
+`be20a481696a` for `repository-handover-mcp.ts` and `2a32b55995ec` for
+`repository-navigation-mcp.ts`, all under `packages/context-tools/src`.
+
+The handover implementation now lives in the Node tools package, exported as
+`saveHandover`/`resumeHandover` and available through
+`encrypted-context handover save|resume`. The checkout script remains a thin
+compatibility entrypoint. No signed formats or collection grants change.
+
+Navigation keeps its six tools by default. Explicit `--handover-dir` configuration
+adds save/resume tools restricted to simple checkpoint names in that existing
+private directory. Their `expectedRoot` is required. All six navigation requests
+also accept optional `expectedRoot` for compatible wrong-checkout rejection before
+indexing or retrieval. Tool declarations stay within the existing 6,200-byte
+navigation budget by shortening descriptions rather than raising the gate.
+
+Validation:
+
+- `npm run check` passed the full workspace suite and independent tarball smoke.
+- After the cancellation-before-write refinement, the four new MCP/binding tests,
+  all 13 existing handover regressions and isolated tarball smoke passed again.
+  Focused doctor tests also passed after its schema-aware request binding change.
+- Packed-package checks exercised CLI and exported API save/resume, private
+  mode-0600 files, new stdio connections and wrong-root rejection. No checkout
+  helper fallback was available inside that installation.
+- Both unchanged benchmark checks passed with minimum required-source recall 1.0.
+  These synthetic gates do not establish whole-task savings.
+- The existing Codex project entry omitted explore/coverage from its allowlist;
+  it now enables all eight tools with explicit checkout and handover storage.
+  Its separate signed-context entry was preserved. Claude received a local
+  repository override, and Kimi a project-local MCP entry. User credentials,
+  provider/model choices and tool-approval settings were not changed. These
+  machine-specific files remain outside commits.
+- MCP SDK probes loaded each actual saved repository binding, discovered eight
+  tools, verified the root and rejected a mismatched root. A checkpoint saved
+  through the Codex binding was resumed through the Claude and Kimi bindings.
+  After a selected source edit, all three refused the old checkpoint. This
+  exercises saved commands and protocol behaviour, **not the native models**.
+
+The private illustrative checkpoint is named
+`portable-handovers-1793530497171.json` beneath the configured task-handover
+storage. It is deliberately stale after the later source refinement and must
+not be used as current implementation evidence. No source, transcript or
+credential from that private record is copied here.
+
+The final task still needs native sessions started in the selected checkout to
+qualify discovery, actual tool use and continuation in each host. Codex CLI
+0.166.0 and Kimi Code 2.3.2 were present; their presence/configuration is not a
+passing model-driven task. Independent review, hosted CI and package publication
+were not performed for this candidate. Existing G release gates and the
+OpenCode qualification plan remain open.
+
+Temporary package installs, fixture repositories and probe files were removed;
+all probe transports were closed. The private configured handover directory and
+illustrative checkpoint are retained. No task-created server remains running.
+
+
+## 1 November 2026 — native acceptance and 0.5.0 release preparation
+
+The owner authorised native acceptance, PR/CI review and a versioned release.
+PR #40 contains the implementation; the first `ec056ae` CI run passed.
+Actual fresh native sessions then exercised the configured project binding:
+
+| Client | Observed result | Scope |
+| --- | --- | --- |
+| Codex CLI 0.166.0, configured Sol/high | Four MCP calls retrieved source and saved `native-clients-20261101.json` | Actual model-directed status, refresh, packet and checkpoint save |
+| Claude Code, reported `claude-opus-5-5`, existing effort setting | Native MCP status and resume returned the source finding and next action from that checkpoint | Actual model-directed continuation, followed by independent read-only code review |
+| Kimi Code 2.3.2, configured `kimi-code/k3.1-pro` | Native resume succeeded; Kimi edited only the task-owned marker, then resume returned the stale-source error | Actual model-directed continuation, file edit and negative freshness check |
+
+Kimi's first invocation correctly skipped the untrusted project server and made
+no tool calls. The second used the documented process-scoped
+`KIMI_CODE_TRUST_WORKSPACE=1` for this exact owner-authorised checkout. No saved
+permission mode, model choice or provider setting was changed. Normal launches
+still require the user to trust the project. This qualification is not proof
+that arbitrary untrusted project servers will load.
+
+Native review found no blocking defect but prompted further hardening. The
+follow-up independent review likewise found no blocking defect, with low-severity
+items resolved as follows:
+
+- Checkpoints are written, synced and closed in a private temporary file before
+  an exclusive hard-link publication. Write, sync or close failure leaves no
+  published partial record. Concurrent names cannot overwrite each other.
+- Cancellation before publication removes scratch; the deterministic regression
+  aborts at a controlled file-open boundary, replacing the earlier timer-based
+  check. Source verification remains bounded rather than interruptible.
+- MCP storage is validated at startup and on calls: canonical existing directory,
+  no symlink path and no group/other permissions on POSIX. Setup docs explain
+  mode 0700 and macOS path aliases.
+- The docs identify possible private temporary files after a kill/power loss and
+  require checking for an active writer before removing an orphan. No automatic
+  sweep races other clients. Filesystem crash durability remains outside scope.
+- The suggested unbuilt-checkout compatibility regression was not reproduced:
+  the old worker-packet entrypoint already imported built `dist/source-packet.mjs`.
+  The documented build requirement remains applicable.
+
+Fault-injection regressions were observed failing before the corresponding
+fixes. Local full checks, focused handover tests and independent tarball smoke
+passed after hardening; final hosted CI and published asset checks are recorded
+with the release. Native model sessions exercised `ec056ae`; subsequent persistence
+changes use the same wire/record formats and receive separate focused/package
+checks. No new provider benchmark or measured savings claim follows.
+
+Private prompts, native event logs and review outputs are retained under the
+local Z1P acceptance evidence directory for this date. They contain machine paths
+and are not published. Acceptance tool calls retrieved source and task state
+scoped to this repository; signed context was not accessed. The transient marker was
+removed after testing, and the saved checkpoint is now historical/stale.

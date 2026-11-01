@@ -4,6 +4,25 @@ Latest implementation and adoption results are in the
 [dogfood execution ledger](docs/DOGFOOD-EXECUTION.md). The dated snapshots below
 remain historical evidence; internal pilot acceptance is separate from G0–G4.
 
+## 0.5.0 release preparation, 1 November 2026
+
+Adds installed CLI/API task handovers and opt-in MCP save/resume with explicit
+private storage, compatible expectedRoot guards on navigation requests, atomic
+exclusive checkpoint publication and validation of checkpoint directories.
+The unsigned v1 record format is retained. The browser-safe core changes only
+its version, kept in step with the tools package.
+
+Local workspace and isolated packed-package checks passed. Native Codex save,
+Claude resume and Kimi resume/edit/stale-rejection were observed; Kimi used a
+process-only project trust setting. Independent native review informed the
+fault/cancellation/directory fixes. Details and limits are in the
+[execution ledger](docs/DOGFOOD-EXECUTION.md#1-november-2026--native-acceptance-and-050-release-preparation).
+
+Final commit CI, matching tarball checksums and fresh installation readback must
+accompany the GitHub release. npm publication is not part of this release.
+No task-cost, subscription-headroom, general G0–G4 completion or cash-saving claim
+is made. The existing broader qualification gates remain open.
+
 ## 0.4.3 shipment checks, 27 September 2026
 
 Navigation refresh no longer fails on a source-suffixed file that is not valid

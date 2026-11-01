@@ -336,8 +336,11 @@ export async function diagnoseRepository(
 
     const callTool = async (name: ToolName, args: Record<string, unknown>) => {
       try {
+        const schema = byName.get(name)?.inputSchema as { properties?: Record<string, unknown> } | undefined;
+        const arguments_ = schema?.properties && 'expectedRoot' in schema.properties
+          ? { ...args, expectedRoot: root } : args;
         const res = (await client.callTool(
-          { name, arguments: args },
+          { name, arguments: arguments_ },
           undefined,
           requestOpts(),
         )) as McpCallResult;
@@ -619,7 +622,7 @@ export async function diagnoseRepository(
       },
       clientAcceptance: 'not-tested',
       nextStep:
-        'Merge binding into the selected project client configuration, reconnect, and verify all five tools in that client. Directory changes do not retarget the server.',
+        'Merge binding into the selected project client configuration, reconnect, and verify all six tools in that client. Directory changes do not retarget the server.',
     };
 
     return report;

@@ -82,6 +82,16 @@ and effort; record the actual values rather than silently switching them.
 
 ## Ordered work queue
 
+The 1 November owner-authorised first slice packages the existing task-handover
+helper into the installed CLI and optional, directory-scoped MCP operations,
+adds request checkout binding checks, and prepares Codex/Claude/Kimi project
+setup. Implementation and deterministic package/stdio checks do not establish
+real model-driven client acceptance or measured savings. See
+[task handovers](TASK-HANDOVERS.md); subsequent evidence belongs in the existing
+execution ledger. Structured execution receipts, Kimi usage import and measured
+incremental refresh remain separate follow-ups. Existing OpenCode and public
+release gates remain in force.
+
 The owner's 22 September priority is [deterministic code intelligence and better
 developer results](DETERMINISTIC-CODE-INTELLIGENCE.md). Begin OS4b-1 with the
 reproduced shadowed-call correctness defect, then OS4b-2 symbol resolution and

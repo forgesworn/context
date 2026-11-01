@@ -41,7 +41,7 @@ Use [the dogfood goals](docs/FORGESWORN-DOGFOOD-GOALS.md) as the internal adopti
 sequence and [GOALS.md](GOALS.md) as the public release gates.
 
 For first-time setup or missing repository tools, follow the
-[portable setup guide](docs/GETTING-STARTED.md). Verify all four tools and the
+[portable setup guide](docs/GETTING-STARTED.md). Verify all six tools and the
 active checkout root before relying on the connection. Discover local executable
 paths, preserve existing client settings and explain any required reconnect;
 saved configuration alone is not client acceptance.

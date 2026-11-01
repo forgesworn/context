@@ -135,7 +135,7 @@ describe('repository packet MCP adapter', () => {
       const packetTool = tools.tools.find((tool) => tool.name === 'repository_packet')
       expect(packetTool?.inputSchema.type).toBe('object')
       expect(packetTool?.inputSchema.additionalProperties).toBe(false)
-      expect(Object.keys(packetTool?.inputSchema.properties ?? {}).sort()).toEqual(['expectedGeneration', 'format', 'maxBytes', 'mode', 'spec'])
+      expect(Object.keys(packetTool?.inputSchema.properties ?? {}).sort()).toEqual(['expectedGeneration', 'expectedRoot', 'format', 'maxBytes', 'mode', 'spec'])
       expect(packetTool?.inputSchema.required).toEqual(['mode', 'spec', 'expectedGeneration'])
       const early = await call(connection.client, { mode: 'build', spec: spec([{ path: 'alpha.ts', startLine: 1, endLine: 3 }]), expectedGeneration: 'missing' })
       expect(early.isError).toBe(true)

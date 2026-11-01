@@ -16,6 +16,12 @@ export interface ContextCliOptions {
   configureVault?: (options: ContextVaultOptions) => ContextVaultOptions
 }
 export async function main(options: ContextCliOptions = {}): Promise<void> {
+  if (process.argv[2] === 'handover') {
+    const { runHandoverCli, formatHandoverError } = await import('./task-handover.mjs')
+    try { await runHandoverCli(process.argv.slice(3)) }
+    catch (error) { throw new Error(formatHandoverError(error)) }
+    return
+  }
   const { values, positionals } = parseArgs({ allowPositionals: true, options: {
     identity: { type: 'string' }, state: { type: 'string' }, room: { type: 'string' },
     'expect-pubkey': { type: 'string' }, personal: { type: 'boolean' },
@@ -25,10 +31,12 @@ export async function main(options: ContextCliOptions = {}): Promise<void> {
     'max-file-bytes': { type: 'string' }, 'max-records': { type: 'string' },
     'max-repositories': { type: 'string' },
     term: { type: 'string' },
+    'handover-dir': { type: 'string' },
   } })
   if (values.help) {
     process.stdout.write((options.name ?? 'encrypted-context') + ' mcp|call <tool> --identity <existing agent hex-key file> --expect-pubkey <agent hex pubkey> --state <encrypted cache> --room <room hex id> [--server <HTTPS origin> ...]\n' +
-      (options.name ?? 'encrypted-context') + ' navigate [directory]   (no directory: the Git checkout containing the working directory)\n' +
+      (options.name ?? 'encrypted-context') + ' navigate [directory] [--handover-dir <existing private directory>]   (no directory: the Git checkout containing the working directory)\n' +
+      (options.name ?? 'encrypted-context') + ' handover save --root ABS --packet ABS --state ABS --out ABS | handover resume --root ABS --handover ABS\n' +
       (options.name ?? 'encrypted-context') + ' doctor <repository-root> --term <known-identifier>\n' +
       (options.name ?? 'encrypted-context') + ' scan <directory> [--max-packages 64] [--max-depth 4] [--observed-at <epoch-seconds>]\n' +
       (options.name ?? 'encrypted-context') + ' scan-source <directory> [--max-files 64] [--max-depth 8] [--max-bytes 1048576] [--max-file-bytes 262144] [--max-records 128] [--observed-at <epoch-seconds>]\n' +
@@ -48,12 +56,13 @@ export async function main(options: ContextCliOptions = {}): Promise<void> {
   if (values.term !== undefined) throw new Error('--term is only supported by doctor. See --help.')
   if (positionals[0] === 'navigate') {
     if (positionals.length > 2) throw new Error('Choose at most one directory to navigate.')
-    if (Object.keys(values).length > 0) throw new Error('navigate takes no flags. See --help.')
+    if (Object.keys(values).some(key => key !== 'handover-dir')) throw new Error('navigate only accepts --handover-dir. See --help.')
     const { resolveCheckoutRoot, serveRepositoryNavigationMcp } = await import('./repository-navigation-mcp.js')
     // Resolved once: the process stays bound to this root even if the client later changes directory.
-    await serveRepositoryNavigationMcp(positionals[1] ?? await resolveCheckoutRoot(process.cwd()))
+    await serveRepositoryNavigationMcp(positionals[1] ?? await resolveCheckoutRoot(process.cwd()), { handoverDirectory: values['handover-dir'] })
     return
   }
+  if (values['handover-dir'] !== undefined) throw new Error('--handover-dir is only supported by navigate. See --help.')
   if (positionals[0] === 'scan-broad-source') {
     if (positionals.length !== 2) throw new Error('Choose one directory to scan.')
     const result = await scanBroadSourceGraph(positionals[1], { maxFiles: integer(values['max-files']),
