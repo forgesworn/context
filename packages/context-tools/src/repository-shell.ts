@@ -26,22 +26,22 @@ export async function writeRepositoryShellFrame(output: Writable, value: unknown
   if (output.destroyed || output.writableEnded) throw new Error('shell output is closed')
   await new Promise<void>((resolve, reject) => {
     let settled = false
-    const cleanup = () => { output.off('close', closed); output.off('error', failed) }
+    const cleanup = () => { output.off('close', closed); output.off('close', cleanup); output.off('error', failed) }
     const complete = (error?: Error | null) => {
       if (settled) return
       settled = true
       if (error) {
-        // Node may emit error after its write callback. Keep the listener until
-        // close so that a rejected callback cannot cause an unhandled event.
+        // Node may emit error after its write callback. Retain the listener
+        // until that error or close, including streams that suppress close.
         if (output.closed) cleanup(); else output.once('close', cleanup)
         reject(error)
       } else { cleanup(); resolve() }
     }
-    const closed = () => complete(new Error('shell output closed during write'))
-    const failed = (error: Error) => complete(error)
+    const closed = () => { complete(new Error('shell output closed during write')); cleanup() }
+    const failed = (error: Error) => { complete(error); cleanup() }
     output.once('close', closed); output.on('error', failed)
     try { output.write(JSON.stringify(value) + '\n', complete) }
-    catch (error) { cleanup(); complete(error instanceof Error ? error : new Error('shell output failed')) }
+    catch (error) { complete(error instanceof Error ? error : new Error('shell output failed')); cleanup() }
   })
 }
 

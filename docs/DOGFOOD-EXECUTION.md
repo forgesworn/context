@@ -1566,3 +1566,12 @@ between the ready event and iterator startup; explicit early stream handlers
 fixed it. These attempts remain recorded. Final source, package and hosted gates
 must be read from their exact revision rather than inferred from these earlier
 runs. Native Windows qualification and broader savings/product gates remain open.
+
+A final bounded native Codex review found a lower-severity listener retention
+case when a writable suppresses `close` or disables automatic destruction. An
+observed failing listener-count assertion was fixed by releasing the frame
+listeners on the error event as well as close. The final focused set covers both
+stream options. That review reported 82,338 input tokens including 64,640 cached,
+plus 2,133 output including 1,795 reasoning; these are separate review usage,
+not whole-task totals. The full local pre-push gate passed the initial ten-test
+revision; the follow-up commit is independently gated again before shipment.

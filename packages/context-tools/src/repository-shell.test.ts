@@ -173,10 +173,15 @@ it('rejects closed output and closure during a backpressured write instead of wa
       expect(result).toBe('closed')
     } finally { clearTimeout(timer); output.emit('drain'); await write }
   }
-  const failed = new Writable({ write(_chunk, _encoding, callback) { callback(new Error('output failed')) } })
-  await expect(writeRepositoryShellFrame(failed, { id: 2 })).rejects.toThrow('output failed')
-  if (!failed.closed) await new Promise(resolve => failed.once('close', resolve))
-  expect(failed.listenerCount('error')).toBe(0)
+  for (const options of [{}, { emitClose: false }, { autoDestroy: false }]) {
+    const failed = new Writable({ ...options, write(_chunk, _encoding, callback) { callback(new Error('output failed')) } })
+    await expect(writeRepositoryShellFrame(failed, { id: 2 })).rejects.toThrow('output failed')
+    await new Promise(resolve => setImmediate(resolve))
+    try {
+      expect(failed.listenerCount('error')).toBe(0)
+      expect(failed.listenerCount('close')).toBe(0)
+    } finally { failed.destroy() }
+  }
 })
 
 it('closes an idle connection and releases its task when its output disappears', async () => {
