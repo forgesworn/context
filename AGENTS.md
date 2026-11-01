@@ -57,11 +57,15 @@ syntax blocks and `build` for reviewed exact ranges. Read the returned source;
 complete syntax alone does not establish complete task evidence.
 
 Refresh after relevant edits, branch switches, pulls, merges or rebases, and
-obtain new packets. A shell directory change does not retarget the server. A
-different repository or worktree needs its own binding: a session started there
+obtain new packets. For legacy fixed-root `navigate`, a shell directory change
+does not retarget the server. A different repository or worktree needs its own binding: a session started there
 with the no-directory entry, or its own explicit root; a moved explicit checkout
 needs its configured path updated. Reconnect after binding or server implementation
-changes; source refresh alone cannot reload server code. Fall back to bounded
+changes; source refresh alone cannot reload server code. Prefer the user-level
+`session` connection described in [global setup](docs/GLOBAL-SESSIONS.md): pass
+the selected canonical checkout as `expectedRoot` on every call. It starts from
+any working folder and evicts the previous index when switching checkouts.
+Fall back to bounded
 `rg`/file reads for unavailable tools, excluded, unsupported or missing evidence.
 Tiny edits in known files do not require a scan. See [daily use](docs/DAILY-USE.md)
 and [source packets](docs/WORKER-PACKETS.md).

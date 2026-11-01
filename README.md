@@ -1,5 +1,9 @@
 # Z1P Core
 
+[Use Z1P in every coding session](docs/GLOBAL-SESSIONS.md): one global MCP entry
+for Codex, Claude and Kimi, with host-verified packets for direct Ollama workers.
+Every request explicitly selects a checkout; source stays local to the tools.
+
 Local code graphs and bounded evidence for coding agents.
 
 **Use Context on your own machine and repositories:** follow the

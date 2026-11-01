@@ -92,6 +92,13 @@ execution ledger. Structured execution receipts, Kimi usage import and measured
 incremental refresh remain separate follow-ups. Existing OpenCode and public
 release gates remain in force.
 
+The follow-up corrects availability across **Kimi, Ollama, Codex and Claude**:
+prefer one user-level `session` MCP entry and the shared `z1p-context` skill,
+with explicit checkout selection on every call. A parent-workspace session must
+not depend on a project-local binding. Direct Ollama workers consume host-verified
+packets through the existing helper. See [global sessions](GLOBAL-SESSIONS.md)
+and the [execution ledger](DOGFOOD-EXECUTION.md) for acceptance scope.
+
 The owner's 22 September priority is [deterministic code intelligence and better
 developer results](DETERMINISTIC-CODE-INTELLIGENCE.md). Begin OS4b-1 with the
 reproduced shadowed-call correctness defect, then OS4b-2 symbol resolution and

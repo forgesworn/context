@@ -184,6 +184,45 @@ export const view = await vault.create({ title: 'Independent consumer', scope: '
       const result = await client.callTool({ name: 'repository_packet', arguments: { mode: 'plan', expectedGeneration: refreshed.generation, spec } })
       assert.notEqual(result.isError, true, text(result))
     } finally { await client.close() }
+    // The global session starts outside Git and requires an explicit root.
+    const globalBase = root + '-global-private'
+    await mkdir(globalBase, { mode: 0o700 })
+    const secondRoot = root + '-second'
+    await mkdir(secondRoot)
+    await writeFile(secondRoot + '/other.ts', 'export const other = 42')
+    execFileSync('git', ['init', '--quiet', secondRoot])
+    async function openGlobal() {
+      const c = new Client({ name: 'packed-global-session', version: '1' })
+      await c.connect(new StdioClientTransport({ command: process.execPath, args: [cli, 'session', '--handover-base', globalBase], cwd: process.cwd(), stderr: 'pipe' }))
+      return c
+    }
+    const globalState = { version: 1, status: 'in_progress', completed: [], decisions: [], checks: [{ index: 0, outcome: 'not_run', evidence: null }], unresolvedQuestions: [], pendingEffects: [], nextAction: 'Inspect example.ts' }
+    let global = await openGlobal()
+    try {
+      const tools = (await global.listTools()).tools
+      assert.equal(tools.length, 8)
+      assert.ok(tools.every(t => t.inputSchema.required.includes('expectedRoot')))
+      assert.equal((await global.callTool({ name: 'repository_status', arguments: {} })).isError, true)
+      assert.equal((await global.callTool({ name: 'repository_status', arguments: { expectedRoot: process.cwd() } })).isError, true)
+      const status = JSON.parse(text(await global.callTool({ name: 'repository_refresh', arguments: { expectedRoot: root } })))
+      const result = await global.callTool({ name: 'repository_packet', arguments: { expectedRoot: root, mode: 'plan', expectedGeneration: status.generation, spec, format: 'json' } })
+      assert.notEqual(result.isError, true, text(result))
+      const packet = JSON.parse(text(result)).packet
+      const saved = await global.callTool({ name: 'repository_handover_save', arguments: { expectedRoot: root, name: 'global.json', packet, state: globalState } })
+      assert.notEqual(saved.isError, true, text(saved))
+      const other = await global.callTool({ name: 'repository_search', arguments: { expectedRoot: secondRoot, term: 'other', format: 'json' } })
+      assert.notEqual(other.isError, true, text(other))
+      assert.equal(JSON.parse(text(other)).results[0].path, 'other.ts')
+      const evicted = JSON.parse(text(await global.callTool({ name: 'repository_status', arguments: { expectedRoot: root } })))
+      assert.equal(evicted.generation, null)
+    } finally { await global.close() }
+    global = await openGlobal()
+    try {
+      const resumed = await global.callTool({ name: 'repository_handover_resume', arguments: { expectedRoot: root, name: 'global.json' } })
+      assert.notEqual(resumed.isError, true, text(resumed))
+      assert.equal(JSON.parse(text(resumed)).state.nextAction, globalState.nextAction)
+      assert.equal((await global.callTool({ name: 'repository_handover_resume', arguments: { expectedRoot: secondRoot, name: 'global.json' } })).isError, true)
+    } finally { await global.close() }
     // Without a directory, the server binds the checkout it is started in.
     client = new Client({ name: 'packed-session-root-check', version: '1' })
     await client.connect(new StdioClientTransport({ command: process.execPath, args: [cli, 'navigate'], cwd: root, stderr: 'pipe' }))

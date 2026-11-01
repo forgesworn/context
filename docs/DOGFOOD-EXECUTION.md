@@ -1322,3 +1322,41 @@ local Z1P acceptance evidence directory for this date. They contain machine path
 and are not published. Acceptance tool calls retrieved source and task state
 scoped to this repository; signed context was not accessed. The transient marker was
 removed after testing, and the saved checkpoint is now historical/stale.
+
+
+## 1 November: global availability across four hosts
+
+The owner's correction is that any coding session needs access to context,
+including sessions opened at a non-Git parent workspace. Context 0.6.0 adds a
+user-level `session` stdio entry with six navigation tools and optional private
+handovers. Every call requires a canonical checkout/worktree `expectedRoot`;
+switching roots evicts the previous index. No sibling discovery or ambient
+cross-project history is introduced. Legacy fixed-root `navigate` remains usable.
+
+Local acceptance exercised real Codex, Claude and Kimi sessions started from a
+non-Git workspace. Each retrieved the new implementation through MCP, selected
+a second checkout using status only, and observed the first generation evicted.
+Kimi loaded the user server without the prior process-scoped project-trust
+override. Existing model, effort, trust and permission defaults were retained;
+Claude's test allowed only the two requested read-only MCP tools for that process.
+
+Direct Ollama acceptance used the existing M4 endpoint and ForgeSworn adapter,
+with a freshly verified source packet and Flash/thinking off. Preflight measured
+39,765 UTF-8 bytes including shared engineering instructions; the helper recorded
+8,042 prompt and 624 completion tokens. Host review checked the extraction's
+root-validation and index-eviction rules and citations against source. This is
+packet-consumption evidence, not native raw-API MCP discovery or a savings study.
+The shared skill is linked across all four environments; raw Ollama does not
+scan skill directories. Private prompts, logs and receipts remain in the dated
+local Z1P acceptance directory.
+
+Deterministic tests cover explicit root rejection, concurrent root isolation,
+index eviction, private storage revalidation, checkpoint isolation and fresh
+connections. Independent package installation tests start the actual global CLI
+outside Git and exercise source packets, switching and save/resume. The initial
+package check exposed a typo in the new test assertion; correcting that assertion
+made the package check pass. Existing token, navigation and scale gates remain.
+Hosted CI, release bytes and the final installed binding are tracked with the
+PR/release; native calls above exercised the candidate build. A configured entry
+does not retrofit tools into an already-running conversation: reconnect or start
+a new session once after installation.
