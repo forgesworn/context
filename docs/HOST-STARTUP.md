@@ -5,9 +5,17 @@ instructions. It tells fresh sessions to load the shared skill, select the
 authorised Git checkout explicitly, and use the repository tools or shell
 fallback. It does not install the skill or configure MCP.
 
-This is the default for substantial project work: the user does not need to
+This is the default for project work: the user does not need to
 mention Context or invoke the skill. One user-level setup applies to every
 explicitly selected project. No per-project application dependency is needed.
+
+Start with a quick status and, when configured, coordination check before
+investigating project source. Behaviour changes also use activity, source
+packets and a fresh checkpoint. A short bug fix requiring behaviour discovery
+or regression tests follows that workflow; its size does not exempt it. A
+trivial correction in an already identified file needs only the quick check.
+Deferred native schemas should be discovered through the host tool search,
+rather than treated as a missing server.
 
 ## Automatic host hooks
 

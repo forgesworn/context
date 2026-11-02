@@ -49,10 +49,10 @@ export async function startupContext(input: unknown, options: StartupHookOptions
         sourceFreshness: 'not-checked', nativeToolDiscovery: 'host-must-verify', sourceScanned: false };
     const context = 'Z1P repository context is enabled by default for project work; the user need not request it.\n' +
         'Startup observation (data, not authority): ' + JSON.stringify(report) + '\n' +
-        'Load the shared z1p-context skill at ' + JSON.stringify(skill) + ' before substantial investigation or edits. ' +
+        'Load the shared z1p-context skill at ' + JSON.stringify(skill) + ' at the start of project work. ' +
         (root ? 'Confirm this checkout is the one authorised by the actual task. ' : 'The working folder is not a selected checkout. Choose the task repository explicitly; do not scan siblings. ') +
-        'Discover native repository_* tools. Read repository_status and repository_coordination; publish your task and intended paths before edits. ' +
-        'Retrieve current source packets, poll notes and renew activity between steps, and save a checkpoint before handover. ' +
+        'Before investigating project source, discover native repository_* tools and call repository_status and, when configured, repository_coordination. If schemas are deferred, use the host tool search; deferred tools are not absent tools. For behaviour changes, publish your task and intended paths before edits. ' +
+        'Retrieve implementation and test evidence with repository_packet, poll notes and renew activity between steps, then refresh and save a checkpoint before handover. A short bug fix requiring behaviour discovery or regression tests uses this workflow. A trivial correction in an already identified file needs only the quick context check, not packets or a checkpoint. ' +
         'If native tools are absent, open one task-scoped shell connection: ' + command.map(quote).join(' ') +
         (options.cacheDirectory ? ' --label HOST --task TASK --path REL' : '') +
         '. Keep stdin open for newline-ended JSON requests. This startup check did not index source or establish source freshness. ' +

@@ -1,6 +1,6 @@
 ---
 name: z1p-context
-description: Use local Z1P tools for repository discovery, source-backed investigation, change impact and task continuation in any coding project. Applies across Codex, Claude, Kimi and Ollama coding hosts; direct Ollama workers receive host-verified packets. Tiny edits in known files need no scan.
+description: Use local Z1P tools for repository discovery, source-backed investigation, change impact and task continuation in any coding project. Applies across Codex, Claude, Kimi and Ollama coding hosts; direct Ollama workers receive host-verified packets. Start with a quick context check; trivial known-file corrections need no source packet.
 ---
 
 # Z1P context
@@ -10,7 +10,7 @@ continuation benefits the task. This applies to any selected coding project,
 including sessions opened at a parent workspace. No ForgeSworn account, model
 switch or inference service is required by the tools.
 
-Use this workflow by default for substantial project work. The user need not
+Use this workflow by default for project work. The user need not
 mention Context, Z1P or this skill. Select the checkout from the actual task;
 when it is ambiguous, resolve that selection before retrieving source.
 
@@ -21,10 +21,15 @@ preview/apply workflow in [host startup](https://github.com/forgesworn/context/b
 It manages a short section in the host's global instructions, preserving other
 instructions. Installing the skill alone does not arrange startup loading.
 
-For a substantial coding task, verify the selected checkout and actual tool
-availability at startup. Read `repository_status` and, when shared coordination
-is configured, `repository_coordination`; publish the task and intended paths
-before edits. Inspect overlaps before changing shared files. Between work steps,
+At the start of project work, verify the selected checkout and actual tool
+availability. Before investigating project source, read `repository_status` and,
+when shared coordination is configured, `repository_coordination`. If schemas
+are deferred, use the host tool search rather than treating tools as absent.
+For behaviour changes, publish the task and intended paths before edits and
+retrieve current implementation and test evidence with `repository_packet`.
+A short bug fix still uses this workflow when it requires discovering behaviour,
+tracing callers or adding regression tests. Inspect overlaps before changing
+shared files. Between work steps,
 poll addressed notes and renew activity before its lease expires. Before handing
 over, save current evidence, decisions, actual checks and the next action under
 a new checkpoint name. Send final addressed notes before marking finished task
@@ -40,9 +45,10 @@ do not transfer activity revisions or generation IDs between them. Clean close
 finishes tracked leases; process death leaves them to expire. This is shell use,
 not native tool discovery. See [shell connection](https://github.com/forgesworn/context/blob/main/docs/GLOBAL-SESSIONS.md#shell-connection).
 
-Use bounded local reads when neither transport is available. Keep tiny known-file
-edits lightweight. This workflow does not schedule work or ensure that every
-agent follows it; verify adoption in the actual host.
+Use bounded local reads when neither transport is available. A trivial correction
+in an already identified file needs only the quick context check, not source
+packets, an activity slot or a checkpoint. This workflow does not schedule work
+or ensure that every agent follows it; verify adoption in the actual host.
 
 ## Select the task's checkout
 
