@@ -33,7 +33,12 @@ await client.connect(new StdioClientTransport({ command:process.execPath,args:[c
 const call = async (name,args={}) => { const result=await client.callTool({name,arguments:{expectedRoot:root,...args}}); assert.notEqual(result.isError,true,JSON.stringify(result)); return JSON.parse(result.content[0].text); };
 try {
   assert.ok((await client.listTools()).tools.some(t=>t.name==='repository_graph'));
-  const status = await call('repository_refresh');
+  const initial = await call('repository_status');
+  assert.equal(initial.freshness, 'unavailable');
+  assert.equal(initial.nextAction.arguments.expectedRoot, root);
+  const status = await call(initial.nextAction.name, initial.nextAction.arguments);
+  assert.equal(status.freshness, 'current');
+  assert.equal((await call('repository_status')).nextAction, undefined);
   const query = await call('repository_graph',{expectedGeneration:status.generation,query:{action:'symbol',symbol:'target'}});
   assert.equal(query.nodes[0].name,'target');
   for(const [path,line,startLine,endLine]of[['lib.rs',3,1,4],['Api.kt',4,3,5]]) {

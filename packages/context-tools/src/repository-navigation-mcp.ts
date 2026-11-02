@@ -198,7 +198,7 @@ export function createRepositoryNavigationServer(root: string, options: Reposito
     'repository_status',
     {
       description:
-        'Current freshness/generation; no refresh.',
+        'Freshness/generation; refresh unavailable/stale/unknown.',
       inputSchema: z.object({ expectedRoot: z.string().optional() }).strict(),
       annotations: { readOnlyHint: true, openWorldHint: false },
     },
@@ -206,7 +206,10 @@ export function createRepositoryNavigationServer(root: string, options: Reposito
       try {
         checkRoot(input.expectedRoot)
         const status: NavigationStatus = await navigation.status(extra.signal)
-        return { content: [{ type: 'text' as const, text: JSON.stringify(status) }] }
+        const nextAction = status.freshness === 'current' ? undefined : {
+          name: 'repository_refresh', arguments: { expectedRoot: boundRoot },
+        }
+        return { content: [{ type: 'text' as const, text: JSON.stringify({ ...status, nextAction }) }] }
       } catch (error) {
         return { content: [{ type: 'text' as const, text: formatError(error) }], isError: true }
       }
@@ -217,7 +220,7 @@ export function createRepositoryNavigationServer(root: string, options: Reposito
     'repository_refresh',
     {
       description:
-        'Refresh after edits; invalidates cursors. Reads build on first use.',
+        'Build/refresh index; invalidates cursors.',
       inputSchema: z.object({ expectedRoot: z.string().optional() }).strict(),
       annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: false },
     },

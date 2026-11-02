@@ -143,6 +143,39 @@ usage estimates are not verified billing or whole-task cost, and preparation,
 repair and review usage remain unknown. No model, provider, permission setting,
 new hook event or executor was introduced.
 
+### Unbuilt-index recovery follow-up (0.13.2)
+
+The 0.13.1 installed-default trial improved startup use: Claude called status,
+coordination and activity without being asked. It still read source directly
+because the index was unbuilt, then skipped packets, refresh and checkpointing.
+The fix passed the independent four-test oracle, but lifecycle adoption remained
+partial. That result is retained separately from the earlier successful
+instance-only reminder trial.
+
+MCP status now supplies a root-bound `nextAction` calling `repository_refresh`
+when freshness is unavailable, stale or unknown. Status still does not build or
+refresh the index. The action disappears once the index is current. Generated
+startup guidance and the shared skill explicitly distinguish an unbuilt index
+from an absent tool. The action is technical recovery data, not permission to
+scan a different checkout or execute project code.
+
+A regression failed before this change and then followed the returned action
+to build an unbuilt index and refresh a stale one. Independent packed-consumer
+coverage follows the same recovery through a global session. Existing tool
+counts and discovery-byte thresholds remain unchanged.
+
+A further ordinary Claude task used the recovery candidate through the normal
+installed globals, with no settings or prompt override. It loaded the skill,
+checked status/coordination, built the unbuilt index, published activity, read
+implementation/test packets, edited, tested, refreshed and saved a checkpoint.
+The 86-second run passed the separate four-test oracle, and a fresh reader
+resumed its checkpoint as current. A readiness guard rejected one save that
+misclassified intentionally uncommitted work as a pending effect; Claude
+corrected it. Activity was marked done before that corrected save, so strict
+finish ordering remains unqualified. Guidance now explicitly requires waiting
+for checkpoint success before marking done; that wording was not model-retested
+under this bounded protocol. This is fixture evidence, not universal adherence.
+
 ### Accounting and delivery gates
 
 The Kimi wire importer was replayed against two real selected exports, including
