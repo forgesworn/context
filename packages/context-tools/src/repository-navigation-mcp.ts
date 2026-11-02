@@ -3,6 +3,7 @@ import { realpathSync } from 'node:fs'
 import { realpath } from 'node:fs/promises'
 import { resolve as resolvePath } from 'node:path'
 import { promisify } from 'node:util'
+import { randomUUID } from 'node:crypto'
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { z } from 'zod'
@@ -12,6 +13,7 @@ import { COVERAGE_MAX_ANSWER_BYTES, COVERAGE_MAX_QUOTE_CHARS, COVERAGE_MAX_QUOTE
 import { registerRepositoryHandovers } from './repository-handover-mcp.js'
 import { buildPacketInline, outlineSource, planPacketInline } from './source-packet.mjs'
 import { buildRepositoryGraph, queryRepositoryGraph } from './repository-graph.js'
+import { PacketReferences } from './repository-packet-references.js'
 
 // One identifier, or a printable ASCII literal containing one (hyphens, dots, spaces).
 const SEARCH_TERM = /^(?=.*[A-Za-z_])[\x20-\x7e]{1,128}$/
@@ -109,6 +111,7 @@ const searchInputSchema = z.object({
 export interface RepositoryNavigationServer {
   server: McpServer
   navigation: RepositoryNavigation
+  packetReferences: PacketReferences
 }
 
 export interface RepositoryNavigationOptions {
@@ -121,6 +124,7 @@ export function createRepositoryNavigationServer(root: string, options: Reposito
   // Named in the instructions so a client can compare it with its own checkout
   // without a status call. Refresh still validates the root itself.
   const boundRoot = displayRoot(root)
+  const packetReferences = new PacketReferences(boundRoot)
   const checkRoot = (expectedRoot?: string) => {
     if (expectedRoot !== undefined && expectedRoot !== boundRoot) throw new Error('repository binding does not match expectedRoot')
   }
@@ -221,6 +225,7 @@ export function createRepositoryNavigationServer(root: string, options: Reposito
       try {
         checkRoot(input.expectedRoot)
         const status: NavigationStatus = await navigation.refresh(extra.signal)
+        packetReferences.clear()
         return { content: [{ type: 'text' as const, text: JSON.stringify(status) }] }
       } catch (error) {
         return { content: [{ type: 'text' as const, text: formatError(error) }], isError: true }
@@ -324,7 +329,7 @@ export function createRepositoryNavigationServer(root: string, options: Reposito
     'repository_packet',
     {
       description:
-        'Verbatim source: build path/startLine/endLine (omit endLine for EOF); plan path/line for TS/JS/Rust/Kotlin blocks. Requires current generation. Default 64 KiB; oversized builds return outlines.',
+        'Exact source: build path/startLine/endLine (no endLine: EOF); plan path/line for TS/JS/Rust/Kotlin. packetId for checkpoint save. Current generation required; 64 KiB default; oversize returns outlines.',
       inputSchema: packetInputSchema,
       annotations: { readOnlyHint: true, openWorldHint: false },
     },
@@ -353,6 +358,7 @@ export function createRepositoryNavigationServer(root: string, options: Reposito
           const after = await currentPacketNavigation(navigation, input.expectedGeneration, extra.signal)
           const response: PacketResponse = {
             mode: input.mode,
+            packetId: 'packet-' + randomUUID(),
             packet: result.packet as PacketResponse['packet'],
             ...('coverage' in result ? { coverage: result.coverage as PacketResponse['coverage'] } : {}),
             navigation: {
@@ -368,6 +374,7 @@ export function createRepositoryNavigationServer(root: string, options: Reposito
           const maxBytes = input.maxBytes ?? DEFAULT_PACKET_MAX_BYTES
           if (Buffer.byteLength(encoded, 'utf8') > maxBytes) throw new Error(`repository packet response exceeds ${maxBytes} bytes`)
           if (before.revision !== after.revision) throw new Error('repository packet navigation changed during packet build')
+          packetReferences.put(response.packetId!, input.expectedGeneration, response.packet)
           if (input.format === 'json') return { content: [{ type: 'text' as const, text: encoded }] }
           const text = renderPacket(response, { fullCaveat: !caveatShown })
           caveatShown = true
@@ -389,8 +396,8 @@ export function createRepositoryNavigationServer(root: string, options: Reposito
     },
   )
 
-  if (options.handoverDirectory) registerRepositoryHandovers(server, boundRoot, options.handoverDirectory)
-  return { server, navigation }
+  if (options.handoverDirectory) registerRepositoryHandovers(server, boundRoot, options.handoverDirectory, { navigation, references: packetReferences })
+  return { server, navigation, packetReferences }
 }
 
 const OVERSIZE = /(source excerpts|packet|packet response|source aggregate) exceeds? \d+ bytes/
@@ -419,6 +426,7 @@ export function renderOutline(reason: string, outlines: SourceOutline[]): string
 
 interface PacketResponse {
   mode: 'build' | 'plan'
+  packetId?: string
   packet: {
     gitHEAD: string
     trust: string
@@ -498,6 +506,7 @@ export function renderPacket(response: PacketResponse, options: { fullCaveat?: b
     out.push(`merged: ${response.coverage.mergedSources.map((entry) => `${entry.path}:${entry.startLine}-${entry.endLine}`).join(', ')}`)
     out.push(`coverage: ${response.coverage.caveat}`)
   }
+  if (response.packetId) out.push(`packetId: ${response.packetId} (connection-local checkpoint reference; expires after refresh, reconnect or ten minutes)`)
   out.push(options.fullCaveat === false ? 'caveat: as on the first packet this session' : `caveat: ${packet.sufficiencyCaveat} ${response.caveat}`)
   return out.join('\n')
 }

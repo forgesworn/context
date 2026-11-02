@@ -72,12 +72,15 @@ it('isolates checkpoints by checkout and resumes across independent global conne
   try {
     const status = value(await c.client.callTool({ name: 'repository_refresh', arguments: { expectedRoot: a } }))
     const spec = { version: 1, task: 'Continue selected repository', acceptanceChecks: ['Read source'], allowedFiles: ['example.ts'], sources: [{ path: 'example.ts', startLine: 1, endLine: 1 }], exclusions: [], unresolvedQuestions: [] }
-    const packet = value(await c.client.callTool({ name: 'repository_packet', arguments: { expectedRoot: a, expectedGeneration: status.generation, mode: 'build', format: 'json', spec } })).packet
+    const built = value(await c.client.callTool({ name: 'repository_packet', arguments: { expectedRoot: a, expectedGeneration: status.generation, mode: 'build', format: 'json', spec } }))
+    const packet = built.packet
     const state = { version: 1, status: 'in_progress', completed: [], decisions: [], checks: [{ index: 0, outcome: 'not_run', evidence: null }], unresolvedQuestions: [], pendingEffects: [], nextAction: 'Read the selected source' }
-    value(await c.client.callTool({ name: 'repository_handover_save', arguments: { expectedRoot: a, name: 'checkpoint.json', packet, state } }))
+    value(await c.client.callTool({ name: 'repository_handover_save', arguments: { expectedRoot: a, name: 'checkpoint.json', packetId: built.packetId, state } }))
     const after = value(await c.client.callTool({ name: 'repository_status', arguments: { expectedRoot: a } }))
     expect(after.generation).toBe(status.generation)
     expect(await readdir(f.storage)).toEqual([createHash('sha256').update(a).digest('hex')])
+    value(await c.client.callTool({ name: 'repository_search', arguments: { expectedRoot: b, term: 'sharedMarker', format: 'json' } }))
+    expect((await c.client.callTool({ name: 'repository_handover_save', arguments: { expectedRoot: a, name: 'after-switch.json', packetId: built.packetId, state } })).isError).toBe(true)
     await c.close(); c = await connect(f.storage)
     const resumed = value(await c.client.callTool({ name: 'repository_handover_resume', arguments: { expectedRoot: a, name: 'checkpoint.json' } }))
     expect(resumed.state.nextAction).toBe(state.nextAction)

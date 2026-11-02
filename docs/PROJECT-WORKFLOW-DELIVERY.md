@@ -81,6 +81,41 @@ retry/resume planning and qualification-receipt checks. It does not execute
 workers, authenticate supplied receipts or establish complete host adherence.
 Actual host trials and whole-task measurement retain the separate gates above.
 
+### Actual 0.12.0 fixture trials and checkpoint repair
+
+Ordinary cancellation tasks did not name Context. All three completed fixes
+passed a separate four-test oracle that rejected the identical baseline. The
+first Claude and Kimi controller launches failed CLI argument parsing before
+model execution; those attempts remain retained. The corrected launches used
+closed stdin and existing model/provider choices. Claude had a $1 API ceiling;
+each run had a 240-second wall limit.
+
+- Claude's hook ran and its Z1P server connected, but its successful fix used
+  Bash/Edit/Read and bypassed Context. This does not qualify its lifecycle.
+- Kimi loaded the shared skill and used native status, coordination, activity,
+  refresh and source packets. `package.json` was rejected as packet evidence.
+  Both checkpoint attempts supplied placeholder packet data and an invented
+  state shape; both failed. It marked its activity done, but the controller hit
+  its wall limit before a complete final response. A local addressed note was
+  delivered; no acknowledgement was observed.
+- Codex used native context, activity, fresh source packets and checkpointing.
+  It saved a valid checkpoint after repairing a missing `.json` suffix and a
+  state schema error. Its fixture run finished in about 77 seconds. This does
+  not establish restart/resume or all-host acceptance.
+
+A further Claude fixture used the same ordinary task and an instance-only
+`UserPromptSubmit` reminder containing the existing startup guidance. That hook
+also executed successfully; the fix passed the independent oracle, but Claude
+still bypassed Context. The experiment is retained, and no global prompt hook
+was added on the strength of an unobserved benefit.
+
+The 0.13.0 follow-up addresses this observed API friction: connection-local
+packet IDs avoid source copying, the checkpoint state schema is discoverable,
+and explicit configuration evidence can be included. These tool repairs do not
+retroactively turn the unsuccessful host steps into passing results. Raw traces,
+patches, controller receipts and oracle results stay in private acceptance
+storage; they are not uploaded into the public repository.
+
 ### Accounting and delivery gates
 
 The Kimi wire importer was replayed against two real selected exports, including
