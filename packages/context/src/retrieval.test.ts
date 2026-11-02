@@ -78,11 +78,17 @@ describe('bounded retrieval of authorised signed context', () => {
   it('ranks focused evidence above a long record that merely mentions every term', async () => {
     const f = await fixture()
     const filler = Array.from({ length: 12 }, (_, i) => `staffing rota parking canteen note${i}`).join(' ')
-    const decoy = await f.add(`${filler} bearing ${filler} wear ${filler} schedule`, 'fixture://minutes')
-    const focused = await f.add('Bearing wear: bearing wear measured, bearing wear within limits.', 'fixture://maintenance')
-    for (const text of ['Staffing rota agreed.', 'Parking permits renewed.', 'Canteen menu changed.', 'Rota swap approved.']) await f.add(text, 'fixture://office')
-    const named = await f.add('Inspection intervals for rotating parts.', 'fixture://gearbox.md')
-    const top = (query: string) => f.vault.retrieve(f.view().id, { query, maxRecords: 1, includeRelated: false }).records.map(r => r.id)
+    const decoy = { id: '21'.repeat(32), kind: 'evidence' as const, text: `${filler} bearing ${filler} wear ${filler} schedule`, source: 'fixture://minutes', observedAt: now }
+    const focused = { id: '22'.repeat(32), kind: 'evidence' as const, text: 'Bearing wear: bearing wear measured, bearing wear within limits.', source: 'fixture://maintenance', observedAt: now }
+    const named = { id: '23'.repeat(32), kind: 'evidence' as const, text: 'Inspection intervals for rotating parts.', source: 'fixture://gearbox.md', observedAt: now }
+    const before = f.view()
+    // All assertions rank the final corpus; intermediate signed revisions add no evidence.
+    const view = await f.vault.appendBatch(before.id, before.head, [decoy, focused,
+      ...['Staffing rota agreed.', 'Parking permits renewed.', 'Canteen menu changed.', 'Rota swap approved.'].map((text, i) => ({ id: (i + 1).toString(16).padStart(64, '0'), kind: 'evidence' as const, text, source: 'fixture://office', observedAt: now })),
+      named,
+    ])
+    expect(view.records).toHaveLength(7)
+    const top = (query: string) => f.vault.retrieve(view.id, { query, maxRecords: 1, includeRelated: false }).records.map(r => r.id)
     // Presence-only scoring prefers the decoy, which contains all three terms once.
     expect(top('bearing wear schedule')).toEqual([focused.id])
     expect(f.vault.retrieve(f.view().id, { query: 'bearing wear schedule', includeRelated: false }).records.map(r => r.id)).toEqual([focused.id, decoy.id])

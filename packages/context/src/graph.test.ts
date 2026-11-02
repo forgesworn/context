@@ -17,10 +17,15 @@ async function fixture() {
 describe('bounded authorised context graph', () => {
   it('prioritises rare exact identifiers over several common workspace terms', async () => {
     const f = await fixture()
-    const target = await f.add('Exported function resolveCheckoutEvidence in the source parser', undefined, 'repo://parser.ts')
-    for (let i = 0; i < 12; i++) await f.add('Workspace package manifests and metadata', undefined, `repo://workspace-${i}.ts`)
-    const graph = f.vault.graph(f.view().id, { query: 'resolveCheckoutEvidence workspace package manifests', maxNodes: 1, maxDepth: 0 })
-    expect(graph.nodes[0].id).toBe(target.id)
+    const target = 'ab'.repeat(32), before = f.view()
+    // Ranking needs this final 13-record corpus, not 13 separately signed revisions.
+    const view = await f.vault.appendBatch(before.id, before.head, [
+      { id: target, kind: 'evidence', text: 'Exported function resolveCheckoutEvidence in the source parser', source: 'repo://parser.ts', observedAt: now },
+      ...Array.from({ length: 12 }, (_, i) => ({ id: (i + 1).toString(16).padStart(64, '0'), kind: 'evidence' as const, text: 'Workspace package manifests and metadata', source: `repo://workspace-${i}.ts`, observedAt: now })),
+    ])
+    expect(view.records).toHaveLength(13)
+    const graph = f.vault.graph(view.id, { query: 'resolveCheckoutEvidence workspace package manifests', maxNodes: 1, maxDepth: 0 })
+    expect(graph.nodes[0].id).toBe(target)
   })
 
   it('keeps an exact code identifier ahead of a short incidental encrypted filename', async () => {
