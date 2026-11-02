@@ -1,0 +1,25 @@
+{
+  "version": 1,
+  "taskId": "replace-task-id",
+  "developerId": "replace-developer-id",
+  "accountId": null,
+  "repositoryId": "replace-repository-id",
+  "category": "development",
+  "client": "codex",
+  "sessionId": "replace-exact-cli-session-id",
+  "from": "2026-11-02T12:00:00.000Z",
+  "to": "2026-11-02T13:00:00.000Z",
+  "phase": "host",
+  "contextUsed": null,
+  "accepted": null,
+  "reviewSeconds": null,
+  "coverage": {
+    "allAttempts": null,
+    "hostPreparation": null,
+    "workers": null,
+    "review": null
+  },
+  "attemptId": "replace-stable-invocation-id",
+  "at": "2026-11-02T12:30:00.000Z",
+  "exitCode": null
+}
