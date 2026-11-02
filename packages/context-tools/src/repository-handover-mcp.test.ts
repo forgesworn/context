@@ -163,3 +163,84 @@ it('rejects missing, non-directory, symlinked and non-private handover storage a
     expect(() => createRepositoryNavigationServer(f.root, { handoverDirectory: f.directory })).toThrow(/handover directory/)
   }
 })
+
+it('saves the exact server-held packet by reference without copying source into the request', async () => {
+  const f = await fixture(), c = await connect(f.root, f.directory)
+  try {
+    const status = json(await c.client.callTool({ name: 'repository_refresh', arguments: { expectedRoot: f.root } }))
+    const built = json(await c.client.callTool({ name: 'repository_packet', arguments: {
+      expectedRoot: f.root, expectedGeneration: status.generation, mode: 'build', format: 'json', spec: f.packet.originalSpec,
+    } }))
+    expect(built.packetId).toMatch(/^packet-/)
+    const args = { expectedRoot: f.root, name: 'reference.json', packetId: built.packetId, state: f.state }
+    const saved = await c.client.callTool({ name: 'repository_handover_save', arguments: args })
+    expect(saved.isError, text(saved)).not.toBe(true)
+    const record = JSON.parse(await readFile(join(f.directory, args.name), 'utf8'))
+    expect(record.packet).toEqual(built.packet)
+    expect((await c.client.callTool({ name: 'repository_handover_save', arguments: { ...args, name: 'ambiguous.json', packet: built.packet } })).isError).toBe(true)
+  } finally { await c.close() }
+})
+
+it('keeps packet references local to the connection, root and current generation', async () => {
+  const f = await fixture(), c = await connect(f.root, f.directory), other = await connect(f.root, f.directory)
+  try {
+    const status = json(await c.client.callTool({ name: 'repository_refresh', arguments: { expectedRoot: f.root } }))
+    const built = json(await c.client.callTool({ name: 'repository_packet', arguments: {
+      expectedRoot: f.root, expectedGeneration: status.generation, mode: 'build', format: 'json', spec: f.packet.originalSpec,
+    } }))
+    const args = { expectedRoot: f.root, name: 'unavailable.json', packetId: built.packetId, state: f.state }
+    expect((await other.client.callTool({ name: 'repository_handover_save', arguments: args })).isError).toBe(true)
+    expect((await c.client.callTool({ name: 'repository_handover_save', arguments: { ...args, expectedRoot: f.directory } })).isError).toBe(true)
+    await c.client.callTool({ name: 'repository_refresh', arguments: { expectedRoot: f.root } })
+    expect((await c.client.callTool({ name: 'repository_handover_save', arguments: args })).isError).toBe(true)
+    expect(await readdir(f.directory)).toEqual([])
+  } finally { await c.close(); await other.close() }
+})
+
+it('rejects stale selected source before saving a referenced packet', async () => {
+  const f = await fixture(), c = await connect(f.root, f.directory)
+  try {
+    const status = json(await c.client.callTool({ name: 'repository_refresh', arguments: { expectedRoot: f.root } }))
+    const built = json(await c.client.callTool({ name: 'repository_packet', arguments: {
+      expectedRoot: f.root, expectedGeneration: status.generation, mode: 'build', format: 'json', spec: f.packet.originalSpec,
+    } }))
+    await writeFile(join(f.root, 'example.ts'), 'export const evidenceMarker = 99\n')
+    const saved = await c.client.callTool({ name: 'repository_handover_save', arguments: {
+      expectedRoot: f.root, name: 'stale-reference.json', packetId: built.packetId, state: f.state,
+    } })
+    expect(saved.isError).toBe(true); expect(await readdir(f.directory)).toEqual([])
+  } finally { await c.close() }
+})
+
+it('advertises the actual checkpoint state contract instead of an arbitrary object', async () => {
+  const f = await fixture(), c = await connect(f.root, f.directory)
+  try {
+    const schema: any = (await c.client.listTools()).tools.find(t => t.name === 'repository_handover_save')!.inputSchema
+    expect(schema.properties.state.properties.status.enum).toEqual(['in_progress', 'blocked', 'ready_for_review'])
+    expect(schema.properties.state.properties.checks.items.properties.outcome.enum).toEqual(['passed', 'failed', 'not_run', 'unknown'])
+    const bad = await c.client.callTool({ name: 'repository_handover_save', arguments: {
+      expectedRoot: f.root, name: 'bad-state.json', packet: f.packet, state: { status: 'complete', summary: 'Guessed state' },
+    } })
+    expect(bad.isError).toBe(true); expect(await readdir(f.directory)).toEqual([])
+  } finally { await c.close() }
+})
+
+it('includes explicitly selected configuration evidence and rejects changed configuration on resume', async () => {
+  const f = await fixture(), c = await connect(f.root, f.directory)
+  try {
+    await writeFile(join(f.root, 'package.json'), '{"private":true,"scripts":{"test":"node --test"}}\n')
+    const status = json(await c.client.callTool({ name: 'repository_refresh', arguments: { expectedRoot: f.root } }))
+    const response = await c.client.callTool({ name: 'repository_packet', arguments: {
+      expectedRoot: f.root, expectedGeneration: status.generation, mode: 'build', format: 'json',
+      spec: { ...f.packet.originalSpec, sources: [{ path: 'package.json' }], allowedFiles: ['package.json'] },
+    } })
+    expect(response.isError, text(response)).not.toBe(true)
+    const built = json(response)
+    const saved = await c.client.callTool({ name: 'repository_handover_save', arguments: {
+      expectedRoot: f.root, name: 'config.json', packetId: built.packetId, state: f.state,
+    } })
+    expect(saved.isError, text(saved)).not.toBe(true)
+    await writeFile(join(f.root, 'package.json'), '{"private":true,"scripts":{"test":"changed"}}\n')
+    expect((await c.client.callTool({ name: 'repository_handover_resume', arguments: { expectedRoot: f.root, name: 'config.json' } })).isError).toBe(true)
+  } finally { await c.close() }
+})

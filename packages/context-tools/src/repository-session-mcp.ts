@@ -25,7 +25,7 @@ async function connection(root: string, handoverDirectory?: string, coordination
     await bound.server.connect(serverSide)
     await client.connect(clientSide)
   } catch (error) { await client.close(); await bound.server.close(); throw error }
-  return { root, client, navigation, cacheAttempted: false, server: bound.server, handoversReady: false,
+  return { root, client, navigation, packetReferences: bound.packetReferences, cacheAttempted: false, server: bound.server, handoversReady: false,
     close: async () => { await client.close(); await bound.server.close() } }
 }
 
@@ -93,7 +93,7 @@ export async function createRepositorySessionServer(options: RepositorySessionOp
         if (request.params.name === 'repository_handover_save') {
           await mkdir(directory, { mode: 0o700 }).catch((error: NodeJS.ErrnoException) => { if (error.code !== 'EEXIST') throw error })
         }
-        registerRepositoryHandovers(selected.server, root, directory)
+        registerRepositoryHandovers(selected.server, root, directory, { navigation: selected.navigation, references: selected.packetReferences })
         selected.handoversReady = true
         await selected.client.listTools()
       }

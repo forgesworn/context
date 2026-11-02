@@ -101,6 +101,51 @@ clients need not share conversation history or credentials. Each still applies
 its own tool permissions. A mismatch with the canonical `expectedRoot` is
 rejected before any checkpoint read or write.
 
+### Save with a packet reference
+
+From 0.13.0, `repository_packet` also returns a `packetId` in JSON and compact
+text output. Prefer it to copying the complete source packet back into a tool
+request:
+
+```json
+{
+  "expectedRoot": "/absolute/selected/checkout",
+  "name": "queue-cancellation-001.json",
+  "packetId": "packet-01234567-89ab-4cde-8fab-0123456789ab",
+  "state": {
+    "version": 1,
+    "status": "in_progress",
+    "completed": [],
+    "decisions": [],
+    "checks": [{"index": 0, "outcome": "not_run", "evidence": null}],
+    "unresolvedQuestions": [],
+    "pendingEffects": [],
+    "nextAction": "Run the selected acceptance check"
+  }
+}
+```
+
+Use the actual identifier returned by the current connection, never the example.
+Supply exactly one of `packetId` or the legacy complete `packet`. Both routes
+rebuild and verify the saved source selection; a reference cannot make stale
+source current or establish that checks really passed. Read the returned source
+before using it as evidence. The MCP schema now exposes the actual state fields,
+status/check enums and limits, rather than an arbitrary object. Checkpoint names
+must end in `.json`.
+
+References remain inside one server connection and selected checkout, retain at
+most four packets of at most 64 KiB each, and expire after ten minutes. Refresh,
+reconnect and switching to another checkout invalidate them. Request a fresh
+packet when a reference is unavailable. They are not persistent handovers,
+cross-host credentials or execution grants. A saved checkpoint remains usable
+through its name in another host, subject to the existing freshness checks.
+
+Explicit `build` packets can include JSON/JSONC, TOML and YAML configuration
+evidence and allowed-file hashes. This does not add these extensions to the
+repository navigation index, follow dependencies or execute configuration.
+Existing path, policy, hidden-file, symlink and resource limits still apply.
+Use 0.13.0 or later to resume a packet containing these configuration extensions.
+
 These are local persistence tools, separate from signed `context_*` collections.
 Enabling them grants no signing, uploading, execution or review authority.
 Applications can also import `saveHandover` and `resumeHandover` from

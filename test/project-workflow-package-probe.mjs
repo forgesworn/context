@@ -28,7 +28,8 @@ assert.equal(graph.dependencies.dependencies[0].lockedCandidates[0].version, '1.
 const alias = join(process.cwd(), 'linked-output'); symlinkSync(root, alias);
 assert.throws(() => run(['graph', root, '--out', join(alias, 'no.html')]));
 const client = new Client({ name:'installed-project-workflow',version:'1' });
-await client.connect(new StdioClientTransport({ command:process.execPath,args:[cli,'session'],stderr:'pipe' }));
+const handovers = join(process.cwd(), 'project-workflow-checkpoints'); mkdirSync(handovers, { mode:0o700 });
+await client.connect(new StdioClientTransport({ command:process.execPath,args:[cli,'session','--handover-base',handovers],stderr:'pipe' }));
 const call = async (name,args={}) => { const result=await client.callTool({name,arguments:{expectedRoot:root,...args}}); assert.notEqual(result.isError,true,JSON.stringify(result)); return JSON.parse(result.content[0].text); };
 try {
   assert.ok((await client.listTools()).tools.some(t=>t.name==='repository_graph'));
@@ -42,7 +43,18 @@ try {
   const deps=await call('repository_graph',{query:{action:'dependencies'}});
   assert.equal(deps.dependencies.installedStateVerified,false);
   assert.equal(deps.dependencies.dependencies[0].requested,'^1');
+  const config = await call('repository_packet',{expectedGeneration:status.generation,mode:'build',format:'json',spec:{sources:[{path:'package.json'}],acceptanceChecks:['Read selected configuration']}});
+  assert.match(config.packetId,/^packet-/);assert.equal(config.packet.sources[0].path,'package.json');
+  const state={version:1,status:'in_progress',completed:[],decisions:[],checks:[{index:0,outcome:'not_run',evidence:null}],unresolvedQuestions:[],pendingEffects:[],nextAction:'Review the selected configuration'};
+  const saved=await call('repository_handover_save',{name:'config-evidence.json',packetId:config.packetId,state});
+  assert.equal(saved.status,'in_progress');
 } finally { await client.close(); }
+const resumedClient=new Client({name:'installed-resume',version:'1'});
+try{
+ await resumedClient.connect(new StdioClientTransport({command:process.execPath,args:[cli,'session','--handover-base',handovers],stderr:'pipe'}));
+ const result=await resumedClient.callTool({name:'repository_handover_resume',arguments:{expectedRoot:root,name:'config-evidence.json'}});
+ assert.notEqual(result.isError,true);assert.equal(JSON.parse(result.content[0].text).freshness,'current');
+}finally{await resumedClient.close()}
 const from='2026-11-02T00:00:00.000Z',to='2026-11-02T01:00:00.000Z',at='2026-11-02T00:10:00.000Z';
 const spec={version:1,taskId:'fixture',developerId:'owner',accountId:null,repositoryId:'fixture',category:'evaluation',client:'kimi',sessionId:'session-fixture',from,to,phase:'host',contextUsed:true,accepted:true,reviewSeconds:null,coverage:{allAttempts:null,hostPreparation:null,workers:null,review:null},attemptId:'fixture-1',at,exitCode:0,freshSession:true};
 const files={};for(const name of ['wire','manifest','spec','usage','inventory','total'])files[name]=join(process.cwd(),`fixture-${name}.json`);

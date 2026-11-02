@@ -304,6 +304,7 @@ describe('repository packet compact rendering', () => {
       expect(lines[2]).toMatch(/^source alpha\.ts:1-3  sha256 [a-f0-9]{16}  3 lines$/)
       expect(lines.slice(3, 6)).toEqual(['1: export function alpha() {', '2:   return 1', '3: }'])
       expect(lines[6]).toMatch(/^allowed: alpha\.ts \(present, [a-f0-9]{16}\)$/)
+      expect(lines.at(-2)).toMatch(/^packetId: packet-[a-f0-9-]{36} /)
       expect(lines.at(-1)).toMatch(/^caveat: /)
       const planned = await connection.client.callTool({ name: 'repository_packet', arguments: { mode: 'plan', spec: spec([{ path: 'alpha.ts', line: 2 }]), expectedGeneration: generation } }) as { isError?: boolean; content?: unknown }
       expect(planned.isError).not.toBe(true)
