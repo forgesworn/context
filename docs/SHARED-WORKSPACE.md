@@ -1,5 +1,9 @@
 # Shared local workspace context and agent coordination
 
+For a browser view of the existing catalogue and activity, use the
+[local ticket dashboard](WORKSPACE-DASHBOARD.md). It can group explicitly linked
+Girnel cards and show saved handover summaries without changing board state.
+
 Context 0.7.0 adds an optional encrypted local store shared by coding hosts. It
 contains a checkout catalogue, reusable file indexes, batch progress and an
 advisory activity board. It uses Node 24's SQLite and crypto; no account,

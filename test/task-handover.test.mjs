@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import test, { after } from 'node:test';
 import { saveHandover, resumeHandover } from '../scripts/task-handover.mjs';
 import { buildPacket } from '../scripts/worker-packet.mjs';
+import { readHandoverSummary } from '../packages/context-tools/dist/task-handover.mjs';
 
 import { fixtureExec as exec } from './git-fixture.mjs';
 const fixtures = [];
@@ -59,6 +60,27 @@ async function writeState(root, state, name = 'state.json') {
   await writeFile(path, JSON.stringify(state));
   return path;
 }
+
+test('dashboard summary retains saved assertions without claiming current source freshness or exposing source text', async () => {
+  const root = await fixture();
+  const spec = { version: 1, task: 'Summarise a saved task', acceptanceChecks: ['Check cancellation'], allowedFiles: ['src.ts'], sources: [{ path: 'src.ts', startLine: 1, endLine: 3 }], exclusions: [], unresolvedQuestions: [] };
+  const { packetPath } = await makePacket(root, spec);
+  const statePath = await writeState(root, validState(spec, { nextAction: 'Review the exact change' }));
+  const handover = join(root, 'summary.json');
+  await saveHandover({ root, packet: packetPath, state: statePath, out: handover });
+  await writeFile(join(root, 'src.ts'), 'changed\nsource\ncontents\n');
+  const summary = await readHandoverSummary({ handover });
+  assert.equal(summary.freshness, 'not-checked');
+  assert.equal(summary.nextAction, 'Review the exact change');
+  assert.deepEqual(summary.checks, [{ outcome: 'passed', criterion: 'Check cancellation' }]);
+  assert.ok(!JSON.stringify(summary).includes('one\\ntwo'));
+  assert.equal(summary.sources, undefined);
+  await assert.rejects(resumeHandover({ root, handover }), /stale/);
+  const record = JSON.parse(await readFile(handover, 'utf8'));
+  record.packetSha256 = '0'.repeat(64);
+  await writeFile(handover, JSON.stringify(record));
+  await assert.rejects(readHandoverSummary({ handover }), /digest differs/);
+});
 
 test('current resume preserves nextAction and no source excerpts', async () => {
   const root = await fixture();
