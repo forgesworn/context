@@ -15,7 +15,10 @@ packets and a fresh checkpoint. A short bug fix requiring behaviour discovery
 or regression tests follows that workflow; its size does not exempt it. A
 trivial correction in an already identified file needs only the quick check.
 Deferred native schemas should be discovered through the host tool search,
-rather than treated as a missing server.
+rather than treated as a missing server. An unavailable, stale or unknown index
+requires `repository_refresh` before packets; it is not a missing tool. MCP
+status supplies a root-bound `nextAction` for that recovery without building
+the index itself.
 
 ## Automatic host hooks
 

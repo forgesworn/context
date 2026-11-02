@@ -25,6 +25,8 @@ At the start of project work, verify the selected checkout and actual tool
 availability. Before investigating project source, read `repository_status` and,
 when shared coordination is configured, `repository_coordination`. If schemas
 are deferred, use the host tool search rather than treating tools as absent.
+If status is unavailable, stale or unknown, call `repository_refresh` before
+source packets. An unbuilt index is recoverable, not a reason to skip the workflow.
 For behaviour changes, publish the task and intended paths before edits and
 retrieve current implementation and test evidence with `repository_packet`.
 A short bug fix still uses this workflow when it requires discovering behaviour,
@@ -32,8 +34,9 @@ tracing callers or adding regression tests. Inspect overlaps before changing
 shared files. Between work steps,
 poll addressed notes and renew activity before its lease expires. Before handing
 over, save current evidence, decisions, actual checks and the next action under
-a new checkpoint name. Send final addressed notes before marking finished task
-slots `done`; finished slots cannot send new notes.
+a new checkpoint name. Wait for a successful save, send final addressed notes,
+then mark finished activity slots `done`. Run these dependent steps sequentially;
+finished slots cannot send new notes.
 
 If this host exposes no native repository tools but the installed CLI includes
 `connect`, use its task-scoped shell transport with the existing private cache

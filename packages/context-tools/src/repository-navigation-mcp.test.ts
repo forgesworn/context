@@ -108,6 +108,34 @@ describe('repository navigation MCP adapter', () => {
     }
   })
 
+  it('advertises a usable refresh action for unbuilt and stale indexes without building on status', async () => {
+    const root = await makeRoot(), canonical = await realpath(root)
+    const { client, serverClose } = await connect(root)
+    const status = async () => JSON.parse(textOf(await client.callTool({ name: 'repository_status', arguments: {} })))
+    try {
+      const before = await status()
+      expect(before.freshness).toBe('unavailable')
+      expect(before.generation).toBeNull()
+      expect(before.nextAction).toEqual({ name: 'repository_refresh', arguments: { expectedRoot: canonical } })
+      const built = await client.callTool(before.nextAction)
+      expect(built.isError).not.toBe(true)
+      const first = await status()
+      expect(first.freshness).toBe('current')
+      expect(first.nextAction).toBeUndefined()
+
+      await writeFile(join(root, 'alpha.ts'), 'export const changedToken = 3\n')
+      const stale = await status()
+      expect(stale.freshness).toBe('stale')
+      expect(stale.nextAction.arguments.expectedRoot).toBe(canonical)
+      const refreshed = await client.callTool(stale.nextAction)
+      expect(refreshed.isError).not.toBe(true)
+      const current = await status()
+      expect(current.freshness).toBe('current')
+      expect(current.generation).not.toBe(first.generation)
+      expect(current.nextAction).toBeUndefined()
+    } finally { await serverClose() }
+  })
+
   it('reports null generation before first use, builds on an early search, then serves after refresh', async () => {
     const root = await makeRoot()
     const { client, serverClose } = await connect(root)
