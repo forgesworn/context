@@ -34,7 +34,7 @@ const open=async()=>{const client=new Client({name:'independent-workspace-agent'
 const call=async(client,name,root,args={})=>{const result=await client.callTool({name,arguments:{expectedRoot:root,...args}});assert.notEqual(result.isError,true,result.content[0].text);return JSON.parse(result.content[0].text)}
 const first=await open(),second=await open()
 try{
- assert.equal((await first.listTools()).tools.length,9)
+ assert.equal((await first.listTools()).tools.length,10)
  const publish={slot:'agent',label:'test agent',task:'Edit source '+ 'fixture metadata '.repeat(30),paths:['source.ts'],state:'working',expectedRevision:0,ttlSeconds:900}
  const [x,y]=await Promise.all([call(first,'repository_activity',a,publish),call(second,'repository_activity',wt,publish)])
  const board=await call(first,'repository_coordination',a)

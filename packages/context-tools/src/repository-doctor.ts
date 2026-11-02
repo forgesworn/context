@@ -15,6 +15,7 @@ const REQUIRED_TOOLS = [
   'repository_explore',
   'repository_coverage',
   'repository_packet',
+  'repository_graph',
 ] as const;
 
 const CLI = fileURLToPath(new URL('../bin/encrypted-context.mjs', import.meta.url));

@@ -3,6 +3,34 @@
 21 September 2026. This records implementation and acceptance separately from
 the [goal definitions](FORGESWORN-DOGFOOD-GOALS.md).
 
+## 2 November 2026 — project workflows and default context, 0.11.0
+
+Implemented explicit TypeScript aliases, Rust/Kotlin syntax planning, bounded
+relationship/dependency queries, an offline graph viewer, packaged accounting
+and supported host startup hooks. The [delivery record](PROJECT-WORKFLOW-DELIVERY.md)
+separates implementation, host behaviour and remaining qualification.
+
+Local checks passed 573 tests and independent installed-package probes. Real
+Chrome covered graph interaction and mobile layout without external requests.
+Two real Kimi session exports qualified additive wire counters. The complete-task
+reconciler keeps the primary coordinator and preparation gap visible rather than
+inventing a total. Billing and measured savings are unavailable.
+
+Clean-input Kimi used native repository context on an ordinary review prompt.
+Claude's hook executed but its model bypassed the repository workflow; this is
+an observed adoption failure. Codex loaded native context in its earlier trial,
+whose inherited launcher stdin prevents clean automatic-adherence qualification.
+A host-mediated Flash/off draft used a verified packet through the existing
+worker adapter; the over-length draft was shortened during host review.
+All retained attempts, including failed qualification, remain in the private
+acceptance inventory. This is not blanket G0–G4 or cross-host lifecycle acceptance.
+
+The old local Node executable began receiving macOS `CODESIGNING` SIGKILLs.
+A fresh official copy of the exact same Node version was verified against the
+official archive SHA-256 and installed for Z1P only. No security policy was
+disabled, existing Node installation replaced, provider switched or user process
+stopped. Final host configuration pins a verified release and that runtime.
+
 ## Routing update: DeepSeek and GLM focus
 
 Operator decision, 21 September 2026: remove Qwen from the default Context

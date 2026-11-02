@@ -22,7 +22,7 @@ vi.mock('@modelcontextprotocol/sdk/client/index.js', () => ({
     async connect() { if (fake.failure === 'connect') throw new Error('fixture handshake failure') }
     async close() { fake.clientClosed++ }
     async listTools() {
-      return { tools: ['repository_status', 'repository_refresh', 'repository_search', 'repository_explore', 'repository_coverage', 'repository_packet']
+      return { tools: ['repository_status', 'repository_refresh', 'repository_search', 'repository_explore', 'repository_coverage', 'repository_packet', 'repository_graph']
         .filter(name => !(fake.failure === 'missing' && name === 'repository_packet'))
         .map(name => ({ name, inputSchema: { type: 'object', properties: { mode: {}, spec: {}, expectedGeneration: {} } } })) }
     }

@@ -44,7 +44,7 @@ it('starts without native tools, rejects root overrides, and keeps a generation 
   const f = await fixture(), c = open({ root: f.root })
   try {
     const ready = await c.next()
-    expect(ready.nativeToolDiscovery).toBe(false); expect(ready.tools).toHaveLength(6)
+    expect(ready.nativeToolDiscovery).toBe(false); expect(ready.tools).toHaveLength(7)
     expect(ready.status.root).toBe(f.root); expect(ready.status.freshness).toBe('unavailable')
     expect((await c.send('repository_search', { expectedRoot: f.parent, term: 'shellMarker' })).isError).toBe(true)
     expect((await c.send('context_read')).isError).toBe(true)

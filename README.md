@@ -6,6 +6,11 @@ Every request explicitly selects a checkout; source stays local to the tools.
 
 Local code graphs and bounded evidence for coding agents.
 
+[Local graph viewer](docs/LOCAL-GRAPH.md): export a private offline source graph,
+follow static relationships and inspect exact evidence. Rust/Kotlin syntax spans
+are available in exploration and packet planning. [Installed usage accounting](docs/DAILY-USAGE.md)
+reconciles selected host receipts with an explicit task inventory.
+
 [Shared workspace](docs/SHARED-WORKSPACE.md): encrypted reusable indexes, resumable
 batch warm-up, and advisory agent activity and addressed notes across worktrees.
 
@@ -46,7 +51,7 @@ deterministic, so routine scans consume no model tokens.
 
 Both are MIT licensed. Provider routing, worker execution and coding-agent UI
 belong to consumers. Local graph exploration belongs in the MIT developer tool;
-the current ecosystem viewer is a prototype, not a packaged capability.
+the separate multi-repository ecosystem viewer remains a prototype.
 No model provider is required by core.
 
 Local stdio MCP servers already provide repository navigation and separate signed

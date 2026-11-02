@@ -38,7 +38,7 @@ it('advertises context without a checkout and requires explicit canonical reposi
   const f = await fixture(), c = await connect(f.storage)
   try {
     const tools = (await c.client.listTools()).tools
-    expect(tools).toHaveLength(8)
+    expect(tools).toHaveLength(9)
     expect(tools.every(t => t.inputSchema.required?.includes('expectedRoot'))).toBe(true)
     expect((await c.client.callTool({ name: 'repository_status', arguments: {} })).isError).toBe(true)
     expect(await readdir(f.storage)).toEqual([])
@@ -62,7 +62,7 @@ it('isolates concurrent repository requests and evicts the previous index on exp
     expect(value(results[1]).results[0].text).toContain("'second'")
     const status = value(await c.client.callTool({ name: 'repository_status', arguments: { expectedRoot: a } }))
     expect(status.root).toBe(a); expect(status.generation).toBe(null)
-    expect((await c.client.listTools()).tools).toHaveLength(6)
+    expect((await c.client.listTools()).tools).toHaveLength(7)
   } finally { await c.close() }
 })
 

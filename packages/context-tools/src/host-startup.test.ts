@@ -40,6 +40,11 @@ it('targets the effective Codex override and leaves the base untouched', async (
   expect(result.path).toBe(join(root, 'AGENTS.override.md'))
   expect(await readFile(join(root, 'AGENTS.md'), 'utf8')).toBe('# Base\n')
   expect(await readFile(result.path, 'utf8')).toContain(result.block)
+  expect((await setupHost({ ...options, apply: true })).action).toBe('current')
+  const removed = await setupHost({ ...options, remove: true, apply: true })
+  expect(removed.path).toBe(result.path)
+  expect(await readFile(result.path, 'utf8')).toBe('# Temporary override\n')
+  expect(await readFile(join(root, 'AGENTS.md'), 'utf8')).toBe('# Base\n')
 })
 
 it('preserves group-write permissions rather than applying the current umask to an existing file', async () => {

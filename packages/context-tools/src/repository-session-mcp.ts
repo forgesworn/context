@@ -83,7 +83,7 @@ export async function createRepositorySessionServer(options: RepositorySessionOp
       extra.signal.throwIfAborted()
       if (active?.root !== root) { await closeActive(); active = await connection(root, undefined, coordination) }
       const selected = active!
-      if (coordination && !selected.cacheAttempted && ['repository_status','repository_refresh','repository_search','repository_explore','repository_coverage','repository_packet'].includes(request.params.name)) {
+      if (coordination && !selected.cacheAttempted && ['repository_status','repository_refresh','repository_search','repository_explore','repository_coverage','repository_packet','repository_graph'].includes(request.params.name)) {
         await selected.navigation.restoreFromCache(extra.signal)
         selected.cacheAttempted = true
       }

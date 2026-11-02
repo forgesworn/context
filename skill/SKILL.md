@@ -10,6 +10,10 @@ continuation benefits the task. This applies to any selected coding project,
 including sessions opened at a parent workspace. No ForgeSworn account, model
 switch or inference service is required by the tools.
 
+Use this workflow by default for substantial project work. The user need not
+mention Context, Z1P or this skill. Select the checkout from the actual task;
+when it is ambiguous, resolve that selection before retrieving source.
+
 ## Start, work and finish
 
 For requested installation of routine startup guidance, use the CLI's `setup`
@@ -59,6 +63,10 @@ pinned to one project as context for unrelated work.
 
 Use `repository_explore` for a symbol, `repository_search` for a literal, then
 `repository_packet` for the exact implementation, callers and tests needed.
+When exposed, `repository_graph` can follow static TS bindings, dependency
+neighbours and impact candidates. Rust/Kotlin syntax and name candidates are
+labelled; they do not establish runtime dispatch. Use node IDs when names are
+ambiguous. Graph source locations still need a current source packet.
 Supply the current `expectedGeneration`; read the returned source rather than
 reasoning from pointers alone. Refresh after relevant edits, branch changes,
 pulls or merges. Index freshness covers selected files and policy, not the

@@ -1,4 +1,5 @@
 import { createHash, randomUUID } from 'node:crypto';
+import { parseLanguageSyntax, syntaxLanguage } from './language-syntax.js';
 import { workspaceKey, type WorkspaceStore } from './workspace-store.js';
 import { constants as fsConstants, promises as fsp } from 'node:fs';
 import * as path from 'node:path';
@@ -966,14 +967,19 @@ export class RepositoryNavigation {
     let parsed = 0;
     for (const [rel, entry] of ordered) {
       let text: string | undefined;
-      if (parsed < EXPLORE_MAX_PARSED_FILES && isScriptPath(rel)) {
+      let syntax, parseFailed = false;
+      if (parsed < EXPLORE_MAX_PARSED_FILES && (isScriptPath(rel) || syntaxLanguage(rel))) {
         text = await this.readVerified(rel, entry.sha256, signal);
+        if (syntaxLanguage(rel)) {
+          syntax = await parseLanguageSyntax(rel, text);
+          if (syntax.hasErrors) { text = undefined; syntax = undefined; parseFailed = true; }
+        }
         parsed++;
         if (this.generation !== gen) {
           throw new Error('RepositoryNavigation: generation changed during explore');
         }
       }
-      files.push({ path: rel, sha256: entry.sha256, hits: entry.hits, ...(text !== undefined ? { text } : {}) });
+      files.push({ path: rel, sha256: entry.sha256, hits: entry.hits, ...(text !== undefined ? { text } : {}), ...(syntax ? { syntax } : {}), ...(parseFailed ? { parseFailed } : {}) });
     }
     const analysis = analyseExplore(symbol, files);
     return makeFrozen({
@@ -1020,6 +1026,28 @@ export class RepositoryNavigation {
       }
     }
     return { generation: gen.id, revision: gen.revision, files };
+  }
+
+  /** Bounded current source for the derived unsigned graph. Selection uses
+   * the existing policy/index, never another scanner or another checkout. */
+  async graphFiles(pathPrefix?: string, signal?: AbortSignal) {
+    const prefix = normalizePathPrefix(pathPrefix)
+    const gen = this.generation
+    if (!gen) throw new Error('RepositoryNavigation: graph requires refresh()')
+    const freshness = await this.inspectFreshness(gen, signal)
+    if (freshness.freshness !== 'current' || freshness.policy.freshness !== 'current') throw new Error('RepositoryNavigation: graph requires current source and policy; call refresh()')
+    const files: { path: string; sha256: string; text: string }[] = []
+    let bytes = 0, omittedFiles = 0
+    for (const entry of gen.files) {
+      if (prefix !== undefined && !entry.path.startsWith(prefix)) continue
+      if (!isScriptPath(entry.path) && !syntaxLanguage(entry.path)) { omittedFiles++; continue }
+      if (files.length >= 256 || bytes + entry.bytes > 8 * 1024 * 1024) { omittedFiles++; continue }
+      const text = await this.readVerified(entry.path, entry.sha256, signal)
+      bytes += Buffer.byteLength(text)
+      files.push({ path: entry.path, sha256: entry.sha256, text })
+    }
+    if (this.generation !== gen || (await this.inspectFreshness(gen, signal)).freshness !== 'current') throw new Error('RepositoryNavigation: source changed during graph; refresh()')
+    return { generation: gen.id, revision: gen.revision, policyDigest: gen.policyRevision, files, omittedFiles, bytes }
   }
 
   private async readVerified(rel: string, expectedSha256: string, signal?: AbortSignal): Promise<string> {

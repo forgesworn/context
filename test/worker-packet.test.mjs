@@ -67,6 +67,23 @@ function planBase(overrides = {}) {
   };
 }
 
+test('plans complete Rust impl methods and Kotlin extension functions', async () => {
+  const root = await fixture();
+  await writeFile(join(root, 'lib.rs'), 'impl Client {\n    pub fn run(&self) -> i32 {\n        42\n    }\n}\n');
+  await writeFile(join(root, 'Api.kt'), 'package demo\n\nfun String.decorate(): String {\n    return this + "!"\n}\n');
+  const result = await planPacket({ root, spec: await spec(root, planBase({ allowedFiles: ['lib.rs', 'Api.kt'], sources: [{ path: 'lib.rs', line: 3 }, { path: 'Api.kt', line: 4 }] })) });
+  assert.deepEqual(result.coverage.mergedSources, [{ path: 'Api.kt', startLine: 3, endLine: 5 }, { path: 'lib.rs', startLine: 2, endLine: 4 }]);
+  assert.equal(result.packet.sources[0].lines[0].content, 'fun String.decorate(): String {');
+});
+
+test('Rust/Kotlin planning rejects malformed syntax and shared boundary lines', async () => {
+  const root = await fixture();
+  await writeFile(join(root, 'bad.rs'), 'fn broken( {\n');
+  await assert.rejects(planPacket({ root, spec: await spec(root, planBase({ allowedFiles: ['bad.rs'], sources: [{ path: 'bad.rs', line: 1 }] })) }), /parse errors/);
+  await writeFile(join(root, 'same.kt'), 'fun a() {} ; fun b() {}\n');
+  await assert.rejects(planPacket({ root, spec: await spec(root, planBase({ allowedFiles: ['same.kt'], sources: [{ path: 'same.kt', line: 1 }] })) }), /ambiguous|boundary/);
+});
+
 test('plans complete nested callback and function units, then merges adjacent selections', async () => {
   const root = await fixture();
   await writeFile(join(root, 'src.ts'), `describe('suite', () => {\n  it.each([1])('case', (value) => {\n    const helper = () => {\n      return value;\n    };\n    expect(helper()).toBe(1);\n  });\n});\n\nfunction outside() {\n  return 2;\n}\n`);

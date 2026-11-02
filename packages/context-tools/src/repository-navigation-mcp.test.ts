@@ -84,7 +84,7 @@ describe('repository navigation MCP adapter', () => {
     try {
       const tools = await client.listTools()
       const names = tools.tools.map((t) => t.name).sort()
-      expect(names).toEqual(['repository_coverage', 'repository_explore', 'repository_packet', 'repository_refresh', 'repository_search', 'repository_status'])
+      expect(names).toEqual(['repository_coverage', 'repository_explore', 'repository_graph', 'repository_packet', 'repository_refresh', 'repository_search', 'repository_status'])
     } finally {
       await serverClose()
     }

@@ -1,14 +1,6 @@
 import { parseArgs } from 'node:util'
 import { readFile, realpath } from 'node:fs/promises'
-import { hexToBytes } from '@noble/hashes/utils'
-import { createNostrIdentity } from '@forgesworn/context/nostr'
 import type { ContextVaultOptions } from '@forgesworn/context'
-import { ContextFileStore } from './context-store.js'
-import { serveContextMcp, callContextTool } from './context-mcp.js'
-import { scanPackageEcosystem } from './repository-scan.js'
-import { scanSourceGraph } from './source-scan.js'
-import { scanEcosystem } from './ecosystem-scan.js'
-import { scanBroadSourceGraph } from './broad-source-scan.js'
 
 export interface ContextCliOptions {
   name?: string
@@ -16,6 +8,27 @@ export interface ContextCliOptions {
   configureVault?: (options: ContextVaultOptions) => ContextVaultOptions
 }
 export async function main(options: ContextCliOptions = {}): Promise<void> {
+  if (process.argv[2] === 'startup') {
+    const { runStartupHook } = await import('./startup-hook.js')
+    process.stdout.write(await runStartupHook(process.argv.slice(3),[process.execPath,await realpath(process.argv[1])]))
+    return
+  }
+  if (process.argv[2] === 'setup-hooks') {
+    const { runHostHookSetup } = await import('./host-hooks.js')
+    process.stdout.write(JSON.stringify(await runHostHookSetup(process.argv.slice(3),[process.execPath,await realpath(process.argv[1])]))+'\n')
+    return
+  }
+  if (process.argv[2] === 'usage') {
+    const { runDailyUsageCli } = await import('./daily-usage.mjs')
+    try { runDailyUsageCli(process.argv.slice(3)) }
+    catch { throw new Error('daily-usage: invalid, changing or inaccessible input/output') }
+    return
+  }
+  if (process.argv[2] === 'graph') {
+    const { runGraphCli } = await import('./graph-cli.js')
+    process.stdout.write(JSON.stringify(await runGraphCli(process.argv.slice(3))) + '\n')
+    return
+  }
   if (process.argv[2] === 'setup') {
     const { runHostSetup } = await import('./host-startup.js')
     process.stdout.write(JSON.stringify(await runHostSetup(process.argv.slice(3), [process.execPath, await realpath(process.argv[1])])) + '\n')
@@ -41,6 +54,7 @@ export async function main(options: ContextCliOptions = {}): Promise<void> {
     'max-files': { type: 'string' }, 'max-bytes': { type: 'string' },
     'max-file-bytes': { type: 'string' }, 'max-records': { type: 'string' },
     'max-repositories': { type: 'string' },
+    project: { type: 'string' },
     term: { type: 'string' },
     'handover-dir': { type: 'string' },
     'handover-base': { type: 'string' },
@@ -53,17 +67,21 @@ export async function main(options: ContextCliOptions = {}): Promise<void> {
       (options.name ?? 'encrypted-context') + ' session [--handover-base <existing private directory>] [--cache-dir <initialised private directory>]   (any working folder; expectedRoot required on every call)\n' +
       (options.name ?? 'encrypted-context') + ' connect ROOT [--handover-base ABS] [--cache-dir ABS --label HOST --task TEXT [--path REL ...]]   (task-scoped JSON-lines shell connection; newline per request)\n' +
       (options.name ?? 'encrypted-context') + ' setup codex|claude|kimi [--config-dir ABS] [--cache-dir ABS] [--handover-base ABS] [--remove] [--apply]   (preview a managed global instruction section; --apply writes it)\n' +
+      (options.name ?? 'encrypted-context') + ' setup-hooks codex|claude|kimi [--launcher ABS] [--config-dir ABS] [--cache-dir ABS] [--handover-base ABS] [--remove] [--apply]   (preview automatic context startup hooks; Codex requires hook trust)\n' +
+      (options.name ?? 'encrypted-context') + ' graph ROOT --out ABS [--json] [--project REL] [--path-prefix REL]   (private offline graph export; never overwrites)\n' +
+      (options.name ?? 'encrypted-context') + ' usage start|finish|import|import-worker|import-run|import-kimi|summary|task --input ABS --spec ABS --out ABS   (offline accounting; see DAILY-USAGE.md for command-specific options)\n' +
       (options.name ?? 'encrypted-context') + ' workspace init|discover ROOT|warm ROOT|status ROOT|index ROOT|forget-index ROOT --cache-dir ABS [--resume|--missing-only] [--priority ABS] [--max-repositories N] [--timeout-ms N]\n' +
       (options.name ?? 'encrypted-context') + ' workspace activity ROOT --cache-dir ABS [--all] [--json] [--repo ABS] [--limit 1-500] [--max-bytes 2048-262144] [--timeout-ms 1-30000]   (one-shot advisory leases; not process liveness or acceptance)\n' +
       (options.name ?? 'encrypted-context') + ' handover save --root ABS --packet ABS --state ABS --out ABS | handover resume --root ABS --handover ABS\n' +
       (options.name ?? 'encrypted-context') + ' doctor <repository-root> --term <known-identifier>\n' +
       (options.name ?? 'encrypted-context') + ' scan <directory> [--max-packages 64] [--max-depth 4] [--observed-at <epoch-seconds>]\n' +
-      (options.name ?? 'encrypted-context') + ' scan-source <directory> [--max-files 64] [--max-depth 8] [--max-bytes 1048576] [--max-file-bytes 262144] [--max-records 128] [--observed-at <epoch-seconds>]\n' +
+      (options.name ?? 'encrypted-context') + ' scan-source <directory> [--project REL] [--max-files 64] [--max-depth 8] [--max-bytes 1048576] [--max-file-bytes 262144] [--max-records 128] [--observed-at <epoch-seconds>]\n' +
       (options.name ?? 'encrypted-context') + ' scan-broad-source <directory> [--max-files 64] [--max-depth 8] [--max-bytes 1048576] [--max-file-bytes 262144] [--max-records 128] [--observed-at <epoch-seconds>]\n' +
       (options.name ?? 'encrypted-context') + ' scan-ecosystem <manifest.json> [--max-repositories 32] [--max-files 128] [--max-records 128] [--observed-at <epoch-seconds>]\nUse --personal instead of --room only for a separate private assistant. CLI call reads a JSON object from stdin. Scans need no identity. No key is generated and no network is contacted on startup.\n')
     return
   }
   const integer = (value: string | undefined): number | undefined => value === undefined ? undefined : Number(value)
+  if (values.project !== undefined && positionals[0] !== 'scan-source') throw new Error('--project is only supported by scan-source and graph')
   if (positionals[0] === 'connect') {
     if (positionals.length !== 2 || Object.keys(values).some(key => !['handover-base', 'cache-dir', 'task', 'label', 'path'].includes(key))) throw new Error('connect requires one canonical checkout root and only its documented options. See --help.')
     if (values.task === undefined && (values.label !== undefined || values.path !== undefined)) throw new Error('connect --label and --path require --task')
@@ -103,6 +121,7 @@ export async function main(options: ContextCliOptions = {}): Promise<void> {
   if (values['handover-dir'] !== undefined) throw new Error('--handover-dir is only supported by navigate. See --help.')
   if (positionals[0] === 'scan-broad-source') {
     if (positionals.length !== 2) throw new Error('Choose one directory to scan.')
+    const { scanBroadSourceGraph } = await import('./broad-source-scan.js')
     const result = await scanBroadSourceGraph(positionals[1], { maxFiles: integer(values['max-files']),
       maxDepth: integer(values['max-depth']), maxBytes: integer(values['max-bytes']), maxFileBytes: integer(values['max-file-bytes']),
       maxRecords: integer(values['max-records']), observedAt: integer(values['observed-at']) })
@@ -111,6 +130,7 @@ export async function main(options: ContextCliOptions = {}): Promise<void> {
   }
   if (positionals[0] === 'scan-ecosystem') {
     if (positionals.length !== 2) throw new Error('Choose one ecosystem manifest to scan.')
+    const { scanEcosystem } = await import('./ecosystem-scan.js')
     const result = await scanEcosystem(positionals[1], { maxRepositories: integer(values['max-repositories']),
       maxFiles: integer(values['max-files']), maxDepth: integer(values['max-depth']), maxBytes: integer(values['max-bytes']),
       maxFileBytes: integer(values['max-file-bytes']), maxRecords: integer(values['max-records']), observedAt: integer(values['observed-at']) })
@@ -119,6 +139,7 @@ export async function main(options: ContextCliOptions = {}): Promise<void> {
   }
   if (positionals[0] === 'scan') {
     if (positionals.length !== 2) throw new Error('Choose one directory to scan.')
+    const { scanPackageEcosystem } = await import('./repository-scan.js')
     const result = await scanPackageEcosystem(positionals[1], { maxPackages: integer(values['max-packages']),
       maxDepth: integer(values['max-depth']), observedAt: integer(values['observed-at']) })
     process.stdout.write(JSON.stringify(result, null, 2) + '\n')
@@ -126,7 +147,8 @@ export async function main(options: ContextCliOptions = {}): Promise<void> {
   }
   if (positionals[0] === 'scan-source') {
     if (positionals.length !== 2) throw new Error('Choose one directory to scan.')
-    const result = await scanSourceGraph(positionals[1], { maxFiles: integer(values['max-files']),
+    const { scanSourceGraph } = await import('./source-scan.js')
+    const result = await scanSourceGraph(positionals[1], { project: values.project, maxFiles: integer(values['max-files']),
       maxDepth: integer(values['max-depth']), maxBytes: integer(values['max-bytes']),
       maxFileBytes: integer(values['max-file-bytes']), maxRecords: integer(values['max-records']),
       observedAt: integer(values['observed-at']) })
@@ -135,6 +157,9 @@ export async function main(options: ContextCliOptions = {}): Promise<void> {
   }
   if (!values.identity || !values.state || !values['expect-pubkey'] || (!!values.room === !!values.personal)) throw new Error('Supply --identity, --expect-pubkey, --state and exactly one of --room or --personal. See --help.')
   if (!['mcp', 'call'].includes(positionals[0]) || positionals.length !== (positionals[0] === 'call' ? 2 : 1)) throw new Error('Choose mcp, or call <tool>.')
+  const [{ hexToBytes }, { createNostrIdentity }, { ContextFileStore }, { serveContextMcp, callContextTool }] = await Promise.all([
+    import('@noble/hashes/utils'), import('@forgesworn/context/nostr'), import('./context-store.js'), import('./context-mcp.js'),
+  ])
   const raw = (await readFile(values.identity, 'utf8')).trim()
   if (!/^[0-9a-fA-F]{64}$/.test(raw)) throw new Error('Identity file must contain an existing agent’s 32-byte hexadecimal key.')
   const sk = hexToBytes(raw), identity = createNostrIdentity(sk)
