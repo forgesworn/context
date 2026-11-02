@@ -79,6 +79,8 @@ export const view = await vault.create({ title: 'Independent consumer', scope: '
   execFileSync(process.execPath, ['host-startup-probe.mjs', cli], { cwd: toolsConsumer, stdio: 'pipe', timeout: 30000 })
   writeFileSync(join(toolsConsumer, 'project-workflow-probe.mjs'), readFileSync(join(checkout, 'test/project-workflow-package-probe.mjs')))
   execFileSync(process.execPath, ['project-workflow-probe.mjs', cli], { cwd: toolsConsumer, stdio: 'pipe', timeout: 120000 })
+  writeFileSync(join(toolsConsumer, 'host-workflow-probe.mjs'), readFileSync(join(checkout, 'test/host-workflow-package-probe.mjs')))
+  execFileSync(process.execPath, ['host-workflow-probe.mjs', cli], { cwd: toolsConsumer, stdio: 'pipe', timeout: 30000 })
   assert.match(execFileSync(process.execPath, [cli, '--help'], { encoding: 'utf8' }), /encrypted-context mcp/)
   // Exercise the installed stdio server: no checkout scripts or source imports.
   const packetRoot = join(toolsConsumer, 'packet-repository')

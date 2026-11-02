@@ -91,6 +91,14 @@ private storage. Signed/encrypted `context_*` collections remain separate.
 
 ## Coordinate concurrent work
 
+For authorised work with independent branches or bounded retries, the optional
+[`workflow` snapshots](https://github.com/forgesworn/context/blob/main/docs/HOST-WORKFLOWS.md)
+can record dependencies, results, review and reconciliation before planning the
+next ready work. Verify that the installed CLI includes them. The host owns
+execution and authenticates receipts and approvals; a plan grants no authority.
+Use these records where recovery or coordination warrants them, keeping small
+edits lightweight. They do not install an executor or change provider routing.
+
 When the optional shared-cache tools are exposed, publish your task and intended
 relative paths using `repository_activity` before substantial edits. Use a unique
 slot per task/worker, initial `expectedRevision: 0`, then the returned revision
