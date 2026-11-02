@@ -116,6 +116,33 @@ retroactively turn the unsuccessful host steps into passing results. Raw traces,
 patches, controller receipts and oracle results stay in private acceptance
 storage; they are not uploaded into the public repository.
 
+### Default workflow scope correction (0.13.1)
+
+One retained Claude trial explicitly used the tiny-known-file exception to skip
+Context for a cancellation bug requiring source discovery and regression tests.
+The shared skill, managed instructions and startup reminder now distinguish a
+quick status/coordination check from the deeper behaviour-change workflow. Short
+bug fixes requiring behaviour discovery or regression tests use activity, source
+packets, refresh and checkpoints. A trivial correction in an already identified
+file needs only the quick context check. Deferred schemas should be discovered
+through the host tool search rather than treated as a missing server.
+
+A fresh Claude trial received the same ordinary cancellation prompt without
+naming Context. Its instance-only SessionStart reminder used the revised guidance;
+global settings remained unchanged and its MCP server was installed 0.13.0.
+It loaded the skill, discovered native tools, checked status and coordination,
+published paths, retrieved implementation/test packets before editing, refreshed,
+saved by packet ID on its first attempt and marked its activity done. It finished
+in 59 seconds within a 240-second wall limit. A separate four-test oracle passed
+and rejected the original baseline; the resulting checkpoint resumed as current.
+
+This is one bounded observation, not a universal adherence guarantee or a causal
+performance comparison. It does not erase the earlier failed workflow trials.
+Installed-default acceptance is recorded separately in release evidence. SDK
+usage estimates are not verified billing or whole-task cost, and preparation,
+repair and review usage remain unknown. No model, provider, permission setting,
+new hook event or executor was introduced.
+
 ### Accounting and delivery gates
 
 The Kimi wire importer was replayed against two real selected exports, including
