@@ -1,5 +1,5 @@
 import { parseArgs } from 'node:util'
-import { readFile } from 'node:fs/promises'
+import { readFile, realpath } from 'node:fs/promises'
 import { hexToBytes } from '@noble/hashes/utils'
 import { createNostrIdentity } from '@forgesworn/context/nostr'
 import type { ContextVaultOptions } from '@forgesworn/context'
@@ -16,6 +16,11 @@ export interface ContextCliOptions {
   configureVault?: (options: ContextVaultOptions) => ContextVaultOptions
 }
 export async function main(options: ContextCliOptions = {}): Promise<void> {
+  if (process.argv[2] === 'setup') {
+    const { runHostSetup } = await import('./host-startup.js')
+    process.stdout.write(JSON.stringify(await runHostSetup(process.argv.slice(3), [process.execPath, await realpath(process.argv[1])])) + '\n')
+    return
+  }
   if (process.argv[2] === 'workspace') {
     const { runWorkspaceCli, WorkspaceCliText, WorkspaceCliJson } = await import('./workspace-cli.js')
     const result = await runWorkspaceCli(process.argv.slice(3))
@@ -47,6 +52,7 @@ export async function main(options: ContextCliOptions = {}): Promise<void> {
       (options.name ?? 'encrypted-context') + ' navigate [directory] [--handover-dir <existing private directory>]   (no directory: the Git checkout containing the working directory)\n' +
       (options.name ?? 'encrypted-context') + ' session [--handover-base <existing private directory>] [--cache-dir <initialised private directory>]   (any working folder; expectedRoot required on every call)\n' +
       (options.name ?? 'encrypted-context') + ' connect ROOT [--handover-base ABS] [--cache-dir ABS --label HOST --task TEXT [--path REL ...]]   (task-scoped JSON-lines shell connection; newline per request)\n' +
+      (options.name ?? 'encrypted-context') + ' setup codex|claude|kimi [--config-dir ABS] [--cache-dir ABS] [--handover-base ABS] [--remove] [--apply]   (preview a managed global instruction section; --apply writes it)\n' +
       (options.name ?? 'encrypted-context') + ' workspace init|discover ROOT|warm ROOT|status ROOT|index ROOT|forget-index ROOT --cache-dir ABS [--resume|--missing-only] [--priority ABS] [--max-repositories N] [--timeout-ms N]\n' +
       (options.name ?? 'encrypted-context') + ' workspace activity ROOT --cache-dir ABS [--all] [--json] [--repo ABS] [--limit 1-500] [--max-bytes 2048-262144] [--timeout-ms 1-30000]   (one-shot advisory leases; not process liveness or acceptance)\n' +
       (options.name ?? 'encrypted-context') + ' handover save --root ABS --packet ABS --state ABS --out ABS | handover resume --root ABS --handover ABS\n' +

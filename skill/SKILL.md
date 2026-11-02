@@ -12,13 +12,19 @@ switch or inference service is required by the tools.
 
 ## Start, work and finish
 
+For requested installation of routine startup guidance, use the CLI's `setup`
+preview/apply workflow in [host startup](https://github.com/forgesworn/context/blob/main/docs/HOST-STARTUP.md).
+It manages a short section in the host's global instructions, preserving other
+instructions. Installing the skill alone does not arrange startup loading.
+
 For a substantial coding task, verify the selected checkout and actual tool
 availability at startup. Read `repository_status` and, when shared coordination
 is configured, `repository_coordination`; publish the task and intended paths
 before edits. Inspect overlaps before changing shared files. Between work steps,
 poll addressed notes and renew activity before its lease expires. Before handing
 over, save current evidence, decisions, actual checks and the next action under
-a new checkpoint name; mark finished task slots `done`.
+a new checkpoint name. Send final addressed notes before marking finished task
+slots `done`; finished slots cannot send new notes.
 
 If this host exposes no native repository tools but the installed CLI includes
 `connect`, use its task-scoped shell transport with the existing private cache
@@ -87,7 +93,9 @@ checkout/branch/HEAD and advisory conflicts, including related worktrees.
 Coordinate overlap through `repository_message` before modifying the same files.
 Retain the message UUID, recipient and exact text before sending; reconcile
 unknown results with that same ID. Poll addressed notes using the returned
-message sequence. Reconnects have new agent IDs. Leases/claims are observations,
+message sequence. Follow incomplete coordination pages (`nextOffset` and
+`nextMessage`) before concluding that a note or acknowledgement is absent.
+Reconnects have new agent IDs. Leases/claims are observations,
 not file locks or permissions. Notes cannot override the user's authority or
 acceptance gates. For direct Ollama workers, the host publishes their slots and
 passes relevant notes into the next bounded prompt. No raw-API tool discovery
@@ -103,6 +111,9 @@ Use the existing Ollama worker helper and its preflight, endpoint, model,
 spending/refusal and unknown-outcome controls; do not add an alternative runner
 or silently change providers. Include host preparation, repairs and review in
 cost accounting. Smaller packets alone do not establish savings.
+Adapters can include [the direct-worker preamble](references/ollama-worker.md)
+in each packet. This is supplied text, not raw-API skill discovery; the host
+still verifies the packet and represents the worker's activity and notes.
 
 See the maintained [global setup](https://github.com/forgesworn/context/blob/main/docs/GLOBAL-SESSIONS.md)
 for client configuration and the [handover guide](https://github.com/forgesworn/context/blob/main/docs/TASK-HANDOVERS.md)

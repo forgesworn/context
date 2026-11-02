@@ -9,6 +9,10 @@ For a shell-capable session whose native MCP tools are absent, releases from
 0.9.0 include the [task-scoped shell connection](GLOBAL-SESSIONS.md#shell-connection).
 It uses the same repository tools without changing the host's configuration.
 
+From 0.10.0, [host startup setup](HOST-STARTUP.md) can add a short managed
+section to the client's global instructions so fresh coding sessions load the
+shared context workflow. This is one installation per host, not per repository.
+
 Connect Context to Codex or Claude Code to retrieve bounded source evidence from
 your own checkout. Keep using your chosen model and your project's normal tests
 and review process. Context does not choose models or require a ForgeSworn
@@ -36,8 +40,8 @@ matching core version:
 mkdir context-install
 cd context-install
 npm init -y
-npm install --ignore-scripts /absolute/path/to/forgesworn-context-0.8.0.tgz \
-  /absolute/path/to/forgesworn-context-tools-0.8.0.tgz
+npm install --ignore-scripts /absolute/path/to/forgesworn-context-0.10.0.tgz \
+  /absolute/path/to/forgesworn-context-tools-0.10.0.tgz
 ```
 
 For that installation, use

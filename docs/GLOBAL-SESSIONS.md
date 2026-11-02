@@ -68,6 +68,12 @@ Do not report a configured entry as active tools in an existing conversation.
 
 ## Shell connection
 
+For routine task-start loading in fresh Codex, Claude and Kimi sessions, use the
+managed global instruction section described in [host startup](HOST-STARTUP.md).
+The existing Ollama adapter can supply the shared direct-worker preamble. These
+are instruction paths; native tool availability still needs verification in the
+actual conversation.
+
 Some coding hosts can run local commands without exposing local MCP tools in
 their current conversation. `connect` supplies a task-scoped JSON-lines transport
 over the same repository server. It does not inject tools into the host, modify
