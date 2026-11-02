@@ -18,6 +18,10 @@ batch warm-up, and advisory agent activity and addressed notes across worktrees.
 overlapping paths, context health and checkpoint summaries, with explicit Girnel
 card links. Read-only, loopback-only; no ticket writes or automatic acceptance.
 
+[Local task console](docs/AGENT-CONSOLE.md): explicitly enable task entry, a
+managed Codex host session, approval/questions, result review and saved-thread
+continuation. Claude, Kimi and Ollama adapters remain pending.
+
 [Bounded host workflows](docs/HOST-WORKFLOWS.md): optional local task contracts,
 dependency/review checks, deterministic result reduction and resumable planning.
 The coding host retains execution, permissions and model selection.

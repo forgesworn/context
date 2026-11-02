@@ -1,5 +1,9 @@
 # Local workspace dashboard
 
+For task entry and the first managed host adapter, see the optional
+[local task console](AGENT-CONSOLE.md). Explicit `--control-dir` mode enables it;
+the default described below stays read-only.
+
 Use the local ticket viewer to see reported agent work, shared file claims and
 saved handovers across the **existing saved workspace catalogue**. It runs as an
 explicit foreground command. It does not discover repositories, build indexes,

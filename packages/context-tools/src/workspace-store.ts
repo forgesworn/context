@@ -64,7 +64,7 @@ export class WorkspaceStore {
    return JSON.parse(gunzipSync(bytes,{maxOutputLength:MAX_PLAIN}).toString('utf8')) as T
   } catch { throw new Error('cannot authenticate or decode workspace cache; preserve the key and inspect/reset this disposable entry') }
  }
- put(key: string, kind: 'index'|'board'|'catalogue'|'warm', value: unknown) {
+ put(key: string, kind: 'index'|'board'|'catalogue'|'warm'|'console', value: unknown) {
   this.writable();this.check()
   const plain=Buffer.from(JSON.stringify(value));if(plain.length>MAX_PLAIN)throw new Error('workspace cache snapshot exceeds decoded byte limit')
   const nonce=randomBytes(12),cipher=createCipheriv('aes-256-gcm',this.key,nonce)
