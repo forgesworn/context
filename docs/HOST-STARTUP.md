@@ -5,6 +5,53 @@ instructions. It tells fresh sessions to load the shared skill, select the
 authorised Git checkout explicitly, and use the repository tools or shell
 fallback. It does not install the skill or configure MCP.
 
+This is the default for substantial project work: the user does not need to
+mention Context or invoke the skill. One user-level setup applies to every
+explicitly selected project. No per-project application dependency is needed.
+
+## Automatic host hooks
+
+Fresh-session trials found that a connected server and written instructions
+do not make every model follow the workflow. `setup-hooks` adds a deterministic
+startup preflight and explicit context reminder through supported host hooks:
+
+```sh
+z1p setup-hooks claude --cache-dir /existing/private/cache \
+  --handover-base /existing/private/handovers
+z1p setup-hooks claude --cache-dir /existing/private/cache \
+  --handover-base /existing/private/handovers --apply
+z1p setup-hooks kimi --apply
+z1p setup-hooks codex --apply
+```
+
+Preview is the default. `--remove --apply` removes the managed hook only.
+`--config-dir ABS` selects an existing host configuration directory. An optional
+`--launcher ABS` uses an existing stable executable wrapper as the hook command;
+the default pins the current Node and installed CLI paths. The shared skill must
+already exist. Models, providers, MCP entries and permission settings are not
+changed. Existing JSON settings and hook handlers retain their bytes; Kimi's
+owned TOML section is marked separately.
+
+Claude and Codex use `SessionStart`; Kimi uses `UserPromptSubmit`, whose stdout
+is appended to model context. Kimi's observation-only `SessionStart` does not
+provide that contract. The installed `startup` command reads bounded hook input,
+selects only the Git checkout containing the supplied local working directory,
+and supplies the shared skill location and connection workflow. A parent
+workspace remains unselected. It reads Git metadata, never source, runs no
+project scripts and claims no fresh index or native tool discovery. Source
+retrieval and task activity still follow the shared skill.
+
+**Codex requires the owner to review and trust a new or changed hook through
+`/hooks`.** The installer reports `trustReviewRequired`; it does not write trust
+records, change managed policy or bypass hook trust. Until approved, the existing
+global instructions and MCP connection remain the available default route.
+Hooks may be disabled by host settings; configuration is not proof of execution.
+Verify the actual hook output and subsequent tool use in a fresh session.
+
+Host contracts: [Codex hooks](https://learn.chatgpt.com/docs/hooks),
+[Claude hooks](https://code.claude.com/docs/en/hooks),
+[Kimi hooks](https://github.com/MoonshotAI/kimi-code/blob/main/docs/en/customization/hooks.md).
+
 ## Preview, apply and remove
 
 Run the installed `encrypted-context` executable. Preview is the default and
@@ -101,7 +148,8 @@ other invalid states:
 - malformed or duplicate managed markers; and
 - instruction, Codex override or configuration-directory changes during apply.
 
-It does not change hooks, models, approvals or MCP settings.
+The `setup` instruction command does not change hooks, models, approvals or MCP
+settings. The separate `setup-hooks` command changes only its managed hook.
 
 An existing installer lock requires checking the owning operation. Do not remove
 a live or uncertain lock to retry. External editors do not participate in the

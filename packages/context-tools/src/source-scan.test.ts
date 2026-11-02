@@ -18,6 +18,47 @@ function bySource(records: Awaited<ReturnType<typeof scanSourceGraph>>['records'
 }
 
 describe('bounded TypeScript and JavaScript source graph scan', () => {
+  it('follows explicit project path aliases and namespace calls through a barrel', async () => {
+    const root = await fixture()
+    await source(root, 'tsconfig.json', JSON.stringify({ compilerOptions: { baseUrl: '.', paths: { '@api/*': ['src/*'] } } }))
+    await source(root, 'src/api.ts', 'export function target() { return 1 }')
+    await source(root, 'src/index.ts', "export { target as run } from './api.js'")
+    await source(root, 'consumer.ts', "import { run } from '@api/index'; import * as api from '@api/index'; export function invoke() { run(); api.run() }")
+    const scan = await scanSourceGraph(root, { project: 'tsconfig.json', observedAt: 1 } as any)
+    const target = bySource(scan.records, 'repo://src/api.ts#target')!
+    expect(bySource(scan.records, 'repo://consumer.ts#invoke')?.relations).toContainEqual({ to: target.id, kind: 'calls' })
+    expect(bySource(scan.records, 'repo://consumer.ts')?.relations).toContainEqual({ to: bySource(scan.records, 'repo://src/index.ts')!.id, kind: 'imports' })
+    expect((scan as any).project.path).toBe('tsconfig.json')
+    expect((scan as any).project.sha256).toMatch(/^[a-f0-9]{64}$/)
+  })
+
+  it('rejects project configuration that escapes the selected root', async () => {
+    const root = await fixture()
+    await source(root, 'tsconfig.json', '{"extends":"../private.json"}')
+    await expect(scanSourceGraph(root, { project: 'tsconfig.json' } as any)).rejects.toThrow(/project/)
+  })
+
+  it('keeps namespace parameter shadowing and type-only namespaces unresolved', async () => {
+    const root = await fixture()
+    await source(root, 'api.ts', 'export function target() {}')
+    await source(root, 'consumer.ts', "import * as api from './api'; import type * as types from './api'; export function direct() { api.target() }; export function shadow(api: any) { api.target() }; export function invalid() { types.target() }")
+    const scan = await scanSourceGraph(root)
+    const target = bySource(scan.records, 'repo://api.ts#target')!
+    expect(bySource(scan.records, 'repo://consumer.ts#direct')!.relations).toContainEqual({ to: target.id, kind: 'calls' })
+    for (const name of ['shadow', 'invalid']) expect(bySource(scan.records, `repo://consumer.ts#${name}`)!.relations?.filter(e => e.kind === 'calls')).toEqual([])
+  })
+
+  it('rejects linked configuration, project references and inherited escaping aliases', async () => {
+    const root = await fixture(), outside = await fixture()
+    await source(outside, 'private.json', '{}')
+    await symlink(join(outside, 'private.json'), join(root, 'linked.json'))
+    await expect(scanSourceGraph(root, { project: 'linked.json' })).rejects.toThrow(/project/)
+    await source(root, 'refs.json', '{"references":[{"path":"../other"}]}')
+    await expect(scanSourceGraph(root, { project: 'refs.json' })).rejects.toThrow(/project/)
+    await source(root, 'paths.json', '{"compilerOptions":{"baseUrl":".","paths":{"@private/*":["../other/*"]}}}')
+    await expect(scanSourceGraph(root, { project: 'paths.json' })).rejects.toThrow(/project/)
+  })
+
   it.each(['ts', 'js'])('resolves file-level shadowing in %s without losing direct calls', async extension => {
     const root = await fixture()
     await source(root, `scope.${extension}`, `
@@ -185,7 +226,9 @@ describe('bounded TypeScript and JavaScript source graph scan', () => {
     await source(root, 'b.ts', `export function same() {}`)
     const result = await scanSourceGraph(root, { observedAt: 123 })
     const caller = bySource(result.records, 'repo://a.ts#caller')!
-    expect(caller.relations?.filter(edge => edge.kind === 'calls') ?? []).toEqual([])
+    expect(caller.relations?.filter(edge => edge.kind === 'calls') ?? []).toEqual([
+      { to: bySource(result.records, 'repo://b.ts#same')!.id, kind: 'calls' },
+    ])
   })
 
   it('keeps cyclic imports and calls valid for atomic signed ingestion', async () => {

@@ -3,9 +3,13 @@ import { createHash } from 'node:crypto'
 import { lstat, open, opendir, realpath, stat } from 'node:fs/promises'
 import { dirname, extname, join, relative, resolve, sep } from 'node:path'
 import ts from 'typescript'
+import { loadSourceProject } from './source-project.js'
+import { createSelectedValueBindings } from './typescript-bindings.js'
 import type { ContextRecord, ContextRelation, ContextRelationKind } from '@forgesworn/context'
 
 export interface SourceGraphScanOptions {
+  /** Explicit root-relative tsconfig; only selected files can resolve. */
+  project?: string
   maxFiles?: number
   maxDepth?: number
   maxBytes?: number
@@ -14,6 +18,7 @@ export interface SourceGraphScanOptions {
   observedAt?: number
 }
 export interface SourceGraphScan {
+  project?: Awaited<ReturnType<typeof loadSourceProject>>['evidence']
   /** Canonical absolute path for the local operator; never copied into records. */
   root: string
   records: ContextRecord[]
@@ -116,96 +121,30 @@ function callResolver(files: ParsedFile[]): (expression: ts.Expression, caller: 
     const binding = checker.getSymbolAtLocation(name)
     if (binding) declarations.set(binding, symbol)
   }
-  // The checker follows type-only export stars to their original value symbol.
-  // Prove a value export path separately before accepting an imported call.
-  const byPath = new Map(files.map(file => [file.path, file]))
-  type ExportSeen = Set<string | ts.Symbol>
-  function valueBindings(binding: ts.Symbol | undefined, seen: ExportSeen): Set<ts.Symbol> {
-    const values = new Set<ts.Symbol>()
-    if (!binding || seen.has(binding)) return values
-    seen.add(binding)
-    if (!(binding.flags & ts.SymbolFlags.Alias)) {
-      if (binding.flags & ts.SymbolFlags.Value) values.add(binding)
-      return values
-    }
-    for (const node of binding.declarations ?? []) {
-      if (ts.isTypeOnlyImportOrExportDeclaration(node)) continue
-      let declaration: ts.ImportDeclaration | ts.ExportDeclaration
-      let name: string
-      if (ts.isImportSpecifier(node)) {
-        if (!ts.isImportDeclaration(node.parent.parent.parent)) continue
-        declaration = node.parent.parent.parent
-        name = (node.propertyName ?? node.name).text
-      } else if (ts.isImportClause(node)) {
-        if (!ts.isImportDeclaration(node.parent)) continue
-        declaration = node.parent
-        name = 'default'
-      } else if (ts.isExportSpecifier(node)) {
-        declaration = node.parent.parent
-        name = (node.propertyName ?? node.name).text
-        if (!declaration.moduleSpecifier) {
-          for (const value of valueBindings(checker.getExportSpecifierLocalTargetSymbol(node), seen)) values.add(value)
-          continue
-        }
-      } else continue
-      const specifier = declaration.moduleSpecifier
-      if (!specifier || !ts.isStringLiteral(specifier)) continue
-      const target = modules.get(declaration.getSourceFile().fileName)?.get(specifier.text)
-      if (target !== undefined) for (const value of valueExports(target, name, seen)) values.add(value)
-    }
-    return values
-  }
-  function valueExports(path: string, name: string, seen: ExportSeen): Set<ts.Symbol> {
-    const values = new Set<ts.Symbol>(), key = `${path}\0${name}`
-    if (seen.has(key)) return values
-    seen.add(key)
-    const file = byPath.get(path)
-    if (!file) return values
-    let explicit = false
-    for (const symbol of file.symbols) {
-      if (!symbol.exported || symbol.kind === 'method') continue
-      const exportName = ts.getCombinedModifierFlags(symbol.node as ts.Declaration) & ts.ModifierFlags.Default ? 'default' : symbol.name
-      if (exportName === name) {
-        explicit = true
-        const binding = checker.getSymbolAtLocation((symbol.node as ts.NamedDeclaration).name!)
-        for (const value of valueBindings(binding, seen)) values.add(value)
-      }
-    }
-    const stars: string[] = []
-    for (const node of file.source.statements) {
-      if (!ts.isExportDeclaration(node)) continue
-      if (node.exportClause && ts.isNamedExports(node.exportClause)) {
-        for (const element of node.exportClause.elements) if (element.name.text === name) {
-          explicit = true
-          if (node.isTypeOnly || element.isTypeOnly) continue
-          if (!node.moduleSpecifier) {
-            for (const value of valueBindings(checker.getExportSpecifierLocalTargetSymbol(element), seen)) values.add(value)
-          } else if (ts.isStringLiteral(node.moduleSpecifier)) {
-            const target = file.modules.get(node.moduleSpecifier.text)
-            if (target !== undefined) for (const value of valueExports(target, (element.propertyName ?? element.name).text, seen)) values.add(value)
-          }
-        }
-      } else if (!node.exportClause && !node.isTypeOnly && node.moduleSpecifier && ts.isStringLiteral(node.moduleSpecifier)) {
-        const target = file.modules.get(node.moduleSpecifier.text)
-        if (target) stars.push(target)
-      }
-    }
-    if (!explicit && name !== 'default') for (const target of stars) {
-      for (const value of valueExports(target, name, seen)) values.add(value)
-    }
-    return values
-  }
+  const { valueBindings, valueExports } = createSelectedValueBindings(files, checker)
   const importedValues = new Map<ts.Symbol, Set<ts.Symbol>>()
   return (expression, caller) => {
-    // Ordinary object/namespace/dynamic calls remain outside this contract.
+    // Only a proven namespace import can introduce a cross-file member call.
     const identifier = ts.isIdentifier(expression)
+    const namespace = ts.isPropertyAccessExpression(expression) && ts.isIdentifier(expression.expression)
+      ? checker.getSymbolAtLocation(expression.expression) : undefined
+    const namespaceImport = namespace?.declarations?.find(ts.isNamespaceImport)
     const member = ts.isPropertyAccessExpression(expression)
       && expression.expression.kind === ts.SyntaxKind.ThisKeyword && !!caller.className
-    if (!identifier && !member) return undefined
-    let binding = checker.getSymbolAtLocation(identifier ? expression : expression.name)
+    if (!identifier && !member && !namespaceImport) return undefined
+    let binding = checker.getSymbolAtLocation(identifier ? expression : (expression as ts.PropertyAccessExpression).name)
     if (!binding) return undefined
-    const imported = !!(binding.flags & ts.SymbolFlags.Alias)
-    if (imported) {
+    const imported = !!(binding.flags & ts.SymbolFlags.Alias) || !!namespaceImport
+    if (namespaceImport && ts.isPropertyAccessExpression(expression)) {
+      const clause = namespaceImport.parent
+      const declaration = clause.parent
+      if (clause.isTypeOnly || !ts.isImportDeclaration(declaration) || !ts.isStringLiteral(declaration.moduleSpecifier)) return undefined
+      const path = modules.get(declaration.getSourceFile().fileName)?.get(declaration.moduleSpecifier.text)
+      if (!path) return undefined
+      const values = valueExports(path, expression.name.text, new Set())
+      const actual = binding.flags & ts.SymbolFlags.Alias ? checker.getAliasedSymbol(binding) : binding
+      if (values.size !== 1 || !values.has(actual)) return undefined
+    } else if (imported) {
       let values = importedValues.get(binding)
       if (!values) { values = valueBindings(binding, new Set()); importedValues.set(binding, values) }
       // A checker alias alone can choose the first of conflicting barrel exports.
@@ -255,6 +194,7 @@ export async function scanSourceGraph(root: string, options: SourceGraphScanOpti
   assert(Number.isSafeInteger(observedAt) && observedAt >= 0, 'Source scan observation time is invalid.')
   const canonicalRoot = await realpath(root)
   assert((await stat(canonicalRoot)).isDirectory(), 'Source scan root must be a directory.')
+  const project = options.project === undefined ? undefined : await loadSourceProject(canonicalRoot, options.project)
 
   const discovered: string[] = []
   let filesSkipped = 0
@@ -329,7 +269,12 @@ export async function scanSourceGraph(root: string, options: SourceGraphScanOpti
     }
     const imports: string[] = [], modules = new Map<string, string>()
     for (const specifier of rawImports) {
-      const absolute = resolveImport(file.path.split(sep).join('/'), specifier, known)
+      const selectedPath = (virtual: string) => resolve(canonicalRoot, '.' + virtual).split(sep).join('/')
+      const resolved = project ? ts.resolveModuleName(specifier, `/${path}`, {
+        ...project.compilerOptions, moduleResolution: ts.ModuleResolutionKind.Bundler,
+        allowJs: true, noLib: true, types: [],
+      }, { fileExists: virtual => known.has(selectedPath(virtual)), readFile: () => undefined }).resolvedModule?.resolvedFileName : undefined
+      const absolute = project ? resolved && selectedPath(resolved) : resolveImport(file.path.split(sep).join('/'), specifier, known)
       if (!absolute) continue
       const target = normal(canonicalRoot, absolute)
       imports.push(target)
@@ -407,7 +352,8 @@ export async function scanSourceGraph(root: string, options: SourceGraphScanOpti
       const names = nameList.length || omitted
         ? `; exported: ${nameList.join(', ')}${omittedText}`
         : ''
-      return { id: ids.get(candidate.key)!, kind: 'evidence', text: `Source file ${candidate.file.path}: ${summary}; ${candidate.file.imports.length} resolved internal import${candidate.file.imports.length === 1 ? '' : 's'}${names}.`, source: `repo://${candidate.file.path}`, observedAt, provenance, ...(relations.length ? { relations: relations.sort(relationSort).slice(0, 16) } : {}) }
+      const language = ['.js', '.jsx', '.mjs', '.cjs'].includes(extname(candidate.file.path)) ? 'JavaScript' : 'TypeScript'
+      return { id: ids.get(candidate.key)!, kind: 'evidence', text: `Source file ${candidate.file.path}: ${summary}; ${candidate.file.imports.length} resolved internal import${candidate.file.imports.length === 1 ? '' : 's'}${names}; syntax: ${language}.`, source: `repo://${candidate.file.path}`, observedAt, provenance, ...(relations.length ? { relations: relations.sort(relationSort).slice(0, 16) } : {}) }
     }
     const symbol = candidate.symbol
     if (retainedKeys.has(symbol.file)) relations.push(relation(ids.get(symbol.file)!, 'relates-to'))
@@ -428,7 +374,8 @@ export async function scanSourceGraph(root: string, options: SourceGraphScanOpti
     if (['function', 'method', 'variable'].includes(symbol.kind)) visit(body)
     return { id: ids.get(candidate.key)!, kind: 'evidence', text: `${symbol.exported ? 'Exported' : 'Local'} ${symbol.kind} ${symbol.name} in ${symbol.file} at line ${symbol.line}${symbol.parameters === undefined ? '' : ` with ${symbol.parameters} parameter${symbol.parameters === 1 ? '' : 's'}`}.`, source: `repo://${symbol.file}#${encodeURIComponent(symbol.name)}`, observedAt, provenance, ...(relations.length ? { relations: relations.sort(relationSort).slice(0, 16) } : {}) }
   })
-  return { root: canonicalRoot, records, filesScanned: parsed.length, filesSkipped, bytesRead,
+  await project?.verify()
+  return { root: canonicalRoot, ...(project ? { project: project.evidence } : {}), records, filesScanned: parsed.length, filesSkipped, bytesRead,
     symbolsFound: parsed.reduce((sum, file) => sum + file.symbols.length, 0),
     importsFound: parsed.reduce((sum, file) => sum + file.imports.length, 0), callsFound,
     scanBounds: { maxFilesHit, maxDepthHit } }

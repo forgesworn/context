@@ -101,9 +101,9 @@ do not silently scan the parent workspace.
 
 | Language / surface | Current support | Next useful depth |
 | --- | --- | --- |
-| TypeScript / JavaScript / TSX / JSX | 0.3.3: isolated Program/TypeChecker binding over selected trees; scope-aware direct calls and local named default/re-export aliases. No tsconfig, external libraries or project type checking. 0.3.2 has earlier syntax/name hints | Explicit project configuration, references and task-level evidence queries; keep dynamic calls and type-directed evidence distinct |
-| Rust / Cargo | Lexical declarations and simple module-file guesses; manifest path dependencies in separate snapshots; Cargo lock resolution unsupported | Parser-backed modules, use/re-exports, types/traits/impls and call/reference candidates; selected workspace/features/cfg context; preserve unresolved macro/trait dispatch |
-| Kotlin / Java | Lexical declaration inference; no meaningful compiler-resolved import/type/call graph | Parsed declarations/imports; package/module and Gradle dependency evidence, then explicitly qualified references. Do not execute Gradle scripts during indexing |
+| TypeScript / JavaScript / TSX / JSX | Isolated Program/TypeChecker binding; explicit root-confined config aliases/relative extends, named and namespace imports, barrel/value-export checks; graph symbol/reference/impact/path queries. No external libraries or project type checking | Project references, deeper type-directed evidence and qualified runtime-dispatch distinctions |
+| Rust / Cargo | Tree-sitter declaration/impl/trait spans in exploration, graph and complete packet planning; references labelled name candidates. Root manifest/lock observations preserve multiple versions and local pointers; broader scanner remains lexical | Module/use/re-export resolution, selected workspace/features/cfg context and release/installed-state evidence; unresolved macros/dispatch remain explicit |
+| Kotlin / Java | Kotlin Tree-sitter declaration/import/package spans, extension and overload identities, complete packets and labelled graph candidates. Java remains lexical | Kotlin module/build metadata and compiler-resolved overload/reference evidence; Java syntax depth. No Gradle execution during indexing |
 | Python | Lexical declarations and conservative relative-import guesses | Parsed scopes/imports and useful references; explicit environment/package assumptions; no import execution |
 | C / C++ | Lexical declarations and quoted-include guesses; selected suffix gaps aligned in 0.3.2 | Parse declarations/includes; distinguish build-config/preprocessor-dependent and FFI edges |
 | Dart / Flutter | Lexical navigation and exact `build` packets; absent from the broad extractor and `plan` packets | Parsed imports/exports/parts and declarations with pub package/version evidence; lexical indexing is not semantic support |
@@ -113,8 +113,8 @@ do not silently scan the parent workspace.
 
 Navigation and extraction must have a tested capability manifest so their suffix
 support cannot silently diverge. The `.kts` and selected C++ gaps were fixed in
-0.3.2; that adds source eligibility, not deeper resolution. Source packets currently
-have syntax-aware planning for TS/JS only; add complete-span planning for each
+0.3.2; that added source eligibility. Source packets now
+have syntax-aware planning for TS/JS, Rust and Kotlin; add complete-span planning for each
 new parser rather than silently truncating another language's function.
 
 ## OS4 language and contract assignments

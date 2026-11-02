@@ -1,0 +1,63 @@
+// Invoked from the independent recipient installation by context-package-smoke.
+import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
+import { mkdirSync, writeFileSync, readFileSync, statSync, realpathSync, symlinkSync } from 'node:fs';
+import { join } from 'node:path';
+import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
+const cli = process.argv[2], root = join(realpathSync(process.cwd()), 'project-workflow-fixture');
+mkdirSync(root);
+const run = args => JSON.parse(execFileSync(process.execPath, [cli, ...args], { cwd: process.cwd(), encoding: 'utf8', timeout: 30000 }));
+writeFileSync(join(root, 'api.ts'), 'export function target() { return 1 }\n');
+writeFileSync(join(root, 'consumer.ts'), "import { target as run } from './api.js'\nexport function invoke() { return run() }\n");
+writeFileSync(join(root, 'lib.rs'), '#[cfg(test)]\nfn checks() {\n  assert!(true);\n}\n');
+writeFileSync(join(root, 'Api.kt'), 'package demo\n\nfun String.decorate(): String {\n  return this\n}\n');
+writeFileSync(join(root, 'package.json'), '{"dependencies":{"api":"^1"}}');
+writeFileSync(join(root, 'package-lock.json'), '{"lockfileVersion":3,"packages":{"node_modules/api":{"version":"1.2.0"}}}');
+const git = args => execFileSync('git', ['-C', root, ...args], { stdio: 'pipe' });
+git(['init', '-q']); git(['add', '.']); git(['-c','user.name=Context fixture','-c','user.email=fixture@example.invalid','-c','commit.gpgsign=false','-c','core.hooksPath=/dev/null','commit','-qm','Fixture']);
+const html = join(process.cwd(), 'project-graph.html'), json = join(process.cwd(), 'project-graph.json');
+assert.equal(run(['graph', root, '--out', html]).format, 'offline-html');
+assert.equal(statSync(html).mode & 0o777, 0o600);
+assert.ok(readFileSync(html, 'utf8').includes("connect-src 'none'"));
+assert.throws(() => run(['graph', root, '--out', html]));
+run(['graph', root, '--out', json, '--json']);
+const graph = JSON.parse(readFileSync(json, 'utf8'));
+assert.ok(graph.nodes.some(n => n.name === 'String.decorate'));
+assert.equal(graph.dependencies.dependencies[0].lockedCandidates[0].version, '1.2.0');
+const alias = join(process.cwd(), 'linked-output'); symlinkSync(root, alias);
+assert.throws(() => run(['graph', root, '--out', join(alias, 'no.html')]));
+const client = new Client({ name:'installed-project-workflow',version:'1' });
+await client.connect(new StdioClientTransport({ command:process.execPath,args:[cli,'session'],stderr:'pipe' }));
+const call = async (name,args={}) => { const result=await client.callTool({name,arguments:{expectedRoot:root,...args}}); assert.notEqual(result.isError,true,JSON.stringify(result)); return JSON.parse(result.content[0].text); };
+try {
+  assert.ok((await client.listTools()).tools.some(t=>t.name==='repository_graph'));
+  const status = await call('repository_refresh');
+  const query = await call('repository_graph',{expectedGeneration:status.generation,query:{action:'symbol',symbol:'target'}});
+  assert.equal(query.nodes[0].name,'target');
+  for(const [path,line,startLine,endLine]of[['lib.rs',3,1,4],['Api.kt',4,3,5]]) {
+    const result=await call('repository_packet',{expectedGeneration:status.generation,mode:'plan',format:'json',spec:{sources:[{path,line}]}});
+    assert.equal(result.packet.sources[0].startLine,startLine); assert.equal(result.packet.sources[0].endLine,endLine);
+  }
+  const deps=await call('repository_graph',{query:{action:'dependencies'}});
+  assert.equal(deps.dependencies.installedStateVerified,false);
+  assert.equal(deps.dependencies.dependencies[0].requested,'^1');
+} finally { await client.close(); }
+const from='2026-11-02T00:00:00.000Z',to='2026-11-02T01:00:00.000Z',at='2026-11-02T00:10:00.000Z';
+const spec={version:1,taskId:'fixture',developerId:'owner',accountId:null,repositoryId:'fixture',category:'evaluation',client:'kimi',sessionId:'session-fixture',from,to,phase:'host',contextUsed:true,accepted:true,reviewSeconds:null,coverage:{allAttempts:null,hostPreparation:null,workers:null,review:null},attemptId:'fixture-1',at,exitCode:0,freshSession:true};
+const files={};for(const name of ['wire','manifest','spec','usage','inventory','total'])files[name]=join(process.cwd(),`fixture-${name}.json`);
+writeFileSync(files.spec,JSON.stringify(spec));writeFileSync(files.manifest,JSON.stringify({sessionId:spec.sessionId}));
+writeFileSync(files.wire,[{type:'metadata',protocol_version:'1.5',created_at:Date.parse(from)},{type:'turn.prompt',agentId:'main'},{type:'usage.record',agentId:'main',usageScope:'turn',model:'kimi-code/k3',time:Date.parse(at),usage:{inputOther:10,inputCacheRead:20,inputCacheCreation:0,output:3}},{type:'prompt.completed',agentId:'main'}].map(e=>JSON.stringify(e)).join('\n'));
+run(['usage','import-kimi','--input',files.wire,'--manifest',files.manifest,'--spec',files.spec,'--out',files.usage]);
+const usage=JSON.parse(readFileSync(files.usage,'utf8'));assert.equal(usage.usage.totalTokens.completeTotal,33);
+writeFileSync(files.inventory,JSON.stringify({version:1,taskId:'fixture',repositoryId:'fixture',inventoryComplete:true,phases:{preparation:'not-used',host:'used',worker:'not-used',review:'not-used'},attempts:[{id:'fixture-1',client:'kimi',phase:'host',receiptSha256:usage.integritySha256}]}));
+run(['usage','task','--input',files.usage,'--spec',files.inventory,'--out',files.total]);
+const total=JSON.parse(readFileSync(files.total,'utf8'));assert.equal(total.taskTotalTokens,33);assert.equal(total.independentlyVerified,false);
+const hostHome=join(process.cwd(),'hook-host');mkdirSync(join(hostHome,'skills/z1p-context'),{recursive:true});writeFileSync(join(hostHome,'skills/z1p-context/SKILL.md'),'Fixture shared skill');
+writeFileSync(join(hostHome,'settings.json'),'{"personal" : "preserve bytes"}');
+const preview=run(['setup-hooks','claude','--config-dir',hostHome]);assert.equal(preview.applied,false);assert.equal(readFileSync(join(hostHome,'settings.json'),'utf8'),'{"personal" : "preserve bytes"}');
+const installed=run(['setup-hooks','claude','--config-dir',hostHome,'--apply']);assert.equal(installed.trustReviewRequired,false);assert.ok(readFileSync(join(hostHome,'settings.json'),'utf8').includes('"personal" : "preserve bytes"'));
+const hookOutput=JSON.parse(execFileSync(process.execPath,[cli,'startup','--host','claude','--skill',join(hostHome,'skills/z1p-context/SKILL.md')],{cwd:process.cwd(),encoding:'utf8',input:JSON.stringify({cwd:root,hook_event_name:'SessionStart'}),timeout:15000}));
+assert.ok(hookOutput.hookSpecificOutput.additionalContext.includes(JSON.stringify(root)));assert.ok(hookOutput.hookSpecificOutput.additionalContext.includes('"sourceScanned":false'));
+assert.equal(run(['setup-hooks','codex','--config-dir',hostHome]).trustReviewRequired,true);
+run(['setup-hooks','claude','--config-dir',hostHome,'--remove','--apply']);assert.equal(JSON.parse(readFileSync(join(hostHome,'settings.json'),'utf8')).hooks.SessionStart.length,0);

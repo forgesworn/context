@@ -82,6 +82,15 @@ and effort; record the actual values rather than silently switching them.
 
 ## Ordered work queue
 
+The November project-workflow slice adds bounded unsigned source-graph queries,
+an offline viewer, explicit TS aliases/namespace bindings, Rust/Kotlin syntax
+spans, manifest/lock observations, installed accounting, Kimi wire counters and
+managed host hooks for default context startup. Its actual delivery and host
+acceptance are tracked in [project workflow delivery](PROJECT-WORKFLOW-DELIVERY.md).
+This supersedes older implementation-gap wording below; compiler-complete
+language resolution, external adoption, measured savings and enterprise gates
+remain separate.
+
 The 1 November owner-authorised first slice packages the existing task-handover
 helper into the installed CLI and optional, directory-scoped MCP operations,
 adds request checkout binding checks, and prepares Codex/Claude/Kimi project

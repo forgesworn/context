@@ -74,8 +74,13 @@ describe('repository packet MCP adapter', () => {
       expect(packet.sources[0]).toMatchObject({ path: file, sha256: digest, startLine: 2, endLine: 2, lines: [{ line: 2, content: 'class EvidenceMarker {}' }] })
       expect(packet.allowedFiles[0]).toMatchObject({ path: file, state: 'present', sha256: digest })
       const planned = await call(connection.client, { mode: 'plan', expectedGeneration: generation, spec: fixtureSpec([{ path: file, line: 2 }]) })
-      expect(planned.isError).toBe(true)
-      expect(text(planned)).toMatch(/planner source extension is unsupported/)
+      if (file.endsWith('.kts')) {
+        expect(planned.isError).not.toBe(true)
+        expect(JSON.parse(text(planned)).packet.sources[0]).toMatchObject({ path: file, startLine: 2, endLine: 2 })
+      } else {
+        expect(planned.isError).toBe(true)
+        expect(text(planned)).toMatch(/planner source extension is unsupported/)
+      }
 
       const changed = '// fixture\nclass UpdatedEvidenceMarker {}\n'
       await writeFile(join(value, file), changed)
@@ -131,7 +136,7 @@ describe('repository packet MCP adapter', () => {
     const value = await root(); const connection = await connect(value)
     try {
       const tools = await connection.client.listTools()
-      expect(tools.tools.map((tool) => tool.name).sort()).toEqual(['repository_coverage', 'repository_explore', 'repository_packet', 'repository_refresh', 'repository_search', 'repository_status'])
+      expect(tools.tools.map((tool) => tool.name).sort()).toEqual(['repository_coverage', 'repository_explore', 'repository_graph', 'repository_packet', 'repository_refresh', 'repository_search', 'repository_status'])
       const packetTool = tools.tools.find((tool) => tool.name === 'repository_packet')
       expect(packetTool?.inputSchema.type).toBe('object')
       expect(packetTool?.inputSchema.additionalProperties).toBe(false)

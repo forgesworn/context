@@ -8,6 +8,7 @@ import { promisify } from 'node:util';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 import ts from 'typescript';
+import { parseLanguageSyntax, syntaxLanguage } from './language-syntax.js';
 import { NavigationPolicy } from './repository-navigation-policy.js';
 
 const execFileAsync = promisify(execFile);
@@ -17,7 +18,7 @@ const MAX_FILES = 32;
 const MAX_FILE_BYTES = 2 * 1024 * 1024;
 const MAX_TOTAL_BYTES = 8 * 1024 * 1024;
 const SOURCE_EXTENSIONS = new Set(['ts', 'tsx', 'js', 'jsx', 'mts', 'cts', 'mjs', 'cjs', 'py', 'rs', 'go', 'java', 'kt', 'kts', 'swift', 'c', 'cc', 'cpp', 'cxx', 'h', 'hh', 'hpp', 'hxx', 'cs', 'rb', 'php', 'dart', 'md']);
-const PLANNABLE_EXTENSIONS = new Set(['ts', 'tsx', 'js', 'jsx', 'mts', 'cts', 'mjs', 'cjs']);
+const PLANNABLE_EXTENSIONS = new Set(['ts', 'tsx', 'js', 'jsx', 'mts', 'cts', 'mjs', 'cjs', 'rs', 'kt', 'kts']);
 const GENERATED_DIRECTORIES = new Set(['node_modules', 'dist', 'build', 'coverage', 'out', 'vendor', 'target']);
 
 function assert(ok, message) { if (!ok) throw new Error(`worker-packet: ${message}`); }
@@ -404,7 +405,10 @@ export async function outlineSource({ root: rootInput, path }) {
   const lines = text.split('\n');
   const lineCount = text.endsWith('\n') ? lines.length - 1 : lines.length;
   let declarations = [];
-  if (PLANNABLE_EXTENSIONS.has(ext)) declarations = outlineEntries(ts.createSourceFile(path, text, ts.ScriptTarget.Latest, true, scriptKind(path)));
+  if (syntaxLanguage(path)) {
+    const syntax = await parseLanguageSyntax(path, text);
+    if (!syntax.hasErrors) declarations = syntax.units.map(({ name, kind, startLine, endLine }) => ({ name, kind, startLine, endLine }));
+  } else if (PLANNABLE_EXTENSIONS.has(ext)) declarations = outlineEntries(ts.createSourceFile(path, text, ts.ScriptTarget.Latest, true, scriptKind(path)));
   return { path, sha256: hash(bytes), bytes: bytes.byteLength, lines: lineCount, declarations: declarations.slice(0, MAX_OUTLINE_ENTRIES), omitted: Math.max(0, declarations.length - MAX_OUTLINE_ENTRIES) };
 }
 
@@ -436,9 +440,20 @@ export async function planPacketInline({ root: rootInput, spec: specInput }) {
     total.value += bytes.byteLength;
     const text = strictText(bytes, `source ${entry.path}`);
     assert(!/\r(?!\n)|[\u2028\u2029]/.test(text), `planner source has line separators unsupported by v1 packet lines: ${entry.path}`);
-    const source = ts.createSourceFile(entry.path, text, ts.ScriptTarget.Latest, true, scriptKind(entry.path));
-    assert(source.parseDiagnostics.length === 0, `source has parse errors: ${entry.path}`);
-    source.__packetCandidates = plannerCandidates(source);
+    let source;
+    if (syntaxLanguage(entry.path)) {
+      const syntax = await parseLanguageSyntax(entry.path, text);
+      assert(!syntax.hasErrors, `source has parse errors: ${entry.path}`);
+      const starts = [0];
+      for (let i = 0; i < text.length; i++) if (text[i] === '\n') starts.push(i + 1);
+      source = { text, end: text.length, getLineStarts: () => starts,
+        getLineAndCharacterOfPosition: pos => ({ line: text.slice(0, pos).split('\n').length - 1 }),
+        __packetCandidates: syntax.units };
+    } else {
+      source = ts.createSourceFile(entry.path, text, ts.ScriptTarget.Latest, true, scriptKind(entry.path));
+      assert(source.parseDiagnostics.length === 0, `source has parse errors: ${entry.path}`);
+      source.__packetCandidates = plannerCandidates(source);
+    }
     files.set(entry.path, { source, sha256: hash(bytes) });
   }
   const resolutions = plan.sources.map((entry, requestIndex) => {

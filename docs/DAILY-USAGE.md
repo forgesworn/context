@@ -5,9 +5,62 @@ selected Claude Code or Codex usage exports and summarises task receipts offline
 Explicit CLI captures from Codex, Claude and Kimi have a separate invocation
 import; Ollama helper attempts retain their existing importer.
 It needs Node from `.nvmrc`; it does not need a model, provider SDK, login or
-network connection. This is developer tooling, not a new MCP operation or a
-published package command. It does not alter client configuration or collect
+network connection. Accounting is also available through the installed
+`encrypted-context usage` command (`z1p usage` with the owner's wrapper). The
+checkout scripts are compatibility entrypoints for that implementation. This
+is not a new MCP operation. It does not alter client configuration or collect
 transcripts automatically.
+
+## Reconcile a whole task
+
+```sh
+z1p usage task --input /absolute/private/host-usage.json \
+  --input /absolute/private/review-usage.json \
+  --spec /absolute/private/task-inventory.json --out /absolute/private/task-total.json
+```
+
+Use [the inventory example](examples/task-usage-inventory.json). List every
+attempt, including repairs and unknown outcomes, with its client, phase and
+receipt checksum (or `null` when missing). Mark each phase `used`, `not-used`
+or `unknown`. A used phase needs attempts. `inventoryComplete` is your explicit
+declaration, not something inferred from the receipts. One receipt cannot cover
+two listed attempts. Request-window receipts may cover multiple requests in
+the named attempt/window; invocation receipts describe one invocation.
+
+Missing attempts, unassigned receipts, unknown phases or incomplete input/output
+counters keep `taskTotalTokens` null. `completeAsDeclared` means the declared
+inventory reconciles; `independentlyVerified` remains false. Whole-task billing
+and savings remain unknown. Do not mark omitted host preparation as `not-used`
+merely because no receipt is available.
+
+## Import Kimi Code session-export counters
+
+Kimi Code 2.x's prompt stream still has no qualified token counters. A separate
+import accepts its explicitly selected **fresh one-prompt main-agent** session
+export, wire protocol 1.5. Obtain the chosen session's `manifest.json` and
+`agents/main/wire.jsonl` locally from its ZIP export; no archive extraction or
+session discovery is performed by this importer.
+
+```sh
+z1p usage import-kimi --input /absolute/private/wire.jsonl \
+  --manifest /absolute/private/manifest.json \
+  --spec /absolute/private/kimi-spec.json --out /absolute/private/kimi-usage.json
+```
+
+Use the CLI invocation spec with `client: "kimi"` and `freshSession: true`.
+The manifest session ID must match; it is not authenticated provider evidence.
+Import includes only additive `usage.record` events for agent `main`, once.
+Fresh input, cache read and cache creation form input total; output is separate.
+Cumulative status, context-window counts, prose and estimates are ignored.
+Duplicate indistinguishable usage events, multiple prompts, mismatched identity,
+out-of-window usage and unsupported protocol versions reject. Other agents need
+their own future qualified evidence; they are excluded and reported here.
+Missing counters remain unknown, reasoning remains unknown, and the receipt is
+one CLI invocation aggregate, not a provider-request count.
+
+The counter mapping follows upstream
+[usage accumulation](https://github.com/MoonshotAI/kimi-code/blob/main/packages/agent-core-v2/src/session/usage/usageAgentModel.ts)
+and [input totals](https://github.com/MoonshotAI/kimi-code/blob/main/packages/agent-core-v2/src/human/llm/usage.ts).
 
 ## Capture a task window as you work
 

@@ -4,6 +4,36 @@ Latest implementation and adoption results are in the
 [dogfood execution ledger](docs/DOGFOOD-EXECUTION.md). The dated snapshots below
 remain historical evidence; internal pilot acceptance is separate from G0–G4.
 
+## 0.11.0 project workflows and default context, 2 November 2026
+
+Adds explicit root-confined TS config aliases, namespace value bindings,
+Tree-sitter Rust/Kotlin syntax spans and packet planning, derived graph queries,
+root manifest/lock observations and a private offline HTML viewer. Runtime calls,
+Cargo build configuration, Kotlin compiler resolution and installed dependency
+identity remain unproven and labelled. Selected syntax grammars execute no
+project code. The existing signed collection format/capacity is unchanged.
+
+`setup-hooks` manages supported Claude/Codex SessionStart and Kimi
+UserPromptSubmit hooks while preserving unrelated configuration. Startup observes
+Git metadata and supplies shared guidance; source is retrieved after checkout
+selection. Codex trust remains an owner `/hooks` action. The shared skill now
+ships in the package for release-pinned installation across all four hosts.
+`usage` packages the existing offline commands, adds qualified Kimi 1.5 wire
+imports and reconciles an explicit whole-task attempt inventory.
+
+Local checks passed 573 tests and independent packed-package probes. Both
+unchanged retrieval benchmark gates, navigation smoke, scale tests and the
+10k postings probe passed. Real Chrome graph interaction/mobile checks passed.
+Observed failing regressions for binding, callback ownership, lock source kind,
+generation races and Git discovery ceilings were repaired. Native host results
+and limits are in the [delivery record](docs/PROJECT-WORKFLOW-DELIVERY.md).
+
+Claude hook execution is proven, but model adherence failed in the clean trial.
+Kimi used native packets by default; no complete four-host lifecycle acceptance
+is claimed. Primary coordinator usage and billing are missing; whole-task cost
+and savings remain unknown. Hosted CI and exact public archive/download/install
+readback are separate shipment evidence, recorded with the GitHub release.
+
 ## 0.10.0 routine host startup, 2 November 2026
 
 Adds `setup codex|claude|kimi` preview/apply/remove for a managed section in

@@ -25,10 +25,10 @@ of that client's conversation and may be sent to its model provider.
 
 ## Availability and prerequisites
 
-The six-tool workflow below is included in this source tree. Build a pinned
+The seven-tool repository workflow below is included in this source tree. Build a pinned
 revision containing `repository_packet` and verify discovery in step 4.
 The public npm packages may lag the source release; do not assume an older npm
-installation includes all six tools. Source and release assets are available at
+installation includes navigation, source packets and graph queries. Source and release assets are available at
 [forgesworn/context](https://github.com/forgesworn/context).
 
 For GitHub releases containing both package tarballs, download the core and tools
@@ -111,8 +111,8 @@ file; replace `yourKnownIdentifier` below:
 "$CONTEXT_NODE" "$CONTEXT_CLI" doctor "$CONTEXT_REPO" --term yourKnownIdentifier
 ```
 
-The command launches this installation's repository server and exercises all six
-tools over stdio: status, refresh, search, explore, coverage and a one-line source packet. It checks
+The command launches this installation's repository server, verifies the seven-tool
+inventory, then exercises status, refresh, search, explore, coverage and a one-line source packet. It checks
 the canonical Git root, HEAD, generation and matching source hash. It prints JSON
 with `ok: true`, the executable/arguments to configure, exclusion counts and the
 evidence location/hash. It does not print source text, write client configuration,

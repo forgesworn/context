@@ -69,11 +69,16 @@ export const view = await vault.create({ title: 'Independent consumer', scope: '
   `], { cwd: consumer, stdio: 'pipe' })
   const toolsConsumer = install('tools-consumer', [core, tools])
   checkNotices(toolsConsumer, '@forgesworn/context-tools')
+  for (const resource of ['SKILL.md', 'references/ollama-worker.md']) {
+    assert.equal(readFileSync(join(toolsConsumer, 'node_modules/@forgesworn/context-tools/dist/skill', resource), 'utf8'), readFileSync(join(checkout, 'skill', resource), 'utf8'))
+  }
   const cli = join(toolsConsumer, 'node_modules/@forgesworn/context-tools/bin/encrypted-context.mjs')
   writeFileSync(join(toolsConsumer, 'workspace-probe.mjs'), readFileSync(join(checkout, 'test/workspace-package-probe.mjs')))
   execFileSync(process.execPath, ['workspace-probe.mjs', cli], { cwd: toolsConsumer, stdio: 'pipe', timeout: 120000 })
   writeFileSync(join(toolsConsumer, 'host-startup-probe.mjs'), readFileSync(join(checkout, 'test/host-startup-package-probe.mjs')))
   execFileSync(process.execPath, ['host-startup-probe.mjs', cli], { cwd: toolsConsumer, stdio: 'pipe', timeout: 30000 })
+  writeFileSync(join(toolsConsumer, 'project-workflow-probe.mjs'), readFileSync(join(checkout, 'test/project-workflow-package-probe.mjs')))
+  execFileSync(process.execPath, ['project-workflow-probe.mjs', cli], { cwd: toolsConsumer, stdio: 'pipe', timeout: 120000 })
   assert.match(execFileSync(process.execPath, [cli, '--help'], { encoding: 'utf8' }), /encrypted-context mcp/)
   // Exercise the installed stdio server: no checkout scripts or source imports.
   const packetRoot = join(toolsConsumer, 'packet-repository')
@@ -91,7 +96,7 @@ export const view = await vault.create({ title: 'Independent consumer', scope: '
   assert.equal(doctor.clientAcceptance, 'not-tested')
   assert.equal(doctor.binding.command, process.execPath)
   assert.deepEqual(doctor.binding.args, [realpathSync(cli), 'navigate', doctor.root])
-  assert.deepEqual(doctor.tools.slice().sort(), ['repository_coverage', 'repository_explore', 'repository_packet', 'repository_refresh', 'repository_search', 'repository_status'])
+  assert.deepEqual(doctor.tools.slice().sort(), ['repository_coverage', 'repository_explore', 'repository_graph', 'repository_packet', 'repository_refresh', 'repository_search', 'repository_status'])
   assert.equal(doctor.evidence.path, 'example.ts')
   assert.equal(doctor.evidence.line, 1)
   assert.ok(!JSON.stringify(doctor).includes('export function'))
@@ -204,7 +209,7 @@ export const view = await vault.create({ title: 'Independent consumer', scope: '
     let global = await openGlobal()
     try {
       const tools = (await global.listTools()).tools
-      assert.equal(tools.length, 8)
+      assert.equal(tools.length, 9)
       assert.ok(tools.every(t => t.inputSchema.required.includes('expectedRoot')))
       assert.equal((await global.callTool({ name: 'repository_status', arguments: {} })).isError, true)
       assert.equal((await global.callTool({ name: 'repository_status', arguments: { expectedRoot: process.cwd() } })).isError, true)

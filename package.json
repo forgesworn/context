@@ -24,7 +24,7 @@
     "test:packages": "node test/context-package-smoke.mjs",
     "check": "npm run build && npm test && npm run test:packages",
     "test:ecosystem": "PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s test -p 'test_ecosystem_*.py'",
-    "test:daily-usage": "node --test test/usage-normalise.test.mjs test/usage-normalise-regression.test.mjs test/daily-usage.test.mjs test/worker-usage.test.mjs test/cli-run-usage.test.mjs"
+    "test:daily-usage": "node --test test/usage-normalise.test.mjs test/usage-normalise-regression.test.mjs test/daily-usage.test.mjs test/worker-usage.test.mjs test/cli-run-usage.test.mjs test/task-accounting.test.mjs"
   },
   "devDependencies": {
     "esbuild": "0.28.2",

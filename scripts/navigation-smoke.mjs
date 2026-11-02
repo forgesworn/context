@@ -106,7 +106,7 @@ async function main() {
     await writeFile(join(fixture, 'source.ts'), 'navToken first\nnavToken second\nnavToken third\n', { mode: 0o600 });
     active = await connect(cli, fixture);
     const names = (await active.client.listTools()).tools.map((tool) => tool.name).sort();
-    assert(JSON.stringify(names) === JSON.stringify(['repository_coverage', 'repository_explore', 'repository_packet', 'repository_refresh', 'repository_search', 'repository_status']), 'unexpected MCP tool set');
+    assert(JSON.stringify(names) === JSON.stringify(['repository_coverage', 'repository_explore', 'repository_graph', 'repository_packet', 'repository_refresh', 'repository_search', 'repository_status']), 'unexpected MCP tool set');
 
     const unavailable = await call(active.client, 'repository_status', {});
     assert(unavailable.freshness === 'unavailable' && unavailable.generation === null, 'session 1 did not start unavailable');
@@ -114,6 +114,10 @@ async function main() {
 
     const firstCurrent = await call(active.client, 'repository_refresh', {});
     assert(firstCurrent.freshness === 'current' && typeof firstCurrent.generation === 'string', 'initial refresh was not current');
+    const graph = await call(active.client, 'repository_graph', { expectedGeneration: firstCurrent.generation, query: { action: 'summary' } });
+    assert(graph.generation === firstCurrent.generation && graph.nodes[0].path === 'source.ts', 'graph lost the selected source identity');
+    assert(graph.completeness.parseFailures.includes('source.ts'), 'graph hid deliberately malformed fixture syntax');
+    checks.graphIdentityAndParseUncertainty = true;
     const initialSearch = await call(active.client, 'repository_search', { term: 'navToken', maxResults: 1, maxBytes: 4096 });
     assert(initialSearch.results.length === 1 && typeof initialSearch.nextCursor === 'string', 'initial search did not produce a cursor');
     assert(initialSearch.bytesUsed === Buffer.byteLength(JSON.stringify(initialSearch), 'utf8'), 'search byte count is not exact UTF-8');

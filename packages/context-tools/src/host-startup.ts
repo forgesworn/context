@@ -86,6 +86,7 @@ export async function setupHost(options: StartupOptions) {
     if (options.handoverBase) command.push('--handover-base', await directory(options.handoverBase))
     block = START + '\n\n## Repository context at task start\n\n' +
       `For a substantial coding task, load the shared z1p-context skill at ${JSON.stringify(skill)}. ` +
+      'Use this workflow by default in every selected project; do not wait for the user to request Context or name the skill. ' +
       'Verify the authorised canonical Git checkout and the repository tools actually exposed by this session. ' +
       'A parent workspace is not a checkout: select the task repository explicitly; do not scan sibling projects.\n\n' +
       'Read repository_status and, when configured, repository_coordination before edits. Publish your task and intended paths, inspect overlaps, poll addressed notes and renew activity between work steps. ' +

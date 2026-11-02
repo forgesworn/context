@@ -27,14 +27,14 @@ needed, and no signed context or project conversation history is imported.
 For a shared encrypted cache, catalogue/batch warm-up and advisory agent activity
 and notes, follow [shared workspace setup](SHARED-WORKSPACE.md). Add its explicit
 `--cache-dir` option to all host entries. It adds three tools; with private
-handovers enabled, the server advertises eleven. Without a cache, the original
-six/eight-tool mode remains unchanged.
+handovers enabled, the server advertises twelve tools. Without a cache, the
+navigation/graph surface has seven tools, or nine with handovers.
 
 ## Host configuration
 
 - **Codex:** merge a user-level `[mcp_servers.z1p-repository]` entry into
   `~/.codex/config.toml`, with the command/args above. Do not set its `cwd` or
-  arguments to one project. Enable the six navigation tools and, when using a
+  arguments to one project. Enable the seven repository tools and, when using a
   handover base, both handover tools.
 - **Claude:** use a user-level stdio entry in `~/.claude.json`, preserving other
   servers. A fixed `navigate` user entry must be replaced with `session` to work
@@ -56,8 +56,10 @@ signed `z1p-context` connections and other user choices. Existing handovers can
 be copied without overwriting into their root's hash directory; retain originals
 and let normal freshness validation reject historical records.
 
-Link the complete repository `skill/` directory into each host's user skill
-root as `z1p-context`. The `.ollama/skills` link is a reference for adapters,
+Link the installed `@forgesworn/context-tools/dist/skill/` directory into each
+host's user skill root as `z1p-context`. This pins all hosts to the verified
+release rather than live development edits. The repository's `skill/` remains
+the maintained source for builds. The `.ollama/skills` link is a reference for adapters,
 not a claim that raw Ollama scans it. Automatic selection remains available.
 Source links and configuration checks do not establish model adherence.
 
@@ -70,6 +72,9 @@ Do not report a configured entry as active tools in an existing conversation.
 
 For routine task-start loading in fresh Codex, Claude and Kimi sessions, use the
 managed global instruction section described in [host startup](HOST-STARTUP.md).
+For automatic metadata preflight and a model-visible reminder, install its
+separate `setup-hooks` integration. Codex requires explicit hook trust. Users
+need not name Context in ordinary project prompts.
 The existing Ollama adapter can supply the shared direct-worker preamble. These
 are instruction paths; native tool availability still needs verification in the
 actual conversation.
