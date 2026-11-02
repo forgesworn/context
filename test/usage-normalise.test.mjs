@@ -245,7 +245,7 @@ test('invalid client throws', () => {
   assert.throws(() => normaliseUsage('other', []), /Invalid usage record/);
 });
 
-test('claude reasoning always null, does not add thinking', () => {
+test('claude reasoning is not inferred from thinking prose', () => {
   const out = normaliseUsage('claude', [claudeRec({ usage: { input_tokens: 1, output_tokens: 1, cache_read_input_tokens: 0, cache_creation_input_tokens: 0, thinking: 'secret thought' } })]);
   assert.equal(out.records[0].usage.reasoningOutputTokens, null);
   assert.ok(!JSON.stringify(out).includes('secret thought'));

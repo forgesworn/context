@@ -30,7 +30,7 @@ function stamp(x) {
 }
 function validateSpec(s) {
   exact(s, SPEC_KEYS);
-  if (s.version !== 1 || !['codex', 'claude', 'ollama'].includes(s.client)) invalid();
+  if (s.version !== 1 || !['codex', 'claude', 'ollama', 'kimi'].includes(s.client)) invalid();
   if (s.client === 'ollama' && (s.phase !== 'worker' || s.sessionId !== 'ollama-workers')) invalid();
   for (const k of ['taskId', 'developerId', 'repositoryId', 'sessionId']) label(s[k]);
   if (s.accountId !== null) label(s.accountId);
@@ -45,7 +45,7 @@ function validateSpec(s) {
 const PROFILE_KEYS = ['version', 'taskId', 'developerId', 'accountId', 'repositoryId', 'category', 'client', 'sessionId', 'phase', 'contextUsed'];
 export function startUsage(profile, at = new Date().toISOString()) {
   exact(profile, PROFILE_KEYS);
-  if (!['codex', 'claude'].includes(profile.client)) invalid();
+  if (!['codex', 'claude', 'kimi'].includes(profile.client)) invalid();
   const from = stamp(at);
   // Reuse the import contract; the temporary end is validation only.
   const spec = validateSpec({ ...profile, from, to: new Date(Date.parse(from) + 1).toISOString(),
@@ -110,7 +110,7 @@ function writeReport(filename, report) {
 
 export function importUsage(text, inputSpec, source = null) {
   const spec = validateSpec(inputSpec);
-  if (spec.client === 'ollama') invalid();
+  if (!['codex', 'claude'].includes(spec.client)) invalid();
   if (typeof text !== 'string' || Buffer.byteLength(text) > MAX_LOG) invalid();
   const lines = text.split('\n'); if (lines.length > MAX_EVENTS + 1) invalid();
   if (source !== null) {
@@ -204,8 +204,76 @@ export function importWorkerUsage(text, inputSpec, source = null) {
   return { ...report, integritySha256: digest(report) };
 }
 
-function usageWarnings(usage, stats) {
-  const warnings = ['usage-event-time-attribution', 'billing-not-collected', 'coverage-is-operator-asserted'];
+// One explicitly identified invocation, not a request-level transcript adapter.
+// Aggregate and request receipts for the same session must never be combined.
+export function importCliUsage(text, inputSpec, source = null) {
+  exact(inputSpec, [...SPEC_KEYS, 'attemptId', 'at', 'exitCode', ...(inputSpec?.client === 'claude' ? ['freshSession'] : [])]);
+  const { attemptId, at, exitCode, freshSession, ...base } = inputSpec;
+  const spec = validateSpec(base);
+  if (!['codex', 'claude', 'kimi'].includes(spec.client)) invalid();
+  if (spec.client === 'claude' && freshSession !== true) invalid();
+  label(attemptId);
+  if (exitCode !== null && (count(exitCode) > 255)) invalid();
+  const timestamp = stamp(at);
+  if (timestamp < spec.from || timestamp >= spec.to) invalid();
+  if (typeof text !== 'string' || Buffer.byteLength(text) > MAX_LOG) invalid();
+  if (source !== null) {
+    exact(source, ['sha256', 'bytes']);
+    if (source.sha256 !== hash(text) || source.bytes !== Buffer.byteLength(text)) invalid();
+  }
+  const lines = text.split('\n'); if (lines.length > MAX_EVENTS + 1) invalid();
+  const events = [];
+  for (const line of lines) {
+    if (!line.trim()) continue;
+    if (Buffer.byteLength(line) > MAX_LINE) invalid();
+    const event = parse(line); if (!object(event)) invalid();
+    if (events.length >= MAX_EVENTS) invalid();
+    events.push(event);
+  }
+  let rawUsage = null, model = null;
+  if (spec.client === 'codex') {
+    const identities = events.filter(e => e.type === 'thread.started');
+    const starts = events.filter(e => e.type === 'turn.started');
+    const terminals = events.filter(e => ['turn.completed', 'turn.failed'].includes(e.type));
+    if (identities.length !== 1 || identities[0] !== events[0] || identities[0].thread_id !== spec.sessionId || starts.length > 1 || terminals.length > 1) invalid();
+    if (terminals.length && events.indexOf(identities[0]) >= events.indexOf(terminals[0])) invalid();
+    if (terminals.length && events.at(-1) !== terminals[0]) invalid();
+    if (terminals[0]?.type === 'turn.completed') rawUsage = terminals[0].usage ?? null;
+  } else if (spec.client === 'claude') {
+    const terminals = events.filter(e => e.type === 'result');
+    if (terminals.length > 1) invalid();
+    const terminal = terminals[0];
+    if (terminal) {
+      if (terminal.session_id !== spec.sessionId || events.at(-1) !== terminal) invalid();
+      rawUsage = terminal.usage ?? null;
+      const models = object(terminal.modelUsage) ? Object.keys(terminal.modelUsage) : [];
+      if (models.length === 1) model = models[0];
+    } else if (!events.some(e => e.type === 'system' && e.subtype === 'init' && e.session_id === spec.sessionId)) invalid();
+  } else {
+    const identities = events.filter(e => e.type === 'session.resume_hint');
+    if (events[0]?.type !== 'system.version' || identities.length !== 1 || identities[0] !== events.at(-1) || identities[0].session_id !== spec.sessionId) invalid();
+    // No counter mapping is qualified for this Kimi stream shape. Do not infer
+    // zero usage, provider model/effort or token counts from assistant prose.
+  }
+  const usage = normaliseUsage(spec.client, [{sessionId: spec.sessionId, responseId: 'cli-run:' + hash(attemptId),
+    at: timestamp, model, effort: null, usage: rawUsage}]);
+  const stats = {events: events.length, recognisedUsage: rawUsage === null ? 0 : 1,
+    otherSession: 0, outsideWindow: 0, cumulativeIgnored: 0, missingIdentity: 0, otherEvents: events.length - (rawUsage === null ? 0 : 1)};
+  const status = exitCode === null ? 'unknown' : exitCode === 0 ? 'success' : 'failed';
+  const warnings = [...usageWarnings(usage, stats, true), 'cli-invocation-identity-and-time-operator-supplied',
+    'cli-exit-status-operator-supplied', 'cli-aggregate-not-request-records', 'cli-status-' + status];
+  if (spec.client === 'kimi') warnings.push('kimi-stream-counters-not-qualified');
+  if (spec.client === 'claude') warnings.push('claude-fresh-session-operator-asserted','claude-main-loop-only');
+  const {sessionId, ...metadata} = spec;
+  const report = {schema:'context-daily-cli-usage-v1', toolVersion:1,
+    metadata:{...metadata,sessionIdHash:hash(sessionId)}, source:source ?? {sha256:hash(text),bytes:Buffer.byteLength(text)},
+    stats,warnings:warnings.sort(),usage,
+    interpretation:{scope:'observed-cli-invocation-usage',taskCoverage:'not-independently-verified',cashSavings:null,tokenSavings:null}};
+  return {...report,integritySha256:digest(report)};
+}
+
+function usageWarnings(usage, stats, cli = false) {
+  const warnings = [cli ? 'cli-invocation-time-attribution' : 'usage-event-time-attribution', 'billing-not-collected', 'coverage-is-operator-asserted'];
   if (!usage.records.length) warnings.push('no-selected-request-usage');
   if (usage.conflicts) warnings.push('conflicting-request-usage');
   if (usage.totalTokens.completeTotal === null) warnings.push('incomplete-token-counters');
@@ -223,11 +291,13 @@ function totals(records) {
 function validateReceipt(r) {
   exact(r, ['schema', 'toolVersion', 'metadata', 'source', 'stats', 'warnings', 'usage', 'interpretation', 'integritySha256']);
   const {integritySha256, ...body} = r;
-  if (r.schema !== 'context-daily-usage-v1' || r.toolVersion !== 1 || !HASH.test(integritySha256) || digest(body) !== integritySha256) invalid();
+  const cli = r.schema === 'context-daily-cli-usage-v1';
+  if ((!cli && r.schema !== 'context-daily-usage-v1') || r.toolVersion !== 1 || !HASH.test(integritySha256) || digest(body) !== integritySha256) invalid();
   exact(r.metadata, [...SPEC_KEYS.filter(k => k !== 'sessionId'), 'sessionIdHash']);
   const { sessionIdHash, ...m } = r.metadata;
   if (!HASH.test(sessionIdHash)) invalid();
   validateSpec({...m, sessionId: m.client === 'ollama' ? 'ollama-workers' : 'validation-placeholder'});
+  if ((cli && m.client === 'ollama') || (!cli && m.client === 'kimi')) invalid();
   if (m.client === 'ollama' && sessionIdHash !== hash('ollama-workers')) invalid();
   exact(r.source, ['sha256', 'bytes']); if (!HASH.test(r.source.sha256)) invalid(); count(r.source.bytes);
   if (r.source.bytes > MAX_LOG) invalid();
@@ -248,7 +318,6 @@ function validateReceipt(r) {
     if (u.inputTokens !== null && [u.cachedInputTokens, u.cacheWriteInputTokens].some(v => v !== null && v > u.inputTokens)) invalid();
     if (u.inputTokens !== null && u.cachedInputTokens !== null && u.cacheWriteInputTokens !== null && add(u.cachedInputTokens, u.cacheWriteInputTokens) > u.inputTokens) invalid();
     if (u.outputTokens !== null && u.reasoningOutputTokens !== null && u.reasoningOutputTokens > u.outputTokens) invalid();
-    if (m.client === 'claude' && u.reasoningOutputTokens !== null) invalid();
   }
   const recomputed = totals(r.usage.records);
   if (JSON.stringify(recomputed.metrics) !== JSON.stringify(r.usage.totals) || JSON.stringify(recomputed.totalTokens) !== JSON.stringify(r.usage.totalTokens) || r.usage.records.filter(a => a.conflict).length !== r.usage.conflicts) invalid();
@@ -256,7 +325,15 @@ function validateReceipt(r) {
   exact(r.stats, ['events', 'recognisedUsage', 'otherSession', 'outsideWindow', 'cumulativeIgnored', 'missingIdentity', 'otherEvents']);
   Object.values(r.stats).forEach(count);
   if (!Array.isArray(r.warnings) || r.warnings.length > 32 || r.warnings.some(w => typeof w !== 'string' || !/^[a-z-]{1,80}$/.test(w))) invalid();
-  if (usageWarnings(r.usage, r.stats).some(w => !r.warnings.includes(w))) invalid();
+  if (usageWarnings(r.usage, r.stats, cli).some(w => !r.warnings.includes(w))) invalid();
+  if (cli) {
+    if (r.usage.records.length !== 1 || r.usage.records[0].effort !== null) invalid();
+    for (const warning of ['cli-invocation-identity-and-time-operator-supplied','cli-exit-status-operator-supplied','cli-aggregate-not-request-records']) if (!r.warnings.includes(warning)) invalid();
+    const statuses = r.warnings.filter(w => w.startsWith('cli-status-'));
+    if (statuses.length !== 1 || !['success','failed','unknown'].some(s => statuses[0] === 'cli-status-' + s)) invalid();
+    if (m.client === 'kimi' && (!r.warnings.includes('kimi-stream-counters-not-qualified') || r.usage.records[0].model !== null || METRICS.some(k => r.usage.records[0].usage[k] !== null))) invalid();
+    if (m.client === 'claude' && ['claude-fresh-session-operator-asserted','claude-main-loop-only'].some(w => !r.warnings.includes(w))) invalid();
+  }
   if (m.client === 'ollama') {
     for (const w of ['worker-identity-and-time-operator-supplied', 'worker-model-and-effort-requested', 'worker-cache-and-reasoning-unknown']) if (!r.warnings.includes(w)) invalid();
     const statuses = r.warnings.filter(w => w.startsWith('worker-status-'));
@@ -266,7 +343,7 @@ function validateReceipt(r) {
     if ([u.cachedInputTokens, u.cacheWriteInputTokens, u.reasoningOutputTokens].some(v => v !== null)) invalid();
     if (!['worker-status-success', 'worker-status-truncated', 'worker-status-unusable'].includes(statuses[0]) && (u.inputTokens !== null || u.outputTokens !== null)) invalid();
   }
-  if (JSON.stringify(r.interpretation) !== JSON.stringify({scope:'observed-selected-request-usage',taskCoverage:'not-independently-verified',cashSavings:null,tokenSavings:null})) invalid();
+  if (JSON.stringify(r.interpretation) !== JSON.stringify({scope:cli ? 'observed-cli-invocation-usage' : 'observed-selected-request-usage',taskCoverage:'not-independently-verified',cashSavings:null,tokenSavings:null})) invalid();
   return r;
 }
 
@@ -283,6 +360,7 @@ export function summariseUsage(receipts) {
     const m = r.metadata;
     for (const old of unique) {
       const n = old.metadata;
+      if (n.client === m.client && n.sessionIdHash === m.sessionIdHash && (r.schema === 'context-daily-cli-usage-v1') !== (old.schema === 'context-daily-cli-usage-v1')) invalid();
       if (m.client !== 'ollama' && n.client === m.client && n.sessionIdHash === m.sessionIdHash && stamp(m.from) < stamp(n.to) && stamp(n.from) < stamp(m.to) &&
           (n.taskId !== m.taskId || n.accountId !== m.accountId || n.repositoryId !== m.repositoryId || n.phase !== m.phase)) invalid();
     }
@@ -296,32 +374,36 @@ export function summariseUsage(receipts) {
     for (const a of r.usage.records) {
       const attribution = JSON.stringify([m.taskId, m.developerId, m.accountId, m.repositoryId, m.phase]);
       const workerStatus = m.client === 'ollama' ? r.warnings.find(w => w.startsWith('worker-status-')).slice('worker-status-'.length) : null;
+      const cli = r.schema === 'context-daily-cli-usage-v1';
+      const cliStatus = cli ? r.warnings.find(w => w.startsWith('cli-status-')) : null;
       if (requestIds.has(a.id)) {
         const old = requestIds.get(a.id);
         const {at: oldAt, ...oldData} = old.record, {at: newAt, ...newData} = a;
-        if (old.attribution !== attribution || old.workerStatus !== workerStatus || JSON.stringify(oldData) !== JSON.stringify(newData)) invalid();
+        if (old.attribution !== attribution || old.workerStatus !== workerStatus || old.cliStatus !== cliStatus || JSON.stringify(oldData) !== JSON.stringify(newData)) invalid();
         if (stamp(newAt) < stamp(oldAt)) old.record.at = stamp(newAt);
         duplicateRequests++; continue;
       }
       const record = {...a, usage:{...a.usage}};
-      requestIds.set(a.id, {attribution, record, workerStatus});
+      requestIds.set(a.id, {attribution, record, workerStatus, cliStatus});
       const key = JSON.stringify([m.client, m.accountId, m.category, a.model, a.effort, m.contextUsed]);
-      if (!cohorts.has(key)) cohorts.set(key, {client:m.client, accountId:m.accountId, category:m.category, model:a.model, effort:a.effort, contextUsed:m.contextUsed, records:[], taskIds:new Set()});
-      const cohort = cohorts.get(key); cohort.records.push(record); cohort.taskIds.add(m.taskId);
+      if (!cohorts.has(key)) cohorts.set(key, {client:m.client, accountId:m.accountId, category:m.category, model:a.model, effort:a.effort, contextUsed:m.contextUsed, records:[], taskIds:new Set(), invocations:0});
+      const cohort = cohorts.get(key); cohort.records.push(record); cohort.taskIds.add(m.taskId); if (cli) cohort.invocations++;
     }
   }
   const taskRows = [...tasks.values()].map(t => ({...t.task,clients:[...t.clients].sort(),accountIds:[...t.accountIds].sort()})).sort((a,b) => a.taskId < b.taskId ? -1 : a.taskId > b.taskId ? 1 : 0);
-  return {schema:'context-daily-summary-v1', receiptCount:unique.length, duplicateReceipts, duplicateRequests,
+  const hasCli = unique.some(r => r.schema === 'context-daily-cli-usage-v1');
+  return {schema:hasCli ? 'context-daily-summary-v2' : 'context-daily-summary-v1', receiptCount:unique.length, duplicateReceipts, duplicateRequests,
+    ...(hasCli ? {cliInvocations:[...requestIds.values()].filter(r => r.cliStatus !== null).length, duplicateCountUnit:'usage-records-not-provider-requests'} : {}),
     workerAttempts: Object.fromEntries(['success', 'truncated', 'unusable', 'refused', 'unknown', 'busy', 'refused-pending'].map(status => [status, [...requestIds.values()].filter(r => r.workerStatus === status).length])),
     tasks:{count:taskRows.length, accepted:taskRows.filter(t => t.accepted === true).length, rejected:taskRows.filter(t => t.accepted === false).length, unknown:taskRows.filter(t => t.accepted === null).length, rows:taskRows},
-    coverage:unique.map(r => ({receiptSha256:r.integritySha256,taskId:r.metadata.taskId,phase:r.metadata.phase,from:r.metadata.from,to:r.metadata.to,asserted:r.metadata.coverage,warnings:r.warnings,sourceStats:r.stats,observedRequests:r.usage.records.length})),
-    cohorts:[...cohorts.entries()].sort(([a],[b]) => a < b ? -1 : a > b ? 1 : 0).map(([,c]) => ({client:c.client,accountId:c.accountId,category:c.category,model:c.model,effort:c.effort,contextUsed:c.contextUsed,taskIds:[...c.taskIds].sort(),observedRequests:c.records.length,...totals(c.records)})),
+    coverage:unique.map(r => ({receiptSha256:r.integritySha256,taskId:r.metadata.taskId,phase:r.metadata.phase,from:r.metadata.from,to:r.metadata.to,asserted:r.metadata.coverage,warnings:r.warnings,sourceStats:r.stats,observedRequests:r.schema === 'context-daily-cli-usage-v1' ? null : r.usage.records.length,...(hasCli ? {observedInvocations:r.schema === 'context-daily-cli-usage-v1' ? 1 : 0} : {})})),
+    cohorts:[...cohorts.entries()].sort(([a],[b]) => a < b ? -1 : a > b ? 1 : 0).map(([,c]) => ({client:c.client,accountId:c.accountId,category:c.category,model:c.model,effort:c.effort,contextUsed:c.contextUsed,taskIds:[...c.taskIds].sort(),observedRequests:c.invocations ? null : c.records.length,...(hasCli ? {observedInvocations:c.invocations} : {}),...totals(c.records)})),
     interpretation:{scope:'observed-usage-not-a-controlled-comparison', taskCoverage:'not-independently-verified', monthlySpend:null, cashSavings:null, tokenSavings:null}};
 }
 
 function main(args) {
   const command = args.shift();
-  if (!['start', 'finish', 'import', 'import-worker', 'summary'].includes(command) || args.length % 2) invalid();
+  if (!['start', 'finish', 'import', 'import-worker', 'import-run', 'summary'].includes(command) || args.length % 2) invalid();
   const opts = new Map();
   for (let i = 0; i < args.length; i += 2) {
     const key = args[i];
@@ -340,11 +422,11 @@ function main(args) {
   }
   if (!opts.has('--input')) invalid();
   let report;
-  if (command === 'import' || command === 'import-worker') {
+  if (command === 'import' || command === 'import-worker' || command === 'import-run') {
     if (!opts.has('--spec') || opts.size !== 3) invalid();
     const spec = parse(readFile(opts.get('--spec')[0], 65536).text);
     const input = readFile(opts.get('--input')[0], command === 'import-worker' ? MAX_LINE : MAX_LOG);
-    report = (command === 'import-worker' ? importWorkerUsage : importUsage)(input.text, spec, {sha256:input.sha256,bytes:input.bytes});
+    report = (command === 'import-worker' ? importWorkerUsage : command === 'import-run' ? importCliUsage : importUsage)(input.text, spec, {sha256:input.sha256,bytes:input.bytes});
     validateReceipt(report);
   } else {
     if (opts.size !== 2 || opts.get('--input').length > 32) invalid();

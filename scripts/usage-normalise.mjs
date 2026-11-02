@@ -72,6 +72,8 @@ function normaliseClaude(usage) {
   const output = metricOrNull(usage.output_tokens);
   const cacheRead = metricOrNull(usage.cache_read_input_tokens);
   const cacheCreate = metricOrNull(usage.cache_creation_input_tokens);
+  const reasoning = metricOrNull(usage.output_tokens_details?.thinking_tokens);
+  if (reasoning !== null && output !== null && reasoning > output) fail();
   const inputTokens = (input !== null && cacheRead !== null && cacheCreate !== null)
     ? safeAdd(safeAdd(input, cacheRead), cacheCreate)
     : null;
@@ -80,7 +82,7 @@ function normaliseClaude(usage) {
     outputTokens: output,
     cachedInputTokens: cacheRead,
     cacheWriteInputTokens: cacheCreate,
-    reasoningOutputTokens: null,
+    reasoningOutputTokens: reasoning,
   };
 }
 
@@ -109,7 +111,7 @@ function metricsEqual(a, b) {
 }
 
 export function normaliseUsage(client, records) {
-  if (client !== 'codex' && client !== 'claude' && client !== 'ollama') fail();
+  if (!['codex', 'claude', 'ollama', 'kimi'].includes(client)) fail();
   if (!Array.isArray(records) || records.length > MAX_RECORDS) fail();
 
   const map = new Map();
@@ -126,7 +128,8 @@ export function normaliseUsage(client, records) {
       ? normaliseCodex(rec.usage)
       : client === 'claude'
         ? normaliseClaude(rec.usage)
-        : normaliseOllama(rec.usage);
+        : client === 'ollama' ? normaliseOllama(rec.usage)
+          : rec.usage === null || rec.usage === undefined ? emptyMetrics() : fail();
     const key = sessionId + '\0' + responseId;
     const prev = map.get(key);
     if (!prev) {

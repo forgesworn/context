@@ -1660,3 +1660,52 @@ requirement and 71.5x thresholds remain unchanged. The initial failure is retain
 with the later exact gate result. Full local, hosted CI, tarball and installed
 readback results are separate shipment evidence; no npm publication or native
 Windows qualification is implied.
+
+
+## 2 November: offline CLI invocation accounting
+
+FS2 now has a separate `import-run` route for explicitly selected, stable native
+CLI captures. The existing request-transcript and Ollama worker importers stay
+available. One identified Codex turn contributes its final aggregate once;
+one fresh Claude CLI result contributes its main-loop usage once. Kimi's
+qualified version/resume-hint capture records an invocation with unknown counters,
+model and effort. No model, provider call, live transcript discovery, source-path
+following or client configuration change is performed by this work.
+
+The receipt is explicitly an invocation aggregate, not a set of provider request
+records. Summaries containing it use v2, with separate invocation counts and
+unknown request counts for aggregate cohorts. Legacy-only summaries keep v1.
+Summary rejects mixing aggregates and request-level records for the same client
+session, even across separately asserted windows, to prevent double accounting.
+An operator-supplied attempt ID and accounting timestamp remain assertions, not
+provider-authenticated identifiers; copying a capture under a new attempt ID can
+overcount. Acceptance, coverage and review time are not inferred from exit codes.
+Price estimates are not imported as bills or savings.
+
+Official Codex event definitions and Claude accounting documentation were checked
+alongside the retained raw captures. Claude documents main-loop usage separately
+from subagent/model totals, and resumed aggregate scope is not qualified here.
+An observed failing test showed that the first draft accepted a Claude capture
+without an explicit fresh-session assertion. It now requires `freshSession: true`
+and labels the result main-loop-only. Another observed failing test showed that
+a terminal record followed by more turn data could be accepted; qualified
+terminal records must now end their capture. Ambiguous multiple turns/results
+are rejected. Explicit Claude thinking-token counts are retained as an output
+subset; thinking prose and nested breakdowns are not added to usage.
+
+The final focused set passed 98 accounting tests. A deterministic replay of the
+existing startup-trial records reproduced four native invocation receipts and
+one Ollama worker receipt, across all four host families. Known observed tokens
+were 1,194,209, including reported cached input; Kimi counters and root
+preparation/integration usage remained unavailable. The task total, billing and
+savings remain unknown. These are retrospective ordinary-use captures, not
+prospective paired comparison arms or a claim that the entire task was measured.
+Capture-file modification times were explicitly recorded as operator capture-time
+attribution, not provider request timestamps. No new inference was dispatched.
+
+Raw inputs remain in their existing private evidence directory; import specs,
+receipts, red/green logs and exact replay checks are in a separate private dated
+record. Final source/hosted gates and merge identity are recorded against their
+exact commits. This is developer source tooling available from any working
+directory by absolute script path. The installed 0.10.0 package versions and
+runtime behaviour do not change in this slice.

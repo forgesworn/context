@@ -107,6 +107,14 @@ in-memory navigation path remains available. File preparation is reused after
 hash checks; directory/hash traversal and posting-map assembly remain. Broader
 OS5 scale, OS2 savings and G0–G4 acceptance are not implied.
 
+The next FS2 source-tooling slice imports explicit Codex/Claude/Kimi CLI captures
+alongside existing Ollama helper receipts. It separates invocation aggregates
+from request-level transcripts, records missing Kimi counters as unknown, and
+keeps whole-task coverage and billing explicit. It is offline checkout tooling,
+not a new inference runner or packaged MCP operation. See
+[CLI usage imports](DAILY-USAGE.md#import-an-explicit-cli-invocation) and the
+execution ledger for the qualified shapes and retained-record replay.
+
 The owner's 22 September priority is [deterministic code intelligence and better
 developer results](DETERMINISTIC-CODE-INTELLIGENCE.md). Begin OS4b-1 with the
 reproduced shadowed-call correctness defect, then OS4b-2 symbol resolution and

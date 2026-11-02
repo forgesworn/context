@@ -2,6 +2,8 @@
 
 The checkout now provides `scripts/daily-usage.mjs` for FS2. It imports explicitly
 selected Claude Code or Codex usage exports and summarises task receipts offline.
+Explicit CLI captures from Codex, Claude and Kimi have a separate invocation
+import; Ollama helper attempts retain their existing importer.
 It needs Node from `.nvmrc`; it does not need a model, provider SDK, login or
 network connection. This is developer tooling, not a new MCP operation or a
 published package command. It does not alter client configuration or collect
@@ -12,7 +14,7 @@ transcripts automatically.
 Use [the task profile](examples/daily-usage-profile.json) to supply task,
 developer, repository, account and exact client session IDs once per task/phase.
 Use nonsecret labels; the profile and boundary retain the session ID locally.
-`client` is `codex` or `claude`. Start before preparation, between requests:
+`client` is `codex`, `claude` or `kimi`. Start before preparation, between requests:
 
 ```sh
 node scripts/daily-usage.mjs start \
@@ -157,18 +159,94 @@ provider calls or directory discovery occur. The existing private-path, stable
 read, no-overwrite and generic-error rules apply. Preserve original 402 receipts
 privately for diagnosis; they are not exposed in the aggregate.
 
+## Import an explicit CLI invocation
+
+Use `import-run` for a stable capture from `codex exec --json`,
+`claude --print --output-format stream-json --verbose`, or
+`kimi --prompt ... --output-format stream-json`. No command is executed by the
+importer. Supply the [invocation specification](examples/cli-usage-import.json):
+
+```sh
+node scripts/daily-usage.mjs import-run \
+  --input /absolute/private/cli-capture.jsonl \
+  --spec /absolute/private/cli-invocation.json \
+  --out /absolute/private/cli-usage.json
+```
+
+The spec adds a stable `attemptId`, an operator-recorded accounting timestamp
+`at`, and an observed `exitCode` (0–255 or `null` when unknown). Reuse the attempt
+ID for copies of one invocation; allocate a new ID for each actual retry or
+resumed process. Capture-file names, content hashes and timestamps do not identify
+an inference attempt. Changing an ID on a copied capture can overcount. Keep
+the attribution evidence privately; the importer cannot authenticate it. If only
+capture time is known, disclose that limitation rather than inventing provider
+request times. `at` must lie within the declared half-open window.
+
+Each import covers one invocation, not a time-filtered subset of its requests:
+
+- **Codex:** one thread identity and at most one turn. Import its final
+  `turn.completed.usage` once; failed or missing terminal usage remains unknown.
+  A terminal event must end the capture. Ambiguous multi-turn streams are rejected.
+- **Claude:** one final `result` for the selected session. Add `freshSession: true`
+  to the spec, based on an actual fresh launch without resume/continue/fork.
+  Resumed-session accounting is not qualified by this adapter. Import only the
+  result's `usage`, covering the main loop; subagent usage needs separate evidence.
+  Do not add per-message counters, nested iteration/cache breakdowns, `modelUsage`
+  counters or price estimates to it. One returned model key may label the
+  aggregate; multiple model keys leave its model unknown. The final result must
+  end the capture; multi-result streaming sessions are rejected.
+- **Kimi:** the qualified shape starts with `system.version` and ends with one
+  matching `session.resume_hint`. It records one invocation with all usage,
+  model and effort fields unknown. No counter mapping is qualified for this
+  stream; assistant prose does not establish usage.
+
+An exit code describes the observed process outcome, not task acceptance or
+complete inference usage. Failed runs retain any reported counters; missing
+usage is never converted into a zero. Existing acceptance, review-time and
+coverage assertions stay explicit, and billing/savings remain unknown.
+
+Invocation receipts use `context-daily-cli-usage-v1`. A summary containing one
+uses `context-daily-summary-v2`: `cliInvocations`/`observedInvocations` count
+captured invocations, while `observedRequests` is `null` for a cohort containing
+an aggregate. Duplicate counts describe usage records, not provider requests.
+Legacy-only summaries keep their v1 format. Copies deduplicate with the same
+invocation ID and attribution; conflicting counters, status or attribution are
+rejected. Aggregates and request-level transcripts for the same client/session
+cannot be combined, even with different declared time windows, because that
+could count the same inference twice. Reconcile them explicitly and select one
+accounting route. Different client sessions and existing Ollama receipts can
+share a task summary.
+
+Input/source bounds, private-file rules, no-overwrite writes and generic errors
+are the same as the other imports. Captures are not discovered automatically;
+their source prose, commands, private paths and provider diagnostics are not
+copied into receipts. This remains checkout developer tooling, available by its
+absolute script path from any working directory, rather than a packaged command.
+
+The accounting contracts are supported by the
+[Codex event definitions](https://github.com/openai/codex/blob/main/codex-rs/exec/src/exec_events.rs),
+[Claude usage guidance](https://code.claude.com/docs/en/agent-sdk/cost-tracking),
+and the selected retained CLI captures. The
+[Kimi command reference](https://www.kimi.com/code/docs/en/kimi-code-cli/reference/kimi-command.html)
+documents stream output; it does not qualify counters in our captured shape.
+
 ## Supported exports and accounting
 
 | Source | Imported usage | Limitations |
 | --- | --- | --- |
 | Codex rollout JSONL | `token_usage_record.payload.usage`, keyed by session and response IDs | Ignores cumulative `event_msg/token_count`, `thread_token_usage` and `turn_token_usage`. Older cumulative-only logs are reported incomplete, not converted to a zero or guessed task delta. Model/effort come from a matching prior `turn_context` when available |
-| Claude Code transcript JSONL | `assistant.message.usage`, keyed by `sessionId` and message ID | Model comes from the message; effort is unknown in this supported shape. Partial streamed copies with conflicting usage become an unknown record. Claude CLI result JSON or arbitrary provider/API exports are not supported by this adapter |
+| Claude Code transcript JSONL | `assistant.message.usage`, keyed by `sessionId` and message ID | Model comes from the message; effort is unknown in this supported shape. Partial streamed copies with conflicting usage become an unknown record. Use the separate `import-run` route for qualified CLI captures; arbitrary provider/API exports are not supported |
 | Ollama helper receipt JSON (`import-worker`) | `reportedTokens.prompt` and `completion`, keyed by the explicit attempt ID | Operator-supplied timestamp/identity; requested model/effort; unknown cache, reasoning and billing; no automatic helper review import |
+| Codex CLI JSONL (`import-run`) | One completed turn's aggregate, with explicit invocation identity/time | One turn only; model/effort unknown; no mixing with transcript usage from that session |
+| Claude CLI JSONL (`import-run`) | One fresh session's final main-loop aggregate | Requires `freshSession: true`; excludes subagent usage and price estimates; no resumed-session or multi-result qualification |
+| Kimi CLI JSONL (`import-run`) | One identified invocation with unknown usage | Counter/model/effort extraction is not qualified; unknown is not zero |
 
 Codex input already includes its reported cache fields. Claude's input total
 adds fresh input, cache reads and cache creation once. Cache creation's nested
 breakdown is not added again. Reasoning output is a subset when reported;
-Claude reasoning is not separately inferred. Missing metrics remain `null`,
+Claude thinking counts are retained only from explicit
+`output_tokens_details.thinking_tokens`, validated as an output subset; they are
+not inferred from prose. Missing metrics remain `null`,
 including omitted cache fields; independently known metrics are retained.
 
 Identical request copies are deduplicated, retaining the earliest event time.
