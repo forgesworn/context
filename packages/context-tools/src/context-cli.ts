@@ -8,6 +8,11 @@ export interface ContextCliOptions {
   configureVault?: (options: ContextVaultOptions) => ContextVaultOptions
 }
 export async function main(options: ContextCliOptions = {}): Promise<void> {
+  if (process.argv[2] === 'workflow') {
+    const { runWorkflowCli } = await import('./host-workflow-cli.js')
+    process.stdout.write(JSON.stringify(await runWorkflowCli(process.argv.slice(3))) + '\n')
+    return
+  }
   if (process.argv[2] === 'startup') {
     const { runStartupHook } = await import('./startup-hook.js')
     process.stdout.write(await runStartupHook(process.argv.slice(3),[process.execPath,await realpath(process.argv[1])]))
@@ -69,6 +74,7 @@ export async function main(options: ContextCliOptions = {}): Promise<void> {
       (options.name ?? 'encrypted-context') + ' setup codex|claude|kimi [--config-dir ABS] [--cache-dir ABS] [--handover-base ABS] [--remove] [--apply]   (preview a managed global instruction section; --apply writes it)\n' +
       (options.name ?? 'encrypted-context') + ' setup-hooks codex|claude|kimi [--launcher ABS] [--config-dir ABS] [--cache-dir ABS] [--handover-base ABS] [--remove] [--apply]   (preview automatic context startup hooks; Codex requires hook trust)\n' +
       (options.name ?? 'encrypted-context') + ' graph ROOT --out ABS [--json] [--project REL] [--path-prefix REL]   (private offline graph export; never overwrites)\n' +
+      (options.name ?? 'encrypted-context') + ' workflow init|plan|append|qualify --root ABS ...   (offline host workflow snapshots; see HOST-WORKFLOWS.md; no execution)\n' +
       (options.name ?? 'encrypted-context') + ' usage start|finish|import|import-worker|import-run|import-kimi|summary|task --input ABS --spec ABS --out ABS   (offline accounting; see DAILY-USAGE.md for command-specific options)\n' +
       (options.name ?? 'encrypted-context') + ' workspace init|discover ROOT|warm ROOT|status ROOT|index ROOT|forget-index ROOT --cache-dir ABS [--resume|--missing-only] [--priority ABS] [--max-repositories N] [--timeout-ms N]\n' +
       (options.name ?? 'encrypted-context') + ' workspace activity ROOT --cache-dir ABS [--all] [--json] [--repo ABS] [--limit 1-500] [--max-bytes 2048-262144] [--timeout-ms 1-30000]   (one-shot advisory leases; not process liveness or acceptance)\n' +

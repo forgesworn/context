@@ -62,7 +62,7 @@ launcher stdin and therefore cannot qualify automatic model adherence.
 
 | Host | Observed | Still unproven |
 | --- | --- | --- |
-| Codex | Native status/coordination and skill loading; useful shadowing review | Complete unattended lifecycle; trusted execution of the new startup hook |
+| Codex | Startup hook now observed automatically in the actual session, native status/coordination and skill loading; useful shadowing review | Complete unattended edit/restart/coordination lifecycle |
 | Claude | SessionStart hook executed and supplied checkout/skill/workflow context; review found the generation race | Model followed Bash reads instead of the repository workflow, so full adoption is not accepted |
 | Kimi | Clean-input trial loaded guidance and used native status, coordination, refresh and source packets | Task publication, final checkpoint and complete lifecycle adherence |
 | Ollama | Host verified a bounded packet; existing Flash/off helper completed a quickstart draft and host reviewed it | Raw API discovery is not supported; no complete host-independent lifecycle claim |
@@ -72,6 +72,14 @@ bypass it. Hook execution supplies guidance, not a guarantee of model behaviour.
 Restart, stale-source refusal, refresh, handovers and coordination have tool and
 installed-package coverage; this does not promote each host to lifecycle
 acceptance. No sibling project was edited to manufacture adoption evidence.
+
+### Bounded host workflow follow-up
+
+The [optional host workflow contract](HOST-WORKFLOWS.md) adds explicit task
+dependencies, result/review records, deterministic finding reduction, bounded
+retry/resume planning and qualification-receipt checks. It does not execute
+workers, authenticate supplied receipts or establish complete host adherence.
+Actual host trials and whole-task measurement retain the separate gates above.
 
 ### Accounting and delivery gates
 
