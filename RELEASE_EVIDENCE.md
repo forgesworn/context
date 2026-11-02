@@ -4,6 +4,32 @@ Latest implementation and adoption results are in the
 [dogfood execution ledger](docs/DOGFOOD-EXECUTION.md). The dated snapshots below
 remain historical evidence; internal pilot acceptance is separate from G0–G4.
 
+## 0.10.0 routine host startup, 2 November 2026
+
+Adds `setup codex|claude|kimi` preview/apply/remove for a managed section in
+the host's existing global instructions. It preserves unrelated bytes and
+permission bits, respects configured host homes and Codex overrides, and follows
+a dormant managed section on removal after a later override. Linked, oversized,
+invalid or ambiguous destinations are rejected. This installs guidance, not
+MCP, hooks, approval policy, provider configuration or guaranteed adherence.
+
+Thirteen focused tests cover the installer. Observed failing regressions for
+permission loss and dormant Codex-section removal were fixed. A separately
+written installed-CLI probe covers preview, idempotence, preservation and
+refusals. Native Kimi wrote the startup guide while Claude independently wrote
+the package probe and integration changed the command. Addressed ownership notes
+and a native Codex checkpoint review exercised actual coordination. A fresh
+Codex process started from the non-Git parent workspace selected the intended
+checkout and retrieved a current source packet. Exact evidence and gaps are in
+the [execution ledger](docs/DOGFOOD-EXECUTION.md).
+
+The shared skill also supplies a bounded direct-worker preamble to the existing
+engineering adapter. One actual Flash/off review used that host-mediated path;
+its substantive concurrency claim was not accepted. No raw Ollama tools or skill
+discovery is claimed. Complete root usage/billing and a controlled comparison
+are unavailable; measured whole-task savings remain open. Final hosted checks,
+release asset hashes and installed readback must accompany shipment.
+
 ## 0.9.0 portable session lifecycle, 1 November 2026
 
 Adds `connect ROOT`, a task-scoped JSON-lines shell transport over the existing

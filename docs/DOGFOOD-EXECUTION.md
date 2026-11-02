@@ -1575,3 +1575,88 @@ stream options. That review reported 82,338 input tokens including 64,640 cached
 plus 2,133 output including 1,795 reasoning; these are separate review usage,
 not whole-task totals. The full local pre-push gate passed the initial ten-test
 revision; the follow-up commit is independently gated again before shipment.
+
+
+## 2 November: routine host startup and concurrent engineering
+
+Context 0.10.0 adds a preview-first `setup` command for the supported global
+instruction files in Codex, Claude and Kimi. It manages only a marked section,
+checks the installed shared skill and existing optional storage directories,
+and preserves unrelated instruction bytes. Removal can follow its section in
+Codex's base file after a later override shadows it; installation refuses to
+create another section until the dormant one is removed. Both-files ambiguity
+is rejected. Existing permission bits are explicitly restored after temporary
+file creation so the current umask does not silently narrow them.
+
+The owner installed all three sections after retaining the original files and
+preview/apply receipts in private task evidence. Each result was checked against
+original bytes plus the proposed block. Native MCP entries, models, efforts,
+providers and approvals were preserved. The shell fallback records the actual
+Node and CLI paths; final installation paths must be refreshed from the released
+package. Global setup applies to tasks in any authorised checkout and needs no
+per-repository instruction write or fleet-wide index rebuild.
+
+Native Kimi and Claude worked concurrently with integration on disjoint files:
+Kimi wrote `docs/HOST-STARTUP.md`, Claude wrote
+`test/host-startup-package-probe.mjs`, and integration owned the installer and
+package-harness wiring. Kimi loaded the shared skill, checked status/coordination,
+published its intended path and sent an ownership note proposing the shared-guide
+link placement. Its final result note was rejected because it had already marked
+its slot done; it reported that failure. The skill now explicitly orders final
+notes before done. Kimi performed bounded whitespace/link checks, not installer
+or fresh-client acceptance, and returned model/effort/usage remained unknown.
+Claude published activity, exchanged ownership/result notes and ran its isolated
+probe against the built CLI; it did not establish full status/packet lifecycle
+adherence. A successful package probe is not evidence that every host will follow
+the instruction section. Both native tasks left commits/configuration to the host.
+
+Native Codex resumed the current review checkpoint and found a P2 removal defect:
+a later override could make removal report absent while leaving the base section.
+An observed failing regression was fixed, and the independent CLI probe now
+exercises that transition too. Its source packet request was invalidated by a
+concurrent source change; it used bounded direct reads and checked the installer
+hash instead of accepting stale packet contents. Its one acknowledgement poll
+was incomplete, so acknowledgement was reported unconfirmed. The shared skill
+now explicitly requires following incomplete coordination pages before concluding
+that notes are absent. These are ordinary collaboration findings, not claims of
+file locking, complete agent adherence or an authenticated multi-user service.
+
+A separate fresh Codex process started from the non-Git parent workspace,
+selected the task checkout without sibling discovery, loaded the shared guide,
+and used status, coordination, explore and a current source packet. The first
+invocation stopped at the CLI's outside-repository check before producing an
+agent turn; the supported process-local `--skip-git-repo-check` option enabled the
+intended parent-workspace launch. Models, approvals, hook trust and persistent
+project trust were not changed. This parent task read implementation and tests;
+it did not execute setup or claim shipment.
+
+The existing Ollama adapter includes the optional installed Context worker
+preamble as text, bounded to 8 KiB, before its normal 64 KiB combined-packet
+preflight. Missing installation is compatible; oversized/invalid content fails
+before inference. The host verified the exact source packet, represented the
+worker's activity and dispatched one M4 Flash/off request through the existing
+helper. The first review's lost-update claim contradicted the lock/recheck and
+exclusive-create behaviour; only its clearer recovery-message suggestion was
+retained, with partial disposition. Provider usage was 9,013 prompt and 1,133
+completion tokens. No worker tests or raw-API tool discovery were claimed.
+Five adapter tests, including real offline preflight, passed separately.
+
+Native Codex review reported 448,520 input tokens including 409,472 cached,
+4,728 output including 1,650 reasoning. The parent task separately reported
+245,776 input including 204,800 cached, 2,617 output including 531 reasoning.
+Claude reported 18 uncached input, 54,720 cache-creation input, 418,594 cache-read
+input and 9,090 output including 1,452 thinking. Its USD 0.7033508 was a list-price
+equivalent, not attributable billing. Exact returned Codex/Kimi model and effort,
+root preparation/integration usage, total billing and owner review time are
+unknown. Private evidence retains prompts, attempts, elapsed times, raw client
+logs, packets, checks and helper receipts. This is ordinary-use evidence, not a
+controlled comparison or a whole-task saving.
+
+Thirteen focused installer tests passed after the two observed red regressions.
+The source-navigation benchmark then hit its fixed 64-file preparation cap as
+the corpus grew. Its file allowance was raised to the scanner's existing maximum
+of 128; the full-corpus assertion, 128-record/retrieval budgets, complete recall
+requirement and 71.5x thresholds remain unchanged. The initial failure is retained
+with the later exact gate result. Full local, hosted CI, tarball and installed
+readback results are separate shipment evidence; no npm publication or native
+Windows qualification is implied.

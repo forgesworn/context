@@ -41,7 +41,9 @@ const baselinePayload = await Promise.all(sourceFiles.map(async path => ({
   source: relative(scanRoot, path), text: await readFile(path, 'utf8'),
 })))
 const baselineTokens = tokens(baselinePayload)
-const scan = await scanSourceGraph(scanRoot, { maxFiles: 64, maxDepth: 8, maxBytes: 8 * 1024 * 1024,
+// Keep the full live corpus assertion as it grows beyond the original 64 files.
+// Retrieval/record budgets and all recall/reduction gates remain unchanged.
+const scan = await scanSourceGraph(scanRoot, { maxFiles: 128, maxDepth: 8, maxBytes: 8 * 1024 * 1024,
   maxFileBytes: 1024 * 1024, maxRecords: 128, observedAt: now })
 const expectedFiles = new Set(sourceFiles.map(path => relative(scanRoot, path)))
 const scannedFiles = new Set(scan.records.filter(record => !record.source.includes('#'))
