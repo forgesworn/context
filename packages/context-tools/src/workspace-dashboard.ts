@@ -2,7 +2,7 @@ import { createHash, randomBytes } from 'node:crypto'
 import { constants } from 'node:fs'
 import { lstat, open, opendir, realpath } from 'node:fs/promises'
 import { createServer } from 'node:http'
-import { isAbsolute, join, relative, resolve } from 'node:path'
+import { dirname, isAbsolute, join, relative, resolve } from 'node:path'
 import { z } from 'zod'
 import { parseArgs } from 'node:util'
 import { readWorkspaceActivity } from './workspace-activity.js'
@@ -10,7 +10,7 @@ import type { WorkspaceActivityRow } from './workspace-activity-types.js'
 import type { WorkspaceCatalogue } from './workspace-catalogue.js'
 import { checkHandoverDirectory } from './repository-handover-mcp.js'
 import { readHandoverSummary } from './task-handover.mjs'
-import { WorkspaceStore, workspaceKey } from './workspace-store.js'
+import { WorkspaceStore, workspaceKey, initialiseWorkspaceStore } from './workspace-store.js'
 import { RepositoryNavigation } from './repository-navigation.js'
 import { renderWorkspaceDashboard } from './workspace-dashboard-view.js'
 
@@ -22,7 +22,7 @@ const cardSchema = z.object({
 }).strict()
 const linksSchema = z.object({ version: z.literal(1), cards: z.array(cardSchema).max(500) }).strict()
 export type GirnelCardLink = z.infer<typeof cardSchema>
-export interface DashboardOptions { repositoryRoot?: string; handoverBase?: string; girnelLinks?: string }
+export interface DashboardOptions { repositoryRoot?: string; handoverBase?: string; girnelLinks?: string; controlDirectory?: string; codexExecutable?: string; maxRunSeconds?: number }
 export interface DashboardTicket {
   id: string; title: string; lane: 'working' | 'blocked' | 'reviewing' | 'done' | 'inactive'
   agents: WorkspaceActivityRow[]; checkoutRoots: string[]; girnel: (GirnelCardLink & { href: string }) | null
@@ -178,7 +178,16 @@ export async function serveWorkspaceDashboard(workspace: string, cacheDirectory:
   if (Buffer.byteLength(JSON.stringify(snapshot)) > 2 * 1024 * 1024) throw new Error('dashboard snapshot exceeds 2 MiB; narrow with --repo')
   let cachedAt = Date.now(), pending: Promise<typeof snapshot> | undefined
   const prefix = '/' + randomBytes(24).toString('hex') + '/'
-  const page = renderWorkspaceDashboard()
+  let controller: import('./agent-console.js').AgentConsole | undefined
+  if (options.controlDirectory) {
+    if (!isAbsolute(options.controlDirectory) || resolve(options.controlDirectory) !== options.controlDirectory || await realpath(dirname(options.controlDirectory)) !== dirname(options.controlDirectory) || await realpath(options.controlDirectory).catch(() => options.controlDirectory) !== options.controlDirectory) throw new Error('control directory must be canonical with an existing parent')
+    const executable = options.codexExecutable
+    if (!executable || !isAbsolute(executable) || !(await lstat(await realpath(executable))).isFile()) throw new Error('Control mode requires an installed absolute --codex executable')
+    await initialiseWorkspaceStore(options.controlDirectory)
+    const { AgentConsole } = await import('./agent-console.js')
+    controller = await AgentConsole.open(workspace, cacheDirectory, { directory: options.controlDirectory, codexExecutable: executable, maxRunSeconds: options.maxRunSeconds, allowedRoots: snapshot.projects.map(project => project.root) })
+  } else if (options.codexExecutable || options.maxRunSeconds !== undefined) throw new Error('Host settings require --control-dir')
+  const page = renderWorkspaceDashboard(!!controller)
   let origin = ''
   const server = createServer(async (request, response) => {
     response.setHeader('Cache-Control', 'no-store')
@@ -188,7 +197,27 @@ export async function serveWorkspaceDashboard(workspace: string, cacheDirectory:
     response.setHeader('Cross-Origin-Resource-Policy', 'same-origin')
     const fail = (code: number, message: string) => { response.writeHead(code, { 'Content-Type': 'text/plain; charset=utf-8' }); response.end(message) }
     if (request.headers.host !== new URL(origin).host || (request.headers.origin !== undefined && request.headers.origin !== origin) || request.headers['sec-fetch-site'] === 'cross-site') return fail(403, 'Forbidden')
-    if (request.method !== 'GET') return fail(405, 'Read-only dashboard')
+    if (controller && request.url === prefix + 'console/action' && request.method === 'POST') {
+      if (request.headers.origin !== origin || request.headers['x-z1p-console'] !== '1' || !/^application\/json(?:;.*)?$/i.test(request.headers['content-type'] ?? '')) return fail(403, 'Console requests require same-origin JSON and explicit client header')
+      try {
+        const parts: Buffer[] = []; let size = 0
+        for await (const chunk of request) { size += chunk.length; if (size > 16384) throw new Error('Console request exceeds 16 KiB'); parts.push(Buffer.from(chunk)) }
+        const task = await controller.action(JSON.parse(Buffer.concat(parts).toString('utf8')))
+        response.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' }); response.end(JSON.stringify(task))
+      } catch (error) {
+        fail(409, error instanceof Error && error.name !== 'ZodError' ? error.message.slice(0, 500) : 'Invalid or incomplete console request')
+      }
+      return
+    }
+    if (request.method !== 'GET') return fail(405, 'This route is read-only')
+    if (controller && request.url === prefix + 'console/snapshot') {
+      try { response.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' }); response.end(JSON.stringify(controller.snapshot())) } catch { fail(503, 'Console journal unavailable') }
+      return
+    }
+    if (controller && request.url?.startsWith(prefix + 'console/task/')) {
+      try { const value = JSON.stringify(controller.task(request.url.slice((prefix + 'console/task/').length))); if (Buffer.byteLength(value) > 1048576) throw new Error(); response.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' }); response.end(value) } catch { fail(404, 'Task unavailable or exceeds the response bound') }
+      return
+    }
     if (request.url === prefix) {
       response.setHeader('Content-Security-Policy', page.csp)
       response.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' }); response.end(page.html); return
@@ -205,23 +234,27 @@ export async function serveWorkspaceDashboard(workspace: string, cacheDirectory:
     } catch { fail(503, 'Observation failed. Previous data is stale; check the local cache and explicitly selected files.') }
   })
   server.maxConnections = 16; server.requestTimeout = 5000; server.headersTimeout = 5000; server.keepAliveTimeout = 1000
-  await new Promise<void>((accept, reject) => { server.once('error', reject); server.listen(0, '127.0.0.1', () => { server.off('error', reject); accept() }) })
+  try { await new Promise<void>((accept, reject) => { server.once('error', reject); server.listen(0, '127.0.0.1', () => { server.off('error', reject); accept() }) }) }
+  catch (error) { await controller?.close(); throw error }
   const address = server.address()
   if (!address || typeof address === 'string') throw new Error('dashboard listener unavailable')
   origin = 'http://127.0.0.1:' + address.port
-  return { url: origin + prefix, close: () => new Promise<void>((accept, reject) => { server.close(error => error ? reject(error) : accept()); server.closeAllConnections() }) }
+  let closing: Promise<void> | undefined
+  return { url: origin + prefix, close: () => closing ??= (async () => { const closed = new Promise<void>((accept, reject) => { server.close(error => error ? reject(error) : accept()); server.closeAllConnections() }); await controller?.close(); await closed })() }
 }
 
 export async function runWorkspaceDashboardCli(args: string[]) {
   const { positionals, values } = parseArgs({ args, allowPositionals: true, options: {
     'cache-dir': { type: 'string' }, repo: { type: 'string' }, 'handover-base': { type: 'string' }, 'girnel-links': { type: 'string' },
+    'control-dir': { type: 'string' }, codex: { type: 'string' }, 'max-run-seconds': { type: 'string' },
   } })
   if (positionals.length !== 1 || !values['cache-dir']) throw new Error('workspace dashboard ROOT --cache-dir ABS [--repo ABS] [--handover-base ABS] [--girnel-links ABS]')
-  const dashboard = await serveWorkspaceDashboard(positionals[0], values['cache-dir'], { repositoryRoot: values.repo, handoverBase: values['handover-base'], girnelLinks: values['girnel-links'] })
+  const maxRunSeconds = values['max-run-seconds'] === undefined ? undefined : /^\d+$/.test(values['max-run-seconds']) ? Number(values['max-run-seconds']) : NaN
+  const dashboard = await serveWorkspaceDashboard(positionals[0], values['cache-dir'], { repositoryRoot: values.repo, handoverBase: values['handover-base'], girnelLinks: values['girnel-links'], controlDirectory: values['control-dir'], codexExecutable: values.codex, maxRunSeconds })
   const stop = () => {
     process.off('SIGINT', stop); process.off('SIGTERM', stop)
     void dashboard.close().catch(() => { process.exitCode = 1 })
   }
   process.once('SIGINT', stop); process.once('SIGTERM', stop)
-  return 'Z1P local dashboard: ' + dashboard.url + '\nRead-only; keep this private URL local. Press Ctrl-C to stop.\n'
+  return 'Z1P local dashboard: ' + dashboard.url + '\n' + (values['control-dir'] ? 'Task control enabled; this private URL can launch your configured host.' : 'Read-only; keep this private URL local.') + ' Press Ctrl-C to stop.\n'
 }
