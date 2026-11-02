@@ -14,6 +14,10 @@ reconciles selected host receipts with an explicit task inventory.
 [Shared workspace](docs/SHARED-WORKSPACE.md): encrypted reusable indexes, resumable
 batch warm-up, and advisory agent activity and addressed notes across worktrees.
 
+[Local ticket dashboard](docs/WORKSPACE-DASHBOARD.md): view agent activity,
+overlapping paths, context health and checkpoint summaries, with explicit Girnel
+card links. Read-only, loopback-only; no ticket writes or automatic acceptance.
+
 [Bounded host workflows](docs/HOST-WORKFLOWS.md): optional local task contracts,
 dependency/review checks, deterministic result reduction and resumable planning.
 The coding host retains execution, permissions and model selection.

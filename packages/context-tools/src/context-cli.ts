@@ -78,6 +78,7 @@ export async function main(options: ContextCliOptions = {}): Promise<void> {
       (options.name ?? 'encrypted-context') + ' usage start|finish|import|import-worker|import-run|import-kimi|summary|task --input ABS --spec ABS --out ABS   (offline accounting; see DAILY-USAGE.md for command-specific options)\n' +
       (options.name ?? 'encrypted-context') + ' workspace init|discover ROOT|warm ROOT|status ROOT|index ROOT|forget-index ROOT --cache-dir ABS [--resume|--missing-only] [--priority ABS] [--max-repositories N] [--timeout-ms N]\n' +
       (options.name ?? 'encrypted-context') + ' workspace activity ROOT --cache-dir ABS [--all] [--json] [--repo ABS] [--limit 1-500] [--max-bytes 2048-262144] [--timeout-ms 1-30000]   (one-shot advisory leases; not process liveness or acceptance)\n' +
+       (options.name ?? 'encrypted-context') + ' workspace dashboard ROOT --cache-dir ABS [--repo ABS] [--handover-base ABS] [--girnel-links ABS]   (local read-only ticket viewer; Ctrl-C to stop)\n' +
       (options.name ?? 'encrypted-context') + ' handover save --root ABS --packet ABS --state ABS --out ABS | handover resume --root ABS --handover ABS\n' +
       (options.name ?? 'encrypted-context') + ' doctor <repository-root> --term <known-identifier>\n' +
       (options.name ?? 'encrypted-context') + ' scan <directory> [--max-packages 64] [--max-depth 4] [--observed-at <epoch-seconds>]\n' +

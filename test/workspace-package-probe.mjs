@@ -62,6 +62,8 @@ try{
  const human=execFileSync(process.execPath,[cli,'workspace','activity',parent,'--cache-dir',cache],{encoding:'utf8',stdio:['ignore','pipe','pipe']})
  assert.match(human,/test agent/);assert.match(human,/Edit source/);assert.match(human,/advisory/i)
  const afterView=await call(first,'repository_coordination',a);assert.equal(afterView.boardRevision,beforeView.boardRevision)
+ const { probeDashboard } = await import('./dashboard-package-probe.mjs')
+ await probeDashboard(cli, parent, cache, [x.agent, y.agent], note.text)
  // A shell-only host uses the installed package and a stable task connection.
  const shellInput=[
   {id:1,name:'repository_refresh'},

@@ -20,6 +20,10 @@ export class WorkspaceCliText {constructor(readonly text:string){}}
 export class WorkspaceCliJson {constructor(readonly value:WorkspaceActivitySnapshot){}}
 interface WarmRun {version:1;mode?:'fresh'|'missing-only';runId:string;ownerPid:number;ownerHost:string;workerPid?:number;workerTicket?:string;pendingRoot?:string;workspace:string;startedAt:number;finishedAt?:number;roots:string[];results:Record<string,{outcome:'indexed'|'failed';verifiedAt:number;durationMs:number;result?:unknown;error?:string}>}
 export async function runWorkspaceCli(args:string[]){
+ if(args[0]==='dashboard'){
+  const {runWorkspaceDashboardCli}=await import('./workspace-dashboard.js')
+  return new WorkspaceCliText(await runWorkspaceDashboardCli(args.slice(1)))
+ }
  const {positionals,values}=parseArgs({args,allowPositionals:true,options:{'cache-dir':{type:'string'},resume:{type:'boolean'},'missing-only':{type:'boolean'},'max-repositories':{type:'string'},'timeout-ms':{type:'string'},priority:{type:'string',multiple:true},'warm-workspace':{type:'string'},'warm-ticket':{type:'string'},all:{type:'boolean'},json:{type:'boolean'},repo:{type:'string'},limit:{type:'string'},'max-bytes':{type:'string'}}})
  const [operation,input]=positionals
  const directory=values['cache-dir']

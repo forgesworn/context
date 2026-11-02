@@ -114,13 +114,36 @@ export async function saveHandoverRecord({ root, packet, state, out, signal }) {
   return { format: FORMAT, status: state.status, bytes: Buffer.byteLength(bytes), packetSha256: record.packetSha256 };
 }
 
-export async function resumeHandover({ root, handover }) {
+async function readHandoverRecord(handover) {
   const record = await readJson(handover, MAX_HANDOVER);
   keys(record, ['format', 'savedAt', 'packetSha256', 'packet', 'state']);
   assert(record.format === FORMAT && typeof record.savedAt === 'string' && Number.isFinite(Date.parse(record.savedAt)), 'invalid handover format or timestamp');
   assert(record.packetSha256 === digest(record.packet), 'packet digest differs');
-  await verifyCurrent(root, record.packet);
   validateState(record.state, record.packet);
+  return record;
+}
+
+/** Read saved assertions only, without source excerpts or a live source check. */
+export async function readHandoverSummary({ handover }) {
+  const record = await readHandoverRecord(handover);
+  text(record.packet.canonicalRoot);
+  text(record.packet.originalSpec.task);
+  for (const criterion of record.packet.originalSpec.acceptanceChecks) text(criterion);
+  return {
+    canonicalRoot: record.packet.canonicalRoot,
+    savedAt: record.savedAt, task: record.packet.originalSpec.task,
+    gitHEAD: record.packet.gitHEAD, packetSha256: record.packetSha256,
+    freshness: 'not-checked', status: record.state.status,
+    nextAction: record.state.nextAction,
+    checks: record.state.checks.map(check => ({
+      outcome: check.outcome, criterion: record.packet.originalSpec.acceptanceChecks[check.index],
+    })),
+  };
+}
+
+export async function resumeHandover({ root, handover }) {
+  const record = await readHandoverRecord(handover);
+  await verifyCurrent(root, record.packet);
   const spec = record.packet.originalSpec;
   return {
     format: FORMAT, trust: 'unsigned', freshness: 'current', savedAt: record.savedAt,

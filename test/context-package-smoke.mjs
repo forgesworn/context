@@ -74,6 +74,7 @@ export const view = await vault.create({ title: 'Independent consumer', scope: '
   }
   const cli = join(toolsConsumer, 'node_modules/@forgesworn/context-tools/bin/encrypted-context.mjs')
   writeFileSync(join(toolsConsumer, 'workspace-probe.mjs'), readFileSync(join(checkout, 'test/workspace-package-probe.mjs')))
+  writeFileSync(join(toolsConsumer, 'dashboard-package-probe.mjs'), readFileSync(join(checkout, 'test/dashboard-package-probe.mjs')))
   execFileSync(process.execPath, ['workspace-probe.mjs', cli], { cwd: toolsConsumer, stdio: 'pipe', timeout: 120000 })
   writeFileSync(join(toolsConsumer, 'host-startup-probe.mjs'), readFileSync(join(checkout, 'test/host-startup-package-probe.mjs')))
   execFileSync(process.execPath, ['host-startup-probe.mjs', cli], { cwd: toolsConsumer, stdio: 'pipe', timeout: 30000 })
