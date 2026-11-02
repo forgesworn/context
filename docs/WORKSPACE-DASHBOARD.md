@@ -1,7 +1,8 @@
 # Local workspace dashboard
 
-For task entry and the first managed host adapter, see the optional
-[local task console](AGENT-CONSOLE.md). Explicit `--control-dir` mode enables it;
+For task entry and managed Codex/Claude host adapters, see the optional
+[local task console](AGENT-CONSOLE.md). Explicit `--control-dir` mode enables task
+control with operator-configured `--codex` and/or `--claude`;
 the default described below stays read-only.
 
 Use the local ticket viewer to see reported agent work, shared file claims and

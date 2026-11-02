@@ -5,9 +5,10 @@ installed coding host, answer its supported questions/approvals, inspect changes
 and tests, and continue its saved conversation. Local result acceptance is
 separate from committing, merging, deployment and Girnel acceptance.
 
-The first adapter is **Codex app-server**, tested against installed Codex CLI
-0.166.0. Claude, Kimi and Ollama appear as pending adapters and cannot be launched
-by this version. Existing independent terminal/app sessions are not attached or
+Adapters are **Codex app-server** (qualified on CLI 0.166.0) and **Claude Code**
+(stream-json/control protocol, qualified on CLI 2.1.316).
+Kimi and Ollama remain pending adapters and cannot be launched by this version.
+Existing independent terminal/app sessions are not attached or
 imported. Oathrun/KithMoot execution routes and their grants remain separate.
 
 ## Start an explicit control session
@@ -18,8 +19,16 @@ z1p workspace dashboard /absolute/workspace --cache-dir /absolute/private/cache 
   --max-run-seconds 600
 ```
 
-Find the installed executable with `command -v codex`. Add `--repo` to restrict
-the console's selection to one canonical saved-catalogue checkout. Existing
+Use `command -v codex` and `command -v claude` to find installed executables.
+Supply `--codex`, `--claude`, or both; only configured hosts are selectable:
+
+```sh
+z1p workspace dashboard /absolute/workspace --cache-dir /absolute/private/cache \
+  --control-dir /absolute/private/task-console --codex /absolute/path/to/codex \
+  --claude /absolute/path/to/claude
+```
+
+Add `--repo` to restrict the console's selection to one canonical saved-catalogue checkout. Existing
 `--handover-base` and `--girnel-links` options still apply to the observation view.
 
 `--control-dir` explicitly creates/opens a private encrypted journal using the
@@ -41,17 +50,23 @@ service, telemetry or new account is introduced.
 1. Select a checkout from the launch-time saved catalogue. Enter the title,
    objective and optional relative intended paths. Save the task.
 2. Select **Run task**. The console publishes advisory activity and starts a new
-   child `codex app-server --listen stdio://` in that checkout. It inherits the
-   installed account, model/provider, reasoning, sandbox and approval configuration.
+   child host in that checkout. Codex uses `app-server --listen stdio://`; Claude
+   uses `--print --verbose --input-format stream-json --output-format stream-json
+   --include-partial-messages --permission-prompt-tool stdio` plus its owned session
+   UUID (`--session-id=...` or `--resume=...`). It inherits the installed account,
+   model/provider, reasoning, sandbox and approval configuration.
    The adapter sends no model, provider or permission overrides. Effective host
    settings are shown once its thread is created.
 3. Follow streamed response text, completed command/test output and file-change
-   records. A host requesting supported approval waits for the owner. Approvals
+   records. Native auto-approved tools continue under the installed permission
+   mode/rules; only requests the host sends to this client wait for the owner. Approvals
    offer one-request accept, decline or cancel, without policy amendments or
    accept-for-session. Ordinary non-secret user questions can be answered here.
 4. **Stop run** requests interruption. An acknowledgement alone is not a terminal
    receipt. The UI shows interrupted only after the host reports it; uncertain
-   outcomes remain labelled Needs reconciliation.
+   outcomes remain labelled Needs reconciliation. Claude interruption acknowledgements
+   and results after Stop are not qualified interruption receipts and require native
+   reconciliation in this release.
 5. A completed turn becomes **Ready for your review**. Inspect the current whole
    working-tree status/diff, previews of bounded new UTF-8 files, result and run
    log. This can include changes that predated the task; it is not task ownership
@@ -79,7 +94,7 @@ One host run is active per console. A host process, including startup and approv
 wait, has a 10–900 second wall bound (600 by default). A separate POSIX watchdog
 enforces the wall bound and reacts to parent loss, checking process start identity
 before signalling its owned process group. Host processes close after turns to
-release memory. macOS/Linux are the qualified platform scope of this adapter.
+release memory. macOS/Linux are the process-control platform scope of these adapters.
 Time limits are not financial caps; usage/billing follow the configured host and
 account. No whole-task savings claim is made.
 
@@ -115,13 +130,51 @@ flows, arbitrary MCP form tools or every app-server feature. Existing Codex thre
 history also remains in the host's own storage; the console journal is not its
 only copy.
 
+## Claude native controls
+
+The adapter uses the installed CLI without adding an SDK dependency. Before
+sending user input it performs `initialize` and read-only `get_settings`, requiring
+an idle session and reported `applied.model`, `account.apiProvider` and permission
+mode. Only those selected fields and a small sandbox summary enter the encrypted
+journal; account email, environment and full native settings are discarded. Older
+CLIs that cannot report this contract fail before a prompt. Hooks, skills and
+settings remain enabled. Claude's print mode skips its workspace trust dialog: the
+operator must select trusted saved checkouts. The console does not add a sandbox.
+
+Ordinary native `can_use_tool` requests show the exact tool name and bounded input
+in the approval panel. Allow echoes that input for this one operation; the adapter
+never echoes permission suggestions or supplies `updatedPermissions`. Decline
+denies the operation; Cancel denies it with Claude's interrupt flag. `Write` shows
+the requested content, and `Edit` the old/new strings; these are native requests,
+not a reconstructed guarantee about the eventual whole-file diff. Review the
+current working tree separately after execution.
+
+`AskUserQuestion` supports up to three non-secret questions, displays choices and
+accepts free-text answers (including multi-select answers expressed as text).
+Native cancellation invalidates a pending request. Mode-changing interactions,
+unsupported control requests and oversized requests are refused and require
+reconciliation. Explicit secret flags are rejected; text inputs are not a secret
+vault. Completed tool results are labelled host-reported, without inventing command
+exit codes that Claude did not supply.
+
+Follow-ups start a fresh process using only the stored UUID and refuse changed
+reported model/provider before a new prompt. A native init reporting another
+session, checkout or model aborts the run. Session history remains in Claude's own
+storage as well as the console's bounded journal. The one-active-host limit spans
+both adapters. No unrelated terminal/app session is attached.
+
+This follows the [official approval and question contract](https://code.claude.com/docs/en/agent-sdk/user-input)
+and the [official SDK control transport](https://github.com/anthropics/claude-agent-sdk-python/blob/main/src/claude_agent_sdk/_internal/query.py),
+checked against the installed CLI. The adapter remains responsible for its own
+bounded native-protocol qualification; SDK documentation alone is not acceptance.
+
 ## Girnel and other hosts
 
 Girnel still owns its board/card status. Existing explicit card metadata links
 remain an observation adapter. Console tasks are local durable work records;
 creating/accepting them does not create/complete Girnel cards or KithMoot
-assignments. The next integration is an explicitly authorised selected-card
-browser adapter, followed by qualified Claude/Kimi/Ollama host adapters. Direct
+assignments. Remaining integrations include an explicitly authorised selected-card browser
+adapter, qualified Kimi/Ollama execution adapters and concurrent task isolation. Direct
 Ollama must reuse its existing worker controls rather than introducing a raw-API
 executor beside them.
 
@@ -148,3 +201,22 @@ mutation made that regression fail. The installed model/provider and read-only,
 on-request policy were retained. A preceding attempt stopped before write approval
 and exposed the missing patch-preview path; that failure was retained and repaired.
 This is one Codex fixture qualification, not all-host, billing or human acceptance.
+
+On 2 November 2026 Claude Code 2.1.316 completed one disposable-fixture, two-turn
+journey using its configured `claude-opus-5-5` / `firstParty` profile and `auto`
+permission mode. Native fixture-local ask rules for Write/Edit/Bash were committed
+before the trial; global settings were unchanged. The console displayed and
+returned an AskUserQuestion answer and individually reviewed Bash requests,
+including the exact two-file edit/test command. An independent baseline mutation
+made the generated regression fail. A fresh owned process resumed the same UUID,
+reran verification and reached fixture-driver acceptance after review. This is
+not owner acceptance or a whole-task cost/savings measurement. A fixture setup
+failure (ignored local settings file, before inference) was retained and repaired
+with an explicit add of that fixture file; no additional model trial was needed.
+
+Deterministic Claude wire tests also cover changed model/provider before a second
+prompt, missing settings, one-operation decline/cancel, cancelled stale approvals,
+unsupported/secret/oversized requests, wrong-session messages, interrupt-only
+acknowledgements and successful results racing with Stop. Packaged HTTP/stdio
+consumers cover both adapters; browser fixtures cover task selection, approvals,
+review, desktop/mobile layout and accessibility without model inference.
