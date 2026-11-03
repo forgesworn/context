@@ -65,8 +65,9 @@ export async function readGirnelLinks(path: string, roots: Set<string>): Promise
   } finally { await file.close() }
 }
 
-export function dashboardTickets(rows: WorkspaceActivityRow[], links: GirnelCardLink[]): DashboardTicket[] {
+export function dashboardTickets(rows: WorkspaceActivityRow[], links: GirnelCardLink[], projects: {sourceRoot: string; checkoutRoot: string; agentId: string}[] = []): DashboardTicket[] {
   const bindings = new Map(links.filter(link => link.agentId !== null).map(link => [JSON.stringify([link.checkoutRoot, link.agentId]), link]))
+  const sourceRoots = new Map(projects.map(project => [JSON.stringify([project.checkoutRoot, project.agentId]), project.sourceRoot]))
   const tickets = new Map<string, DashboardTicket>()
   for (const link of links) {
     const href = new URL('#/b/' + encodeURIComponent(link.boardId) + '/c/' + encodeURIComponent(link.cardId), link.appUrl).href
@@ -78,7 +79,8 @@ export function dashboardTickets(rows: WorkspaceActivityRow[], links: GirnelCard
     }
   }
   for (const row of rows) {
-    const link = bindings.get(JSON.stringify([row.checkoutRoot, row.agentId]))
+    const identity = JSON.stringify([row.checkoutRoot, row.agentId]), sourceRoot = sourceRoots.get(identity)
+    const link = bindings.get(identity) ?? (sourceRoot ? bindings.get(JSON.stringify([sourceRoot, row.agentId])) : undefined)
     const href = link ? new URL('#/b/' + encodeURIComponent(link.boardId) + '/c/' + encodeURIComponent(link.cardId), link.appUrl).href : null
     const key = link ? JSON.stringify(['girnel', href]) : JSON.stringify(['activity', row.groupId, row.checkoutRoot, row.agentId])
     let ticket = tickets.get(key)
@@ -87,6 +89,7 @@ export function dashboardTickets(rows: WorkspaceActivityRow[], links: GirnelCard
     if (link && ticket.girnel && link.observedAt > ticket.girnel.observedAt) { ticket.title = link.title; ticket.girnel = { ...link, href: href! } }
     ticket.agents.push(row)
     if (!ticket.checkoutRoots.includes(row.checkoutRoot)) ticket.checkoutRoots.push(row.checkoutRoot)
+    if (sourceRoot && !ticket.checkoutRoots.includes(sourceRoot)) ticket.checkoutRoots.push(sourceRoot)
   }
   for (const ticket of tickets.values()) {
     const active = ticket.agents.filter(agent => agent.active)
@@ -214,7 +217,7 @@ export async function serveWorkspaceDashboard(workspace: string, cacheDirectory:
     const additions = controller?.observations(options.repositoryRoot).filter(row => !snapshot.activity.rows.some(existing => existing.agentId === row.agentId && existing.checkoutRoot === row.checkoutRoot)) ?? []
     const rows = [...additions, ...snapshot.activity.rows]
     if (rows.length > 500) throw new Error('Combined observations exceed 500 rows; narrow with --repo')
-    const tickets = dashboardTickets(rows, selectedLinks).map(ticket => ticket.girnel ? { ...ticket, observationUrl: origin + girnelObservationPath(ticket, feedSecret) } : ticket)
+    const tickets = dashboardTickets(rows, selectedLinks, controller?.observationProjects(options.repositoryRoot)).map(ticket => ticket.girnel ? { ...ticket, observationUrl: origin + girnelObservationPath(ticket, feedSecret) } : ticket)
     return { ...snapshot, activity: { ...snapshot.activity, rows }, tickets, overlaps: dashboardOverlaps(rows), girnel: { ...snapshot.girnel, bindings: links.length } }
   }
   const server = createServer(async (request, response) => {
