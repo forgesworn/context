@@ -22,7 +22,7 @@ const cardSchema = z.object({
 }).strict()
 const linksSchema = z.object({ version: z.literal(1), cards: z.array(cardSchema).max(500) }).strict()
 export type GirnelCardLink = z.infer<typeof cardSchema>
-export interface DashboardOptions { repositoryRoot?: string; handoverBase?: string; girnelLinks?: string; controlDirectory?: string; codexExecutable?: string; claudeExecutable?: string; kimiExecutable?: string; ollamaProfile?: string; maxRunSeconds?: number }
+export interface DashboardOptions { repositoryRoot?: string; handoverBase?: string; girnelLinks?: string; controlDirectory?: string; codexExecutable?: string; claudeExecutable?: string; kimiExecutable?: string; ollamaProfile?: string; maxRunSeconds?: number; maxActive?: number }
 export interface DashboardTicket {
   id: string; title: string; lane: 'working' | 'blocked' | 'reviewing' | 'done' | 'inactive'
   agents: WorkspaceActivityRow[]; checkoutRoots: string[]; girnel: (GirnelCardLink & { href: string }) | null
@@ -185,8 +185,8 @@ export async function serveWorkspaceDashboard(workspace: string, cacheDirectory:
     for (const [host, executable] of [['codex', options.codexExecutable], ['claude', options.claudeExecutable], ['kimi', options.kimiExecutable]]) if (executable && (!isAbsolute(executable) || !(await lstat(await realpath(executable))).isFile())) throw new Error('Control mode requires an installed absolute --' + host + ' executable')
     await initialiseWorkspaceStore(options.controlDirectory)
     const { AgentConsole } = await import('./agent-console.js')
-    controller = await AgentConsole.open(workspace, cacheDirectory, { directory: options.controlDirectory, codexExecutable: options.codexExecutable, claudeExecutable: options.claudeExecutable, kimiExecutable: options.kimiExecutable, ollamaProfile: options.ollamaProfile, maxRunSeconds: options.maxRunSeconds, allowedRoots: snapshot.projects.map(project => project.root) })
-  } else if (options.codexExecutable || options.claudeExecutable || options.kimiExecutable || options.ollamaProfile || options.maxRunSeconds !== undefined) throw new Error('Host settings require --control-dir')
+    controller = await AgentConsole.open(workspace, cacheDirectory, { directory: options.controlDirectory, codexExecutable: options.codexExecutable, claudeExecutable: options.claudeExecutable, kimiExecutable: options.kimiExecutable, ollamaProfile: options.ollamaProfile, maxRunSeconds: options.maxRunSeconds, maxActive: options.maxActive, allowedRoots: snapshot.projects.map(project => project.root) })
+  } else if (options.codexExecutable || options.claudeExecutable || options.kimiExecutable || options.ollamaProfile || options.maxRunSeconds !== undefined || options.maxActive !== undefined) throw new Error('Host settings require --control-dir')
   const page = renderWorkspaceDashboard(!!controller)
   let origin = ''
   const server = createServer(async (request, response) => {
@@ -228,7 +228,13 @@ export async function serveWorkspaceDashboard(workspace: string, cacheDirectory:
         if (!pending) pending = readWorkspaceDashboard(workspace, cacheDirectory, options).then(value => { snapshot = value; cachedAt = Date.now(); return value }).finally(() => { pending = undefined })
         await pending
       }
-      const json = JSON.stringify(snapshot)
+      // Explicit control mode contributes only its own published metadata. Do
+      // not widen saved-catalogue discovery or expose task inbox/source content.
+      const additions = controller?.observations(options.repositoryRoot).filter(row => !snapshot.activity.rows.some(existing => existing.agentId === row.agentId && existing.checkoutRoot === row.checkoutRoot)) ?? []
+      const rows = [...additions, ...snapshot.activity.rows]
+      if (rows.length > 500) throw new Error('Combined observations exceed 500 rows; narrow with --repo')
+      const value = additions.length ? { ...snapshot, activity: { ...snapshot.activity, rows }, tickets: [...dashboardTickets(additions, []), ...snapshot.tickets], overlaps: dashboardOverlaps(rows) } : snapshot
+      const json = JSON.stringify(value)
       if (Buffer.byteLength(json) > 2 * 1024 * 1024) throw new Error('snapshot too large')
       response.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' }); response.end(json)
     } catch { fail(503, 'Observation failed. Previous data is stale; check the local cache and explicitly selected files.') }
@@ -246,11 +252,12 @@ export async function serveWorkspaceDashboard(workspace: string, cacheDirectory:
 export async function runWorkspaceDashboardCli(args: string[]) {
   const { positionals, values } = parseArgs({ args, allowPositionals: true, options: {
     'cache-dir': { type: 'string' }, repo: { type: 'string' }, 'handover-base': { type: 'string' }, 'girnel-links': { type: 'string' },
-    'control-dir': { type: 'string' }, codex: { type: 'string' }, claude: { type: 'string' }, kimi: { type: 'string' }, 'ollama-profile': { type: 'string' }, 'max-run-seconds': { type: 'string' },
+    'control-dir': { type: 'string' }, codex: { type: 'string' }, claude: { type: 'string' }, kimi: { type: 'string' }, 'ollama-profile': { type: 'string' }, 'max-run-seconds': { type: 'string' }, 'max-active': { type: 'string' },
   } })
   if (positionals.length !== 1 || !values['cache-dir']) throw new Error('workspace dashboard ROOT --cache-dir ABS [--repo ABS] [--handover-base ABS] [--girnel-links ABS]')
   const maxRunSeconds = values['max-run-seconds'] === undefined ? undefined : /^\d+$/.test(values['max-run-seconds']) ? Number(values['max-run-seconds']) : NaN
-  const dashboard = await serveWorkspaceDashboard(positionals[0], values['cache-dir'], { repositoryRoot: values.repo, handoverBase: values['handover-base'], girnelLinks: values['girnel-links'], controlDirectory: values['control-dir'], codexExecutable: values.codex, claudeExecutable: values.claude, kimiExecutable: values.kimi, ollamaProfile: values['ollama-profile'], maxRunSeconds })
+  const maxActive = values['max-active'] === undefined ? undefined : /^\d+$/.test(values['max-active']) ? Number(values['max-active']) : NaN
+  const dashboard = await serveWorkspaceDashboard(positionals[0], values['cache-dir'], { repositoryRoot: values.repo, handoverBase: values['handover-base'], girnelLinks: values['girnel-links'], controlDirectory: values['control-dir'], codexExecutable: values.codex, claudeExecutable: values.claude, kimiExecutable: values.kimi, ollamaProfile: values['ollama-profile'], maxRunSeconds, maxActive })
   const stop = () => {
     process.off('SIGINT', stop); process.off('SIGTERM', stop)
     void dashboard.close().catch(() => { process.exitCode = 1 })

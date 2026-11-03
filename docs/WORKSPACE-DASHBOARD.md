@@ -142,3 +142,13 @@ from your cache or this viewer. Girnel links open with no referrer.
 
 No new ForgeSworn-operated service, identity, key, provider or account is added.
 The foreground process holds the decrypted observations in memory until stopped.
+
+
+Managed control sessions support isolated task worktrees, three concurrent host
+runs by default (`--max-active 1–4`), and per-task inboxes with separate delivery
+and acknowledgement states. The browser defaults new tasks to committed-HEAD
+worktrees; selected-checkout tasks retain existing local changes and run
+exclusively in their repository. Filter tasks by pending decisions or unread
+notes. See [the console contract](AGENT-CONSOLE.md#concurrent-work-and-shared-inbox-0190)
+for source/branch handling, native worker registration, Ollama turn-boundary
+notes, restart reconciliation and retained worktree cleanup.

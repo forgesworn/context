@@ -46,5 +46,15 @@ else if(m.id==='question'){
 function ask(){phase='approval';if(fileMode){event('item/started',{turnId:'turn-'+turn,item:{id:'file-edit',type:'fileChange',changes:[{path:root+'/source.txt',kind:{type:'update'},diff:'@@ -1 +1 @@\\n-before\\n+after\\n'},{path:root+'/regression.test.mjs',kind:{type:'add'},diff:regressionText}]}});send({id:'approval',method:'item/fileChange/requestApproval',params:{threadId:thread,turnId:'turn-'+turn,itemId:'file-edit',grantRoot:null,reason:'Apply the reviewed two-file fixture change'}})}else send({id:'approval',method:'item/commandExecution/requestApproval',params:{threadId:thread,turnId:'turn-'+turn,itemId:'test-command',command:'node --test regression.test.mjs',cwd:root,reason:'Verify the requested fixture change'}})}
 `)
   await chmod(executable, 0o700)
-  return { temp, workspace, root, cache, control, executable, trace, cleanup: () => rm(temp, { recursive: true, force: true }) }
+  return { temp, workspace, root, cache, control, executable, trace, git, cleanup: async () => {
+    // Only this generated fixture's worktrees/files are reset and removed.
+    const trees = git(['worktree', 'list', '--porcelain', '-z']).toString().split('\0')
+    for (const field of trees) if (field.startsWith('worktree ') && field.slice(9) !== root) {
+      const path = field.slice(9), branch = execFileSync('git', ['-C', path, 'symbolic-ref', '--short', 'HEAD'], { env: gitEnvironment(), encoding: 'utf8' }).trim()
+      execFileSync('git', ['-C', path, '-c', 'core.hooksPath=/dev/null', 'restore', '--source=HEAD', '--staged', '--worktree', '--', '.'], { env: gitEnvironment() })
+      await rm(join(path, 'regression.test.mjs'), { force: true })
+      git(['worktree', 'remove', path]); git(['branch', '-d', branch])
+    }
+    await rm(temp, { recursive: true, force: true })
+  } }
 }
