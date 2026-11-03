@@ -224,13 +224,11 @@ qualification is separate from protocol documentation and deterministic doubles.
 
 ## Girnel and other hosts
 
-Girnel still owns its board/card status. Existing explicit card metadata links
-remain an observation adapter. Console tasks are local durable work records;
-creating/accepting them does not create/complete Girnel cards or KithMoot
-assignments. Remaining integrations include an explicitly authorised selected-card browser
-adapter and live Ollama model qualification (now delivered below). Direct
-Ollama must reuse its existing worker controls rather than introducing a raw-API
-executor beside them.
+Girnel owns its board/card status. Explicit metadata binds activity to a selected
+card, and its separate read-only feed can now be connected in standalone Girnel
+1.2. Progress updates there live; saving an observation as a comment requires
+Girnel review and current board access. See [card activity](WORKSPACE-DASHBOARD.md#live-card-activity-and-reviewed-comments).
+Console task acceptance never completes a Girnel card or KithMoot assignment.
 
 ## Protocol and validation
 

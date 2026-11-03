@@ -80,9 +80,9 @@ labelled. The JSON response is capped at 2 MiB; narrow with `--repo` if necessar
 ## Girnel card links
 
 Girnel can own the durable ticket while Z1P reports execution observations. The
-first adapter consumes an **explicitly prepared local metadata file**. This is
-not a Girnel export command, browser/IndexedDB connection, live sync or board
-write API. No Girnel checkout, board credentials or room is opened implicitly.
+adapter consumes an **explicitly prepared local metadata file**. No Girnel
+checkout, board credentials or room is opened implicitly. Girnel 1.2 adds a
+standalone browser connection for the selected card, described below.
 
 ```json
 {
@@ -122,13 +122,46 @@ The file accepts only the listed fields, at most 500 bindings/256 KiB, saved
 catalogue roots, and safe HTTPS or loopback HTTP app URLs without credentials,
 queries or fragments. Links use Girnel's `#/b/BOARD/c/CARD` route; opening one
 requires access in that browser and compatible routing at the chosen app URL.
-It grants no board access. The dashboard contacts Girnel only when you choose to
-open the link. Do not include invitation fragments, attachments, keys or secrets.
+It grants no board access. The dashboard makes no outgoing Girnel requests. Opening the link
+contacts Girnel; connecting the feed lets that Girnel browser origin read the
+selected observations from loopback. Do not include invitation fragments, attachments, keys or secrets.
 
-The future browser adapter should supply only explicitly selected card metadata
-and stable IDs, preserve Girnel's normal session/write boundary and keep human
-acceptance separate. This viewer introduces no second assignment executor or
-KithMoot/Oathrun authority path.
+### Live card activity and reviewed comments
+
+In the dashboard card's **Task, files & provenance**, copy **Read-only Girnel
+feed**. Open that same card in standalone Girnel 1.2 or newer, choose **Z1P
+activity**, paste the address and connect. Permit local-network access if the
+browser asks. Activity refreshes every ten seconds while the sheet is open.
+Closing or disconnecting stops it; reopening requires an explicit connection.
+A stopped dashboard or blocked browser connection shows unavailable data and
+disables review. No feed is contacted before connecting.
+
+The feed shares only that card's explicitly bound task observations: agent IDs,
+labels/task text, checkout names and opaque checkout IDs, branches/HEADs, relative
+paths, reported states and lease times. It omits absolute checkout roots, source,
+checkpoints, inboxes and console/control state. The 256 KiB version-1 envelope is
+`z1p-girnel-observation`; partial workspace observations remain labelled partial.
+It uses a separate random-server-secret capability and exact configured Girnel
+origin. It cannot invoke console actions. Do not share the dashboard/control URL.
+
+In Girnel, **Review update for comment** freezes an exact bounded comment preview.
+**Save reviewed update as comment** uses your current Girnel board access and
+identity. New observations invalidate a changed preview; stale/wrong-card data
+cannot be reviewed. Existing matching update markers suppress sequential repeat
+saves, including reopening the sheet. This is not a distributed exactly-once
+promise across concurrent devices. Local durability and ordinary encrypted board
+sync remain separate. No column movement, assignment acceptance or new execution
+authority is inferred.
+
+Removing a binding revokes the feed on its next request, without waiting for the
+five-second observation cache. Removing one agent stops its disclosure; removing
+all card bindings disables the feed. A restarted dashboard issues new addresses.
+Previously read plaintext and saved comments cannot be recalled by revocation.
+The selected Girnel origin can read its explicitly shared feed; do not point
+`appUrl` at an origin you do not trust. Browser local-network policy can require
+permission or refuse the connection. Girnel does not proxy a refused connection
+through a hosted service. Embedded hosts retain their existing UI/network policy.
+This introduces no KithMoot/Oathrun assignment or execution authority path.
 
 ## Local access and data
 

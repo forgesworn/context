@@ -46,8 +46,14 @@ function dashboard() {
         if (!ticket.agents.length) card.append(node('p', 'No published activity linked to this selected card.', 'muted'))
         const details = node('details') as HTMLDetailsElement; details.dataset.key = ticket.id; details.open = open.has(ticket.id)
         details.append(node('summary', 'Task, files & provenance'))
+        if (ticket.observationUrl) {
+          details.append(node('p', 'In this Girnel card, open Z1P activity and paste this read-only feed address. It shares the listed task text, identities, branches and paths with that Girnel origin.'))
+          const label = node('label', 'Read-only Girnel feed'), address = document.createElement('input')
+          address.readOnly = true; address.value = ticket.observationUrl; address.addEventListener('focus', () => address.select())
+          label.append(address); details.append(label)
+        }
         for (const agent of ticket.agents) {
-          details.append(node('p', agent.task), node('p', agent.checkoutRoot, 'muted'), node('code', 'HEAD ' + (agent.head ?? 'unknown')), node('p', 'Published ' + date(agent.updatedAt) + ' · lease ends ' + date(agent.expiresAt), 'muted'))
+          details.append(node('p', agent.task), node('code', 'Agent ID ' + agent.agentId), node('p', agent.checkoutRoot, 'muted'), node('code', 'HEAD ' + (agent.head ?? 'unknown')), node('p', 'Published ' + date(agent.updatedAt) + ' · lease ends ' + date(agent.expiresAt), 'muted'))
           const paths = node('ul'); for (const path of agent.paths) paths.append(node('li', path)); details.append(paths)
         }
         card.append(details); lane.append(card)
