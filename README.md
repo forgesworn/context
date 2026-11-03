@@ -20,7 +20,9 @@ card links. Read-only, loopback-only; no ticket writes or automatic acceptance.
 
 [Local task console](docs/AGENT-CONSOLE.md): explicitly enable task entry, a
 managed Codex, Claude or Kimi host session, approvals/questions, result review and
-saved conversation continuation. Ollama execution remains pending.
+saved conversation continuation. An optional bounded Ollama worker lane uses an
+operator-configured helper profile, reviewed source dispatch/replacements and configured checks.
+Live worker availability requires an eligible model on that endpoint.
 
 [Bounded host workflows](docs/HOST-WORKFLOWS.md): optional local task contracts,
 dependency/review checks, deterministic result reduction and resumable planning.
