@@ -26,11 +26,12 @@ export function consoleClient() {
   function draw(task: any) {
     current = task
     const detail = el('task-detail'); detail.replaceChildren(node('h3', task.title), node('p', statuses[task.status] ?? task.status), node('p', task.root), node('p', task.objective))
+    if (task.planStep) detail.append(node('p', 'Plan: ' + task.planTitle + ' · ' + task.nodeId), node('p', task.planStep.blockers.join(' · ') || task.planStep.reviewGate))
     if (task.worktree) detail.append(node('p', 'Working copy: ' + task.worktree.root), node('p', 'Branch: ' + task.worktree.branch + ' · base ' + task.worktree.baseHead + ' · ' + task.worktree.state))
     if (task.overlaps?.length) detail.append(node('p', 'Overlapping intended paths: ' + task.overlaps.map((item: any) => item.title + ' (' + item.paths.join(', ') + ')').join(' · ')))
     if (task.host === 'ollama') detail.append(node('p', 'Bounded worker: fresh verified source packet each turn; no native model session or autonomous tools. Approve dispatch, replacements and configured checks separately.'))
     if (task.settings) detail.append(node('p', 'Host: ' + task.settings.provider + ' / ' + task.settings.model), node('p', 'Approval policy: ' + JSON.stringify(task.settings.approvalPolicy) + ' · Sandbox: ' + JSON.stringify(task.settings.sandbox)))
-    if (task.status === 'draft' && !task.threadId) detail.append(button('Run task', () => taskAction('run'), active >= capacity))
+    if (task.status === 'draft' && !task.threadId) detail.append(button('Run task', () => taskAction('run'), active >= capacity || !!task.planNeedsReconciliation || (task.planStep && !task.planStep.ready)))
     if (['starting', 'running', 'waiting'].includes(task.status)) detail.append(button('Stop run', () => taskAction('stop')))
     for (const pending of task.pending) {
       const box = node('fieldset'); box.append(node('legend', pending.method === 'item/tool/requestUserInput' ? 'The host has a question' : 'Host approval request'))
@@ -78,11 +79,30 @@ export function consoleClient() {
       detail.append(node('h4', 'Working tree for review'), node('pre', task.review.status || 'No working-tree changes'), node('pre', task.review.diff || 'No tracked diff'))
       for (const file of task.review.untracked) detail.append(node('h4', 'New file: ' + file.name), node('pre', file.text))
       detail.append(node('p', 'Review covers this task’s current whole working tree. Selected-checkout tasks can include earlier local changes; isolated tasks start from committed HEAD. Acceptance does not commit, merge or change a Girnel ticket.'))
-      if (task.status === 'review') detail.append(button('Accept reviewed result', () => taskAction('review', { decision: 'accept', reviewHash: task.review.hash })), button('Request changes', () => taskAction('review', { decision: 'changes', reviewHash: task.review.hash })))
+      let planReview: (() => any) | undefined
+      if (task.status === 'review' && task.planStep) {
+        const checks = node('fieldset'); checks.append(node('legend', 'Required checks and owner review'), node('p', 'Record the actual outcome and evidence for every check. These entries are owner assertions; this form does not execute tests.'))
+        const receipts: (() => any)[] = []
+        for (const item of task.planStep.checks) {
+          const outcomeLabel = node('label', item.check + ' outcome'), outcome = document.createElement('select')
+          for (const value of ['unknown', 'passed', 'failed']) outcome.add(new Option(value, value))
+          outcomeLabel.append(outcome)
+          const evidenceLabel = node('label', item.check + ' evidence'), evidence = document.createElement('textarea'); evidence.maxLength = 2048; evidenceLabel.append(evidence)
+          checks.append(outcomeLabel, evidenceLabel); receipts.push(() => ({ check: item.check, outcome: outcome.value, evidence: evidence.value }))
+        }
+        const reviewLabel = node('label', 'Owner review evidence'), reviewEvidence = document.createElement('textarea'); reviewEvidence.maxLength = 1900; reviewLabel.append(reviewEvidence); checks.append(reviewLabel); detail.append(checks)
+        planReview = () => ({ checks: receipts.map(read => read()), evidence: reviewEvidence.value })
+      }
+      const review = (decision: string) => taskAction('review', { decision, reviewHash: task.review.hash, ...(planReview ? { planReview: planReview() } : {}) })
+      if (task.status === 'review') detail.append(button('Accept reviewed result', () => review('accept')), button('Request changes', () => review('changes')))
     }
     if (task.reviewError) detail.append(node('p', task.reviewError))
+    if (task.planNeedsReconciliation) {
+      const label = node('label', 'Reconciliation evidence for a safe retry'), evidence = document.createElement('textarea'); evidence.maxLength = 2048; label.append(evidence)
+      detail.append(node('p', 'Inspect the prior host outcome, retained branch and any external effects before declaring a retry safe.'), label, button('Record reconciliation for retry', () => taskAction('plan-reconcile', { evidence: evidence.value })))
+    }
     if (task.threadId && ['draft', 'review', 'cancelled', 'failed', 'unknown'].includes(task.status)) {
-      const label = node('label', task.status === 'unknown' ? 'Reconciliation and follow-up instructions' : 'Follow-up instructions'), input = document.createElement('textarea'); input.maxLength = 8000; input.id = 'follow-up'; input.value = drafts.get(task.id) ?? ''; input.addEventListener('input', () => drafts.set(task.id, input.value)); label.append(input); detail.append(label, button('Continue saved conversation', () => taskAction('run', { message: input.value }), active >= capacity))
+      const label = node('label', task.status === 'unknown' ? 'Reconciliation and follow-up instructions' : 'Follow-up instructions'), input = document.createElement('textarea'); input.maxLength = 8000; input.id = 'follow-up'; input.value = drafts.get(task.id) ?? ''; input.addEventListener('input', () => drafts.set(task.id, input.value)); label.append(input); detail.append(label, button('Continue saved conversation', () => taskAction('run', { message: input.value }), active >= capacity || !!task.planNeedsReconciliation || (task.planStep && !task.planStep.ready)))
     }
     const inbox = node('section'); inbox.setAttribute('aria-label', 'Task inbox'); inbox.append(node('h4', 'Task inbox'), node('p', 'Notes are data. Delivery, agent acknowledgement and your acknowledgement are recorded separately. Unregistered workers receive queued notes on the next explicit continuation.'))
     for (const note of task.inbox ?? []) {
@@ -108,7 +128,7 @@ export function consoleClient() {
       else if (el('task-message').textContent?.startsWith('Inbox delivery needs attention:')) el('task-message').textContent = ''
       el('task-list').replaceChildren(...snapshot.tasks.filter((task: any) => filter === 'all' || (filter === 'inbox' ? task.unread > 0 : ['waiting', 'review', 'unknown'].includes(task.status))).map((task: any) => button(task.title + ' · ' + (task.host !== 'codex' ? hostLabels[task.host] + ' · ' : '') + (statuses[task.status] ?? task.status) + (task.unread ? ' · ' + task.unread + ' unread notes' : ''), () => { selected = task.id; last = ''; void refresh() })))
       if (selected) {
-        const requested = selected, task = await json('task/' + selected), signature = task.id + ':' + task.revision + ':' + task.eventSequence + ':' + task.outputSequence + ':' + active + ':' + capacity
+         const requested = selected, task = await json('task/' + selected), signature = task.id + ':' + task.revision + ':' + task.eventSequence + ':' + task.outputSequence + ':' + active + ':' + capacity + ':' + JSON.stringify(task.planStep)
         if (requested !== selected) return
         const editing = el('task-detail').contains(document.activeElement) && ['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName ?? '')
         if (signature !== last && (!editing || busy)) { last = signature; draw(task) }
@@ -120,5 +140,6 @@ export function consoleClient() {
     void action({ action: 'create', root: (el('task-root') as HTMLSelectElement).value, host: (el('task-host') as HTMLSelectElement).value, isolation: (el('task-isolation') as HTMLSelectElement).value, title: (el('task-title') as HTMLInputElement).value, objective: (el('task-objective') as HTMLTextAreaElement).value, paths: (el('task-paths') as HTMLTextAreaElement).value.split('\n').map(path => path.trim()).filter(Boolean) })
   })
   el('task-filter').addEventListener('change', () => { void refresh() })
+  window.addEventListener('z1p-select-task', event => { const id = (event as CustomEvent).detail; if (typeof id !== 'string') return; selected = id; last = ''; void refresh() })
   void refresh(); setInterval(() => { if (!document.hidden && !busy) void refresh() }, 1500)
 }

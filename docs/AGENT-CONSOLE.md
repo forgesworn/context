@@ -49,6 +49,14 @@ arguments, change provider/policy, resume arbitrary thread IDs or signal arbitra
 PIDs. The operator selects the executable at launch. No remote listener, hosted
 service, telemetry or new account is introduced.
 
+## Plan a feature across managed tasks
+
+Use **New task plan** to define steps, hosts, source files, checks and dependencies.
+The plan view follows readiness and blockers beside actual managed-run status.
+Each run remains explicit; owner-recorded passing check evidence and exact result
+review are required before dependent steps become ready. See
+[task plans](TASK-PLANS.md) for worktree integration, recovery and limits.
+
 ## Link an existing registered agent
 
 For an inbox without launching new hosts, provider executables are optional:
