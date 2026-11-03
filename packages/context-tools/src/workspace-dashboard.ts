@@ -192,7 +192,6 @@ export async function serveWorkspaceDashboard(workspace: string, cacheDirectory:
   let controller: import('./agent-console.js').AgentConsole | undefined
   if (options.controlDirectory) {
     if (!isAbsolute(options.controlDirectory) || resolve(options.controlDirectory) !== options.controlDirectory || await realpath(dirname(options.controlDirectory)) !== dirname(options.controlDirectory) || await realpath(options.controlDirectory).catch(() => options.controlDirectory) !== options.controlDirectory) throw new Error('control directory must be canonical with an existing parent')
-    if (!options.codexExecutable && !options.claudeExecutable && !options.kimiExecutable && !options.ollamaProfile) throw new Error('Control mode requires an installed absolute --codex, --claude, --kimi executable or --ollama-profile')
     for (const [host, executable] of [['codex', options.codexExecutable], ['claude', options.claudeExecutable], ['kimi', options.kimiExecutable]]) if (executable && (!isAbsolute(executable) || !(await lstat(await realpath(executable))).isFile())) throw new Error('Control mode requires an installed absolute --' + host + ' executable')
     await initialiseWorkspaceStore(options.controlDirectory)
     const { AgentConsole } = await import('./agent-console.js')
@@ -214,8 +213,10 @@ export async function serveWorkspaceDashboard(workspace: string, cacheDirectory:
       finally { store.close() }
     }
     const selectedLinks = options.repositoryRoot ? links.filter(link => link.checkoutRoot === options.repositoryRoot) : links
-    const additions = controller?.observations(options.repositoryRoot).filter(row => !snapshot.activity.rows.some(existing => existing.agentId === row.agentId && existing.checkoutRoot === row.checkoutRoot)) ?? []
-    const rows = [...additions, ...snapshot.activity.rows]
+    const inboxOwners = new Set(controller?.externalOwnerAddresses() ?? [])
+    const observed = snapshot.activity.rows.filter(row => !inboxOwners.has(row.agentId))
+    const additions = controller?.observations(options.repositoryRoot).filter(row => !observed.some(existing => existing.agentId === row.agentId && existing.checkoutRoot === row.checkoutRoot)) ?? []
+    const rows = [...additions, ...observed]
     if (rows.length > 500) throw new Error('Combined observations exceed 500 rows; narrow with --repo')
     const tickets = dashboardTickets(rows, selectedLinks, controller?.observationProjects(options.repositoryRoot)).map(ticket => ticket.girnel ? { ...ticket, observationUrl: origin + girnelObservationPath(ticket, feedSecret) } : ticket)
     return { ...snapshot, activity: { ...snapshot.activity, rows }, tickets, overlaps: dashboardOverlaps(rows), girnel: { ...snapshot.girnel, bindings: links.length } }
@@ -264,6 +265,20 @@ export async function serveWorkspaceDashboard(workspace: string, cacheDirectory:
       return
     }
     if (request.method !== 'GET') return fail(405, 'This route is read-only')
+    if (controller && request.url?.startsWith(prefix + 'console/external-candidates?')) {
+      try {
+        const url = new URL(request.url, origin), keys = [...url.searchParams.keys()]
+        if (keys.length !== 1 || keys[0] !== 'root') throw new Error('Select one saved checkout')
+        const value = JSON.stringify(await controller.externalCandidates(url.searchParams.get('root')!))
+        if (Buffer.byteLength(value) > 1048576) throw new Error('External candidates exceed response bound')
+        response.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' }); response.end(value)
+      } catch { fail(409, 'External agents unavailable; select an exact saved checkout and refresh') }
+      return
+    }
+    if (controller && request.url?.startsWith(prefix + 'console/external/')) {
+      try { const value = JSON.stringify(controller.externalTask(request.url.slice((prefix + 'console/external/').length))); if (Buffer.byteLength(value) > 1048576) throw new Error(); response.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' }); response.end(value) } catch { fail(404, 'External inbox unavailable or exceeds the response bound') }
+      return
+    }
     if (controller && request.url === prefix + 'console/snapshot') {
       try { response.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' }); response.end(JSON.stringify(controller.snapshot())) } catch { fail(503, 'Console journal unavailable') }
       return
@@ -308,5 +323,5 @@ export async function runWorkspaceDashboardCli(args: string[]) {
     void dashboard.close().catch(() => { process.exitCode = 1 })
   }
   process.once('SIGINT', stop); process.once('SIGTERM', stop)
-  return 'Z1P local dashboard: ' + dashboard.url + '\n' + (values['control-dir'] ? 'Task control enabled; this private URL can launch your configured host.' : 'Read-only; keep this private URL local.') + ' Press Ctrl-C to stop.\n'
+  return 'Z1P local dashboard: ' + dashboard.url + '\n' + (values['control-dir'] ? (values.codex || values.claude || values.kimi || values['ollama-profile'] ? 'Task control and external inboxes enabled; keep this private URL local.' : 'External inboxes enabled; keep this private URL local.') : 'Read-only; keep this private URL local.') + ' Press Ctrl-C to stop.\n'
 }

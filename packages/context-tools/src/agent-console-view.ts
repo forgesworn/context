@@ -101,6 +101,7 @@ export function consoleClient() {
       const hostSelect = el('task-host') as HTMLSelectElement
       for (const option of Array.from(hostSelect.options)) { const host = snapshot.hosts.find((host: any) => host.id === option.value); if (host) { option.disabled = !host.available; option.textContent = hostLabels[option.value]; if (!host.available) option.textContent += host.reason ? ' · unavailable' : ' · not configured'; option.title = host.reason ?? '' } }
       if (!hostSelect.selectedOptions[0] || hostSelect.selectedOptions[0].disabled) { const first = Array.from(hostSelect.options).find(option => !option.disabled); if (first) hostSelect.value = first.value }
+      ;(el('new-task') as HTMLDetailsElement).hidden = !snapshot.hosts.some((host: any) => host.available)
       el('console-bound').textContent = snapshot.active + '/' + snapshot.maxActive + ' active runs · ' + snapshot.reviewCount + ' ready for review · ' + snapshot.maxRunSeconds + ' seconds maximum per host process' + (snapshot.hosts.find((host: any) => host.id === 'ollama')?.reason ? ' · ' + snapshot.hosts.find((host: any) => host.id === 'ollama').reason : '')
       const filter = (el('task-filter') as HTMLSelectElement).value
       if (snapshot.inboxError) el('task-message').textContent = 'Inbox delivery needs attention: ' + snapshot.inboxError

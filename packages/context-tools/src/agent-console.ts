@@ -17,6 +17,7 @@ import type { AgentHost, HostFactory, HostRequest, HostEvent } from './agent-hos
 import { createWorktree, verifyWorktree, worktreeLocation, reviewGit, type ConsoleWorktree } from './console-worktrees.js'
 import type { WorkspaceActivityRow } from './workspace-activity-types.js'
 import { consoleAddress, workerSlot, inboxPrompt, noteLimit, type ConsoleNote } from './console-inbox.js'
+import { ExternalConsole, externalActionSchemas } from './external-console.js'
 const digest = (value: unknown) => createHash('sha256').update(JSON.stringify(value)).digest('hex')
 const uuid = z.string().uuid(), bounded = (max: number) => z.string().min(1).max(max).refine(value => !/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/.test(value))
 const base = { requestId: uuid, id: uuid, expectedRevision: z.number().int().nonnegative() }
@@ -28,8 +29,10 @@ export const consoleActionSchema = z.discriminatedUnion('action', [
   z.object({ ...base, action: z.literal('acknowledge'), messageId: uuid }).strict(),
   z.object({ ...base, action: z.literal('answer'), pendingId: uuid, decision: z.enum(['accept', 'decline', 'cancel']).optional(), answers: z.record(z.string(), z.string().max(4000)).optional() }).strict(),
   z.object({ ...base, action: z.literal('review'), decision: z.enum(['accept', 'changes']), reviewHash: z.string().regex(/^[a-f0-9]{64}$/) }).strict(),
+  ...externalActionSchemas,
 ])
 type Action = z.infer<typeof consoleActionSchema>
+type ManagedAction = Exclude<Action, { action: 'external-link' | 'external-note' | 'external-read' | 'external-remove' }>
 type Status = 'draft' | 'starting' | 'running' | 'waiting' | 'stopping' | 'review' | 'accepted' | 'cancelled' | 'failed' | 'unknown'
 type Pending = { id: string; wireId: string | number; method: string; params: any; preview?: { changes: unknown[]; hash: string } }
 interface Task {
@@ -55,8 +58,11 @@ export class AgentConsole {
   private readonly live = new Map<string, Live>()
   private serial: Promise<unknown> = Promise.resolve()
   private closing = false
+  private closePromise?: Promise<void>
   private pollTimer?: ReturnType<typeof setInterval>
   private pollError?: string
+  private polling?: Promise<void>
+  private external: ExternalConsole
   private lastRenew = new Map<string, number>()
   private lock?: { path: string; bytes: string }
   private ollamaUnavailable?: string
@@ -66,6 +72,7 @@ export class AgentConsole {
     try { this.shared = new WorkspaceStore(cache) } catch (error) { this.store.close(); throw error }
     this.key = workspaceKey('console', workspace)
     this.factories = { codex: options.factory ?? (options.codexExecutable ? codexHost(options.codexExecutable, options.maxRunSeconds ?? 600) : undefined), claude: options.claudeExecutable ? claudeHost(options.claudeExecutable, options.maxRunSeconds ?? 600) : undefined, kimi: options.kimiExecutable ? kimiHost(options.kimiExecutable, options.maxRunSeconds ?? 600) : undefined, ollama: options.ollamaProfile ? ollamaHost(options.ollamaProfile, options.directory, options.maxRunSeconds ?? 600) : undefined }
+    this.external = new ExternalConsole(this.store, this.shared, workspace, (root, identity) => this.root(root, identity), peer => this.state().tasks.some(task => peer.agentId === consoleAddress(task) || peer.agentId === task.peerId || peer.slot === workerSlot(task.id)))
   }
   static async open(workspace: string, cache: string, options: ConsoleOptions) {
     const max = options.maxRunSeconds ?? 600
@@ -126,17 +133,21 @@ export class AgentConsole {
     const live = await describeCheckout(root), info = await lstat(live.commonDirectory)
     const actual = digest([live.commonDirectory, info.dev, info.ino])
     if (live.commonDirectory !== saved.commonDirectory || (identity && actual !== identity)) throw new Error('Checkout identity changed; reconcile the task')
-    return { identity: actual, checkout: live }
+    return { identity: actual, checkout: live, groupId: workspaceKey('activity-group', workspaceKey('board', live.commonDirectory + '\0' + info.dev + ':' + info.ino)) }
   }
   snapshot() {
     return { enabled: true, roots: this.options.allowedRoots ?? [], hosts: [{ id: 'codex', available: !!this.factories.codex }, { id: 'claude', available: !!this.factories.claude }, { id: 'kimi', available: !!this.factories.kimi }, { id: 'ollama', available: !!this.factories.ollama, ...(this.ollamaUnavailable ? { reason: this.ollamaUnavailable } : {}) }], maxRunSeconds: this.options.maxRunSeconds ?? 600, maxActive: this.options.maxActive ?? 3, active: this.live.size, inboxError: this.pollError, reviewCount: this.state().tasks.filter(task => task.status === 'review').length,
-      tasks: this.state().tasks.map(({ id, revision, title, root, host, status, updatedAt, eventSequence, worktree, isolation, inbox }) => ({ id, revision, title, root, host, status, updatedAt, eventSequence, executionRoot: worktree?.root ?? root, isolation: isolation ?? 'checkout', unread: (inbox ?? []).filter(note => !note.ownerAcknowledgedAt).length })) }
+      tasks: this.state().tasks.map(({ id, revision, title, root, host, status, updatedAt, eventSequence, worktree, isolation, inbox }) => ({ id, revision, title, root, host, status, updatedAt, eventSequence, executionRoot: worktree?.root ?? root, isolation: isolation ?? 'checkout', unread: (inbox ?? []).filter(note => !note.ownerAcknowledgedAt).length })), external: this.external.snapshot() }
   }
+  externalCandidates(root: string) { return this.external.candidates(root) }
+  externalTask(id: string) { return this.external.detail(id) }
+  externalOwnerAddresses() { return this.external.ownerAddresses() }
   task(id: string) { uuid.parse(id); const task = this.state().tasks.find(task => task.id === id); if (!task) throw new Error('Task not found'); const live = this.live.get(id); return { ...task, inbox: task.inbox ?? [], address: consoleAddress(task), executionRoot: task.worktree?.root ?? task.root, liveOutput: live?.output ?? '', outputSequence: live?.outputSequence ?? 0 } }
   async action(raw: unknown) {
     return this.queue(async () => {
       if (this.closing) throw new Error('Console is closing')
       const action = consoleActionSchema.parse(raw), hash = digest(action)
+      if (action.action === 'external-link' || action.action === 'external-note' || action.action === 'external-read' || action.action === 'external-remove') return this.external.action(action)
       if (action.action === 'create') {
         const old = this.state().tasks.find(task => task.id === action.requestId)
         if (old) { const { isolation, ...legacy } = action; if (old.createHash !== hash && !(old.isolation === undefined && isolation === 'checkout' && old.createHash === digest(legacy))) throw new Error('Request ID reused with different content'); return old }
@@ -240,7 +251,7 @@ export class AgentConsole {
       await this.publish(task, action.decision === 'accept' ? 'done' : 'blocked'); return this.task(task.id)
     })
   }
-  private record(action: Exclude<Action, { action: 'create' }>, hash: string, update: (task: Task) => void) {
+  private record(action: Exclude<ManagedAction, { action: 'create' }>, hash: string, update: (task: Task) => void) {
     return this.change(state => { const task = state.tasks.find(task => task.id === action.id)!; update(task); task.revision++; task.updatedAt = Date.now(); task.receipts.push({ id: action.requestId, hash }); task.receipts = task.receipts.slice(-64); return task })
   }
   private async executionCheckout(task: Task) {
@@ -251,15 +262,16 @@ export class AgentConsole {
   }
   private async executionRoot(task: Task) { return (await this.executionCheckout(task)).root }
   observations(sourceRoot?: string): WorkspaceActivityRow[] {
-    return this.state().tasks.filter(task => task.observation && (!sourceRoot || task.root === sourceRoot)).map(task => ({ ...task.observation!, active: task.observation!.expiresAt > Date.now() && task.observation!.state !== 'done' }))
+    return [...this.state().tasks.filter(task => task.observation && (!sourceRoot || task.root === sourceRoot)).map(task => ({ ...task.observation!, active: task.observation!.expiresAt > Date.now() && task.observation!.state !== 'done' })), ...this.external.observations(sourceRoot)]
   }
   /** Associations from this console's retained task identities, never agent labels. */
   observationProjects(sourceRoot?: string) {
-    return this.state().tasks.filter(task => task.observation && (!sourceRoot || task.root === sourceRoot)).map(task => ({sourceRoot: task.root, checkoutRoot: task.observation!.checkoutRoot, agentId: task.observation!.agentId}))
+    return [...this.state().tasks.filter(task => task.observation && (!sourceRoot || task.root === sourceRoot)).map(task => ({sourceRoot: task.root, checkoutRoot: task.observation!.checkoutRoot, agentId: task.observation!.agentId})), ...this.external.projects(sourceRoot)]
   }
   /** Mirror addressed notes only; never submit a new turn or approve a tool. */
   async poll() {
-    return this.queue(async () => {
+    if (this.polling) return this.polling
+    const operation = this.queue(async () => {
       if (this.closing) return
       const errors: string[] = []
       for (const saved of this.state().tasks) {
@@ -311,9 +323,12 @@ export class AgentConsole {
           }
         } catch (error) { errors.push(saved.id + ': ' + String(error).slice(0, 300)) }
       }
+      await this.external.poll()
       this.pollError = errors.length ? errors.join(' · ').slice(0, 1000) : undefined
       if (this.pollError) throw new Error(this.pollError)
     })
+    this.polling = operation.finally(() => { this.polling = undefined })
+    return this.polling
   }
   private async publish(task: Task, state: 'working' | 'blocked' | 'reviewing' | 'done', verifiedRoot?: string) {
     const coordination = new RepositoryCoordination(this.shared, task.coordId as ReturnType<typeof randomUUID>)
@@ -442,9 +457,15 @@ export class AgentConsole {
     return { ...value, hash: digest({ ...value, untracked, result: task.result, hostDiff: task.diff, thread: task.threadId, turn: task.turnId }) }
   }
   async close() {
+    if (this.closePromise) return this.closePromise
     this.closing = true; if (this.pollTimer) clearInterval(this.pollTimer)
-    await this.queue(async () => { for (const id of [...this.live.keys()]) await this.failWithinQueue(id, 'Console closed. Reconcile the saved host thread before continuing.') })
-    this.shared.close(); this.store.close()
-    if (this.lock && await readFile(this.lock.path, 'utf8') === this.lock.bytes) await unlink(this.lock.path)
+    this.closePromise = (async () => {
+      try { await this.queue(async () => { for (const id of [...this.live.keys()]) await this.failWithinQueue(id, 'Console closed. Reconcile the saved host thread before continuing.'); await this.external.close() }) }
+      finally {
+        this.shared.close(); this.store.close()
+        if (this.lock && await readFile(this.lock.path, 'utf8') === this.lock.bytes) await unlink(this.lock.path)
+      }
+    })()
+    return this.closePromise
   }
 }
