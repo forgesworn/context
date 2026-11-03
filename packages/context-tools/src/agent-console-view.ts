@@ -27,6 +27,7 @@ export function consoleClient() {
     current = task
     const detail = el('task-detail'); detail.replaceChildren(node('h3', task.title), node('p', statuses[task.status] ?? task.status), node('p', task.root), node('p', task.objective))
     if (task.planStep) detail.append(node('p', 'Plan: ' + task.planTitle + ' · ' + task.nodeId), node('p', task.planStep.blockers.join(' · ') || task.planStep.reviewGate))
+    if (task.planSupersededBy) detail.append(node('p', 'Previous requirements revision. Preserve this work; open the newer plan for current instructions. New runs, approval grants and acceptance are disabled here. The original host retains stop controls.'))
     if (task.worktree) detail.append(node('p', 'Working copy: ' + task.worktree.root), node('p', 'Branch: ' + task.worktree.branch + ' · base ' + task.worktree.baseHead + ' · ' + task.worktree.state))
     if (task.overlaps?.length) detail.append(node('p', 'Overlapping intended paths: ' + task.overlaps.map((item: any) => item.title + ' (' + item.paths.join(', ') + ')').join(' · ')))
     if (task.host === 'ollama') detail.append(node('p', 'Bounded worker: fresh verified source packet each turn; no native model session or autonomous tools. Approve dispatch, replacements and configured checks separately.'))
@@ -54,7 +55,7 @@ export function consoleClient() {
           }
           if (question.options) box.append(node('p', question.options.map((o: any) => o.label + ': ' + o.description).join(' · ')))
         }
-        box.append(button('Send answers', () => taskAction('answer', { pendingId: pending.id, answers: Object.fromEntries(Object.entries(answers).map(([id, value]) => [id, value()])) })))
+        box.append(button('Send answers', () => taskAction('answer', { pendingId: pending.id, answers: Object.fromEntries(Object.entries(answers).map(([id, value]) => [id, value()])) }), !!task.planSupersededBy))
         if (pending.params.cancellable) { box.append(button('Decline question', () => taskAction('answer', { pendingId: pending.id, decision: 'decline' })), button('Cancel question', () => taskAction('answer', { pendingId: pending.id, decision: 'cancel' }))) }
       } else {
         if (pending.params.tool) box.append(node('h4', 'Requested tool: ' + pending.params.tool), node('pre', JSON.stringify(pending.params.input, null, 2)))
@@ -69,7 +70,7 @@ export function consoleClient() {
         }
         const raw = node('details'); raw.append(node('summary', 'Full host request'), node('pre', JSON.stringify(pending.params, null, 2))); box.append(raw)
         if (pending.method === 'item/fileChange/requestApproval' && !pending.preview) box.append(node('p', 'A matching proposed patch is unavailable. Approval is disabled here; use the native host to reconcile.'))
-        for (const [decision, label] of [['accept', 'Allow this request'], ['decline', 'Decline'], ['cancel', 'Cancel request']]) box.append(button(label, () => taskAction('answer', { pendingId: pending.id, decision }), decision === 'accept' && pending.method === 'item/fileChange/requestApproval' && !pending.preview))
+        for (const [decision, label] of [['accept', 'Allow this request'], ['decline', 'Decline'], ['cancel', 'Cancel request']]) box.append(button(label, () => taskAction('answer', { pendingId: pending.id, decision }), decision === 'accept' && (!!task.planSupersededBy || (pending.method === 'item/fileChange/requestApproval' && !pending.preview))))
       }
       detail.append(box)
     }
@@ -80,7 +81,7 @@ export function consoleClient() {
       for (const file of task.review.untracked) detail.append(node('h4', 'New file: ' + file.name), node('pre', file.text))
       detail.append(node('p', 'Review covers this task’s current whole working tree. Selected-checkout tasks can include earlier local changes; isolated tasks start from committed HEAD. Acceptance does not commit, merge or change a Girnel ticket.'))
       let planReview: (() => any) | undefined
-      if (task.status === 'review' && task.planStep) {
+      if (task.status === 'review' && task.planStep && !task.planSupersededBy) {
         const checks = node('fieldset'); checks.append(node('legend', 'Required checks and owner review'), node('p', 'Record the actual outcome and evidence for every check. These entries are owner assertions; this form does not execute tests.'))
         const receipts: (() => any)[] = []
         for (const item of task.planStep.checks) {
@@ -94,7 +95,7 @@ export function consoleClient() {
         planReview = () => ({ checks: receipts.map(read => read()), evidence: reviewEvidence.value })
       }
       const review = (decision: string) => taskAction('review', { decision, reviewHash: task.review.hash, ...(planReview ? { planReview: planReview() } : {}) })
-      if (task.status === 'review') detail.append(button('Accept reviewed result', () => review('accept')), button('Request changes', () => review('changes')))
+      if (task.status === 'review') detail.append(button('Accept reviewed result', () => review('accept'), !!task.planSupersededBy), button('Request changes', () => review('changes'), !!task.planSupersededBy))
     }
     if (task.reviewError) detail.append(node('p', task.reviewError))
     if (task.planNeedsReconciliation) {
@@ -104,7 +105,7 @@ export function consoleClient() {
     if (task.threadId && ['draft', 'review', 'cancelled', 'failed', 'unknown'].includes(task.status)) {
       const label = node('label', task.status === 'unknown' ? 'Reconciliation and follow-up instructions' : 'Follow-up instructions'), input = document.createElement('textarea'); input.maxLength = 8000; input.id = 'follow-up'; input.value = drafts.get(task.id) ?? ''; input.addEventListener('input', () => drafts.set(task.id, input.value)); label.append(input); detail.append(label, button('Continue saved conversation', () => taskAction('run', { message: input.value }), active >= capacity || !!task.planNeedsReconciliation || (task.planStep && !task.planStep.ready)))
     }
-    const inbox = node('section'); inbox.setAttribute('aria-label', 'Task inbox'); inbox.append(node('h4', 'Task inbox'), node('p', 'Notes are data. Delivery, agent acknowledgement and your acknowledgement are recorded separately. Unregistered workers receive queued notes on the next explicit continuation.'))
+    const inbox = node('section'); inbox.setAttribute('aria-label', 'Task inbox'); inbox.append(node('h4', 'Task inbox'), node('p', 'Notes are data. Delivery, agent acknowledgement and your acknowledgement are recorded separately. ' + (task.planSupersededBy ? 'This previous task cannot continue. Registered workers may receive its change note; unregistered workers receive current requirements through a new explicit task.' : 'Unregistered workers receive queued notes on the next explicit continuation.')))
     for (const note of task.inbox ?? []) {
       const box = node('fieldset'); box.append(node('legend', note.from === 'owner' ? 'Your note' : 'Agent note'), node('pre', note.text), node('p', note.deliveredTo === 'owner' ? 'Received for your review' : note.acknowledgedAt ? 'Acknowledged by agent' : note.deliveredAt ? 'Delivered to registered worker; awaiting acknowledgement' : note.submittedTurn ? 'Submitted with a turn; acknowledgement unconfirmed' : 'Queued for delivery'))
       if (!note.ownerAcknowledgedAt) box.append(button('Mark note read', () => taskAction('acknowledge', { messageId: note.id })))
@@ -126,12 +127,13 @@ export function consoleClient() {
       const filter = (el('task-filter') as HTMLSelectElement).value
       if (snapshot.inboxError) el('task-message').textContent = 'Inbox delivery needs attention: ' + snapshot.inboxError
       else if (el('task-message').textContent?.startsWith('Inbox delivery needs attention:')) el('task-message').textContent = ''
-      el('task-list').replaceChildren(...snapshot.tasks.filter((task: any) => filter === 'all' || (filter === 'inbox' ? task.unread > 0 : ['waiting', 'review', 'unknown'].includes(task.status))).map((task: any) => button(task.title + ' · ' + (task.host !== 'codex' ? hostLabels[task.host] + ' · ' : '') + (statuses[task.status] ?? task.status) + (task.unread ? ' · ' + task.unread + ' unread notes' : ''), () => { selected = task.id; last = ''; void refresh() })))
+       el('task-list').replaceChildren(...snapshot.tasks.filter((task: any) => filter === 'all' || (filter === 'inbox' ? task.unread > 0 : ['waiting', 'review', 'unknown'].includes(task.status))).map((task: any) => button(task.title + ' · ' + (task.superseded ? 'previous requirements · ' : '') + (task.host !== 'codex' ? hostLabels[task.host] + ' · ' : '') + (statuses[task.status] ?? task.status) + (task.unread ? ' · ' + task.unread + ' unread notes' : ''), () => { selected = task.id; last = ''; void refresh() })))
       if (selected) {
          const requested = selected, task = await json('task/' + selected), signature = task.id + ':' + task.revision + ':' + task.eventSequence + ':' + task.outputSequence + ':' + active + ':' + capacity + ':' + JSON.stringify(task.planStep)
         if (requested !== selected) return
+         if (current?.id === task.id && task.revision < current.revision) return
         const editing = el('task-detail').contains(document.activeElement) && ['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement?.tagName ?? '')
-        if (signature !== last && (!editing || busy)) { last = signature; draw(task) }
+         if (signature !== last && (!editing || busy || task.planSupersededBy !== current?.planSupersededBy)) { last = signature; draw(task) }
       }
     } catch (error) { el('task-message').textContent = String(error) }
   }
