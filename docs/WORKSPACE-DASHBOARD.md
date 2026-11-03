@@ -2,7 +2,8 @@
 
 For task entry and managed Codex/Claude/Kimi host adapters, see the optional
 [local task console](AGENT-CONSOLE.md). Explicit `--control-dir` mode enables task
-control with operator-configured `--codex`, `--claude` and/or `--kimi`;
+control with operator-configured `--codex`, `--claude`, `--kimi` and/or
+`--ollama-profile ABS`;
 the default described below stays read-only.
 
 Use the local ticket viewer to see reported agent work, shared file claims and

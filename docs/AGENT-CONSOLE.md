@@ -7,7 +7,9 @@ separate from committing, merging, deployment and Girnel acceptance.
 
 Adapters are **Codex app-server** (qualified on CLI 0.166.0), **Claude Code**
 (stream-json/control protocol, qualified on CLI 2.1.316) and **Kimi Code**
-(ACP1 stdio; qualification below). Ollama execution remains pending.
+(ACP1 stdio; qualification below). An optional **bounded Ollama worker** lane
+uses an installed worker helper and explicit operator profile; it has no native
+coding-agent session or autonomous tools. See its separate contract below.
 Existing independent terminal/app sessions are not attached or
 imported. Oathrun/KithMoot execution routes and their grants remain separate.
 
@@ -220,7 +222,7 @@ Girnel still owns its board/card status. Existing explicit card metadata links
 remain an observation adapter. Console tasks are local durable work records;
 creating/accepting them does not create/complete Girnel cards or KithMoot
 assignments. Remaining integrations include an explicitly authorised selected-card browser
-adapter, qualified Ollama execution and concurrent task isolation. Direct
+adapter, live Ollama model qualification and concurrent task isolation. Direct
 Ollama must reuse its existing worker controls rather than introducing a raw-API
 executor beside them.
 
@@ -289,3 +291,101 @@ including review waits. Failed evidence and cleanup receipts were retained; no
 provider refusal or uncertain result was automatically retried. Native context
 calls also exposed unsupported `.txt` packet sources and an invalid checkpoint
 state; Kimi recovered through supported source evidence and a valid saved checkpoint.
+
+
+## Bounded Ollama worker
+
+Add `--ollama-profile /absolute/private/ollama-console.json` in control mode.
+The JSON file must be canonical, regular and private (0600). No helper is
+installed, downloaded, pulled, restarted or exposed by this option. Supply the
+existing Python executable, `ollama-workers` helper and engineering adapter:
+
+```json
+{
+  "version": 1,
+  "python": "/absolute/path/to/python3",
+  "helper": "/absolute/path/to/ollama-workers/scripts/ollama_task.py",
+  "engineeringAdapter": "/absolute/path/to/forgesworn-engineering/scripts/ollama_worker.py",
+  "endpoint": "http://127.0.0.1:11435",
+  "model": "deepseek-v4.1-flash:cloud",
+  "think": "false",
+  "maxOutput": 4096,
+  "timeoutSeconds": 300,
+  "routeReason": "Bounded coding draft from the selected checkout",
+  "verification": null
+}
+```
+
+Use an explicit eligible full model name. `localhost` can forward cloud
+inference: the configured account/provider controls billing and disclosure.
+The helper retains endpoint locking, pending markers, preflight, refusal and
+receipt behaviour. No raw provider API executor or automatic fallback is added.
+Startup reads helper status/inventory without inference. A pending marker or
+missing model disables this host with a reason, leaving other hosts usable;
+restart the dashboard after native reconciliation/eligibility changes. Native
+inference is checked again immediately before dispatch. Profile contents are
+bound to this worker task; changed model, endpoint, thinking, output/time limits,
+helper paths or verification configuration refuse continuation.
+
+Ollama requires 1–8 explicit supported non-hidden source file paths, with an
+existing parent directory and at least one existing source. Directories, source
+symlinks/hardlinks and excluded files are refused. Each existing file is at most
+16,000 bytes; the source packet is at most 24 KiB. Missing selected output files
+are recorded as absent. The controller uses the existing source-packet builder
+and checks hashes, checkout identity, HEAD and navigation policy before disclosure
+and before applying a replacement. It does not scan other projects or give the
+model filesystem, MCP or shell tools.
+
+Each turn asks separately to send the bounded packet to the configured worker,
+apply exact whole-file UTF-8 replacements and run the operator-configured check.
+The engineering adapter preflights its composed guidance plus packet before
+inference. A returned JSON draft can replace only selected files; it cannot
+select commands, permissions, endpoints, file modes or deletions. Unknown fields,
+malformed JSON and oversized/out-of-scope drafts are refused. No response claims
+establish that tests or tools ran. An approval is one operation, without a
+remembered grant. Declined replacements remain drafts and are recorded as rejected
+worker output if that no-change result is accepted locally.
+
+For verification, replace `null` with an operator-owned object such as
+`{"executable":"/absolute/path/to/node","args":["--test","regression.test.mjs"],"timeoutSeconds":60}`.
+The exact executable, argv and checkout are shown for approval; no shell or
+model-generated command is executed. Configure an appropriate profile/check for
+the selected project. With `null`, or if the check is declined, the result says
+that no verification ran. A numeric nonzero check exit is failure; timeout or
+uncertain process effects require reconciliation. Configured project code runs
+as the OS owner without a sandbox. Source guards are bounded point-in-time
+checks, not hostile-process isolation or an atomic multi-file transaction. A
+partial write or uncertain check never silently rolls back or replays.
+
+Continuation uses a fresh owned controller and verified source packet, plus the
+last bounded worker summary. This is not model-side KV/session resume, automatic
+history import or a tool-using agent loop. At most16turns are retained per worker
+task. The shared one-active-run and watchdog bounds remain. Stop before dispatch
+or during an idle approval has a qualified local cancellation receipt; stopping
+in-flight inference/checks remains Needs reconciliation because killing a local
+client does not prove remote inference stopped. The original helper pending
+marker is preserved and must be reconciled there; no automatic clearing/retry,
+provider refusal replay or account-hold bypass occurs.
+
+Worker task summaries are encrypted in the console journal. Packet/prompt files,
+answers and original helper receipts remain in private 0700/0600 directories under
+`CONTROL_DIR/workers/<task>/<turn>/`; they are **not encrypted at rest** by the
+console. The engineering adapter's temporary composed prompt is managed by that
+adapter. Keep receipts for accounting/reconciliation, then archive/remove completed
+worker evidence explicitly; do not remove pending markers to make a retry work.
+Local result review records the owner's disposition through the existing helper,
+without another inference request. Provider-reported token counts are labelled;
+missing usage, account totals and whole-task billing/savings remain unknown.
+
+On 3 November 2026 the intended M4 endpoint responded to helper status and
+inventory, with no pending request and **no listed models**. No inference trial,
+model installation or fallback was attempted. A later fresh readiness check listed the intended Flash model, with no pending
+request. The actual installed helper and engineering adapter then completed one
+two-turn `deepseek-v4.1-flash:cloud` / thinking-off disposable fixture in 49.361 seconds:
+reviewed replacements, configured verification, independent baseline rejection,
+fresh-source-packet continuation and fixture-driver result acceptance. Exactly two
+native calls were made, without fallback or automatic retry. Original receipts,
+reported usage, partial/accepted helper reviews and cleanup evidence were retained.
+This qualifies one bounded worker journey, not model-side session/KV reuse,
+owner acceptance, every provider, account totals or whole-task billing/savings.
+Deterministic controlled-endpoint/helper/browser evidence remains separate.

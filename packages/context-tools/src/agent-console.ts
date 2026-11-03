@@ -12,6 +12,8 @@ import { RepositoryCoordination } from './repository-coordination.js'
 import { codexHost } from './codex-host.js'
 import { claudeHost } from './claude-host.js'
 import { kimiHost } from './kimi-host.js'
+import { ollamaHost, reviewOllama } from './ollama-host.js'
+import { loadOllamaProfile, ollamaEligibility } from './ollama-profile.js'
 import type { AgentHost, HostFactory, HostRequest, HostEvent } from './agent-host.js'
 
 const exec = promisify(execFile)
@@ -19,7 +21,7 @@ const digest = (value: unknown) => createHash('sha256').update(JSON.stringify(va
 const uuid = z.string().uuid(), bounded = (max: number) => z.string().min(1).max(max).refine(value => !/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/.test(value))
 const base = { requestId: uuid, id: uuid, expectedRevision: z.number().int().nonnegative() }
 export const consoleActionSchema = z.discriminatedUnion('action', [
-  z.object({ action: z.literal('create'), requestId: uuid, root: bounded(2048), title: bounded(160), objective: bounded(8000), host: z.enum(['codex', 'claude', 'kimi']), paths: z.array(bounded(512)).max(32).default([]) }).strict(),
+  z.object({ action: z.literal('create'), requestId: uuid, root: bounded(2048), title: bounded(160), objective: bounded(8000), host: z.enum(['codex', 'claude', 'kimi', 'ollama']), paths: z.array(bounded(512)).max(32).default([]) }).strict(),
   z.object({ ...base, action: z.literal('run'), message: z.string().max(8000).optional() }).strict(),
   z.object({ ...base, action: z.literal('stop') }).strict(),
   z.object({ ...base, action: z.literal('answer'), pendingId: uuid, decision: z.enum(['accept', 'decline', 'cancel']).optional(), answers: z.record(z.string(), z.string().max(4000)).optional() }).strict(),
@@ -30,7 +32,7 @@ type Status = 'draft' | 'starting' | 'running' | 'waiting' | 'stopping' | 'revie
 type Pending = { id: string; wireId: string | number; method: string; params: any; preview?: { changes: unknown[]; hash: string } }
 interface Task {
   id: string; revision: number; eventSequence: number; createdAt: number; updatedAt: number
-  root: string; identity: string; host: 'codex' | 'claude' | 'kimi'; title: string; objective: string; paths: string[]; status: Status
+  root: string; identity: string; host: 'codex' | 'claude' | 'kimi' | 'ollama'; title: string; objective: string; paths: string[]; status: Status
   createHash: string; receipts: { id: string; hash: string }[]; threadId?: string; turnId?: string
   settings?: { model: string; provider: string; approvalPolicy: unknown; sandbox: unknown }
   pending: Pending[]; events: { sequence: number; text: string }[]; eventsTruncated: boolean
@@ -39,7 +41,7 @@ interface Task {
 }
 interface State { version: 1; tasks: Task[] }
 interface Live { host?: AgentHost; finishing: boolean; output: string; outputSequence: number; proposals: Map<string, unknown[]>; stopTimer?: ReturnType<typeof setTimeout> }
-export interface ConsoleOptions { directory: string; codexExecutable?: string; claudeExecutable?: string; kimiExecutable?: string; maxRunSeconds?: number; factory?: HostFactory; allowedRoots?: string[] }
+export interface ConsoleOptions { directory: string; codexExecutable?: string; claudeExecutable?: string; kimiExecutable?: string; ollamaProfile?: string; maxRunSeconds?: number; factory?: HostFactory; allowedRoots?: string[] }
 
 /** Optional local owner controller. The selected external harness owns execution. */
 export class AgentConsole {
@@ -50,20 +52,27 @@ export class AgentConsole {
   private serial: Promise<unknown> = Promise.resolve()
   private closing = false
   private lock?: { path: string; bytes: string }
+  private ollamaUnavailable?: string
   private factories: Partial<Record<Task['host'], HostFactory>>
   private constructor(readonly workspace: string, cache: string, private options: ConsoleOptions) {
     this.store = new WorkspaceStore(options.directory)
     try { this.shared = new WorkspaceStore(cache) } catch (error) { this.store.close(); throw error }
     this.key = workspaceKey('console', workspace)
-    this.factories = { codex: options.factory ?? (options.codexExecutable ? codexHost(options.codexExecutable, options.maxRunSeconds ?? 600) : undefined), claude: options.claudeExecutable ? claudeHost(options.claudeExecutable, options.maxRunSeconds ?? 600) : undefined, kimi: options.kimiExecutable ? kimiHost(options.kimiExecutable, options.maxRunSeconds ?? 600) : undefined }
+    this.factories = { codex: options.factory ?? (options.codexExecutable ? codexHost(options.codexExecutable, options.maxRunSeconds ?? 600) : undefined), claude: options.claudeExecutable ? claudeHost(options.claudeExecutable, options.maxRunSeconds ?? 600) : undefined, kimi: options.kimiExecutable ? kimiHost(options.kimiExecutable, options.maxRunSeconds ?? 600) : undefined, ollama: options.ollamaProfile ? ollamaHost(options.ollamaProfile, options.directory, options.maxRunSeconds ?? 600) : undefined }
   }
   static async open(workspace: string, cache: string, options: ConsoleOptions) {
     const max = options.maxRunSeconds ?? 600
     if (!Number.isInteger(max) || max < 10 || max > 900) throw new Error('console max run must be 10–900 seconds')
     if (process.platform === 'win32' && !options.factory) throw new Error('This host adapter currently requires macOS or Linux')
+    let unavailable: string | undefined
+    if (options.ollamaProfile) {
+      const profile = await loadOllamaProfile(options.ollamaProfile, max)
+      try { await ollamaEligibility(profile) } catch (error) { unavailable = String(error).slice(0, 1000) }
+    }
     const controller = new AgentConsole(workspace, cache, options)
     try {
       await controller.acquire()
+      if (unavailable) { controller.ollamaUnavailable = unavailable; controller.factories.ollama = undefined }
       controller.change(state => {
         for (const task of state.tasks) if (['starting', 'running', 'waiting', 'stopping'].includes(task.status)) {
           task.status = 'unknown'; task.pending = []; task.revision++
@@ -111,7 +120,7 @@ export class AgentConsole {
     return { identity: actual, checkout: live }
   }
   snapshot() {
-    return { enabled: true, roots: this.options.allowedRoots ?? [], hosts: [{ id: 'codex', available: !!this.factories.codex }, { id: 'claude', available: !!this.factories.claude }, { id: 'kimi', available: !!this.factories.kimi }, { id: 'ollama', available: false }], maxRunSeconds: this.options.maxRunSeconds ?? 600, maxActive: 1, active: this.live.size,
+    return { enabled: true, roots: this.options.allowedRoots ?? [], hosts: [{ id: 'codex', available: !!this.factories.codex }, { id: 'claude', available: !!this.factories.claude }, { id: 'kimi', available: !!this.factories.kimi }, { id: 'ollama', available: !!this.factories.ollama, ...(this.ollamaUnavailable ? { reason: this.ollamaUnavailable } : {}) }], maxRunSeconds: this.options.maxRunSeconds ?? 600, maxActive: 1, active: this.live.size,
       tasks: this.state().tasks.map(({ id, revision, title, root, host, status, updatedAt, eventSequence }) => ({ id, revision, title, root, host, status, updatedAt, eventSequence })) }
   }
   task(id: string) { uuid.parse(id); const task = this.state().tasks.find(task => task.id === id); if (!task) throw new Error('Task not found'); const live = this.live.get(id); return { ...task, liveOutput: live?.output ?? '', outputSequence: live?.outputSequence ?? 0 } }
@@ -123,6 +132,7 @@ export class AgentConsole {
         const old = this.state().tasks.find(task => task.id === action.requestId)
         if (old) { if (old.createHash !== hash) throw new Error('Request ID reused with different content'); return old }
         if (!this.factories[action.host]) throw new Error('Selected host is not configured in this console')
+        if (action.host === 'ollama' && (!action.paths.length || action.paths.length > 8 || action.paths.some(path => path === '.' || path.endsWith('/')))) throw new Error('Ollama requires 1–8 explicit source files')
         const root = await this.root(action.root)
         // Reuse the coordination boundary to validate relative path syntax before saving.
         if (action.paths.some(path => path !== '.' && (path.includes('\\') || path.includes(':') || path.startsWith('/') || path.endsWith('//') || posix.normalize(path.replace(/\/$/, '')) !== path.replace(/\/$/, '') || path.split('/').includes('..') || /[\x00-\x1f]/.test(path)))) throw new Error('Intended paths must be relative and cannot traverse')
@@ -187,6 +197,7 @@ export class AgentConsole {
       if (task.status !== 'review' || !task.review || action.reviewHash !== task.review.hash) throw new Error('No matching result is ready for review')
       const audit = await this.audit(task)
       if (audit.hash !== task.review.hash) throw new Error('Checkout or result changed. Review a new run before accepting.')
+      if (task.host === 'ollama') await reviewOllama(this.options.ollamaProfile!, this.options.directory, task.threadId!, task.turnId!, action.decision, task.root)
       return this.record(action, hash, current => { current.status = action.decision === 'accept' ? 'accepted' : 'draft'; if (action.decision === 'accept') current.accepted = { at: Date.now(), hash: audit.hash }; this.log(current, action.decision === 'accept' ? 'Local owner accepted this exact result and checkout snapshot.' : 'Owner requested changes. Enter a follow-up instruction.') })
     })
   }
@@ -195,7 +206,7 @@ export class AgentConsole {
   }
   private async publish(task: Task, state: 'working' | 'blocked' | 'reviewing' | 'done') {
     const coordination = new RepositoryCoordination(this.shared, task.coordId as ReturnType<typeof randomUUID>)
-    const input = { expectedRoot: task.root, slot: 'console-' + task.id, label: ({ codex: 'Codex', claude: 'Claude', kimi: 'Kimi' }[task.host]) + ' / task console', task: task.title, paths: task.paths, state, expectedRevision: task.coordRevision, ttlSeconds: 1800 }
+    const input = { expectedRoot: task.root, slot: 'console-' + task.id, label: ({ codex: 'Codex', claude: 'Claude', kimi: 'Kimi', ollama: 'Ollama' }[task.host]) + ' / task console', task: task.title, paths: task.paths, state, expectedRevision: task.coordRevision, ttlSeconds: 1800 }
     let result
     try { result = await coordination.update(input) }
     catch (error) {
@@ -211,7 +222,7 @@ export class AgentConsole {
     const host = await this.factories[task.host]!(task.root, { event: event => { void this.queue(() => this.event(task.id, event)) }, request: request => { void this.queue(() => this.hostRequest(task.id, request)) }, lost: reason => { void this.lost(task.id, reason) } })
     live.host = host
     if (this.closing || this.live.get(task.id) !== live || live.finishing) { await host.close(); return }
-    const settings = await host.request(task.threadId ? 'thread/resume' : 'thread/start', task.threadId ? { threadId: task.threadId, cwd: task.root, excludeTurns: true } : { cwd: task.root })
+    const settings = await host.request(task.threadId ? 'thread/resume' : 'thread/start', task.threadId ? { threadId: task.threadId, cwd: task.root, excludeTurns: true } : { cwd: task.root, ...(task.host === 'ollama' ? { paths: task.paths } : {}) })
     if (settings.cwd !== task.root || settings.thread?.cwd !== task.root || typeof settings.thread.id !== 'string' || settings.thread.status?.type === 'active') throw new Error('Host thread checkout or state does not match the selected task')
     if (settings.thread.id.length > 512 || typeof settings.model !== 'string' || settings.model.length > 256 || typeof settings.modelProvider !== 'string' || settings.modelProvider.length > 256 || Buffer.byteLength(JSON.stringify([settings.approvalPolicy, settings.sandbox])) > 32768) throw new Error('Invalid host settings response')
     if (task.settings && (settings.model !== task.settings.model || settings.modelProvider !== task.settings.provider)) throw new Error('Saved host model/provider changed. Reconcile configuration before continuing.')
@@ -223,7 +234,7 @@ export class AgentConsole {
     const live = this.live.get(id), task = this.task(id)
     if (!live?.host || live.finishing) return
     if (request.params.threadId !== task.threadId || (task.turnId && request.params.turnId !== task.turnId)) { live.host.reject(request.id); return }
-    if (!(task.host === 'kimi' ? ['kimi/tool/requestApproval', 'item/tool/requestUserInput'] : task.host === 'claude' ? ['claude/tool/requestApproval', 'item/tool/requestUserInput'] : ['item/commandExecution/requestApproval', 'item/fileChange/requestApproval', 'item/tool/requestUserInput']).includes(request.method) || (request.method === 'item/fileChange/requestApproval' && request.params.grantRoot) || (request.method === 'item/tool/requestUserInput' && (!Array.isArray(request.params.questions) || request.params.questions.length > 3 || request.params.questions.some((q: any) => q.isSecret)))) {
+    if (!(task.host === 'ollama' ? ['ollama/tool/requestApproval'] : task.host === 'kimi' ? ['kimi/tool/requestApproval', 'item/tool/requestUserInput'] : task.host === 'claude' ? ['claude/tool/requestApproval', 'item/tool/requestUserInput'] : ['item/commandExecution/requestApproval', 'item/fileChange/requestApproval', 'item/tool/requestUserInput']).includes(request.method) || (request.method === 'item/fileChange/requestApproval' && request.params.grantRoot) || (request.method === 'item/tool/requestUserInput' && (!Array.isArray(request.params.questions) || request.params.questions.length > 3 || request.params.questions.some((q: any) => q.isSecret)))) {
       live.host.reject(request.id); await this.failWithinQueue(id, 'Host requested an unsupported interaction; use its native client to reconcile'); return
     }
     if (Buffer.byteLength(JSON.stringify(request.params)) > 32768 || task.pending.length >= 8) { live.host.reject(request.id); await this.failWithinQueue(id, 'Host request bound exceeded'); return }
