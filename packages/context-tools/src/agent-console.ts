@@ -15,6 +15,7 @@ import { loadOllamaProfile, ollamaEligibility } from './ollama-profile.js'
 import type { AgentHost, HostFactory, HostRequest, HostEvent } from './agent-host.js'
 
 import { createWorktree, verifyWorktree, worktreeLocation, reviewGit, type ConsoleWorktree } from './console-worktrees.js'
+import type { WorkspaceActivityRow } from './workspace-activity-types.js'
 import { consoleAddress, workerSlot, inboxPrompt, noteLimit, type ConsoleNote } from './console-inbox.js'
 const digest = (value: unknown) => createHash('sha256').update(JSON.stringify(value)).digest('hex')
 const uuid = z.string().uuid(), bounded = (max: number) => z.string().min(1).max(max).refine(value => !/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/.test(value))
@@ -38,6 +39,7 @@ interface Task {
   settings?: { model: string; provider: string; approvalPolicy: unknown; sandbox: unknown }
   pending: Pending[]; events: { sequence: number; text: string }[]; eventsTruncated: boolean
   result: string; diff: string; review?: { hash: string; head: string | null; status: string; diff: string; untracked: { name: string; hash: string; text: string }[] }; reviewError?: string
+  observation?: Omit<WorkspaceActivityRow, 'active'>
   isolation?: 'checkout' | 'worktree'; worktree?: ConsoleWorktree; inbox?: ConsoleNote[]; inboxCursor?: number; peerId?: string; overlaps?: { id: string; title: string; paths: string[] }[]
   accepted?: { at: number; hash: string }; coordId: string; coordRevision: number
 }
@@ -241,11 +243,15 @@ export class AgentConsole {
   private record(action: Exclude<Action, { action: 'create' }>, hash: string, update: (task: Task) => void) {
     return this.change(state => { const task = state.tasks.find(task => task.id === action.id)!; update(task); task.revision++; task.updatedAt = Date.now(); task.receipts.push({ id: action.requestId, hash }); task.receipts = task.receipts.slice(-64); return task })
   }
-  private async executionRoot(task: Task) {
+  private async executionCheckout(task: Task) {
     const selected = await this.root(task.root, task.identity)
-    if (task.isolation !== 'worktree') return task.root
+    if (task.isolation !== 'worktree') return selected.checkout
     if (!task.worktree) throw new Error('Managed worktree is not prepared')
-    return (await verifyWorktree(this.options.directory, task.id, task.worktree, selected.checkout.commonDirectory)).root
+    return verifyWorktree(this.options.directory, task.id, task.worktree, selected.checkout.commonDirectory)
+  }
+  private async executionRoot(task: Task) { return (await this.executionCheckout(task)).root }
+  observations(sourceRoot?: string): WorkspaceActivityRow[] {
+    return this.state().tasks.filter(task => task.observation && (!sourceRoot || task.root === sourceRoot)).map(task => ({ ...task.observation!, active: task.observation!.expiresAt > Date.now() && task.observation!.state !== 'done' }))
   }
   /** Mirror addressed notes only; never submit a new turn or approve a tool. */
   async poll() {
@@ -257,7 +263,7 @@ export class AgentConsole {
         try {
           let task = this.task(saved.id)
           const root = await this.executionRoot(task)
-          if (Date.now() - (this.lastRenew.get(task.id) ?? 0) > 300000) await this.publish(task, this.live.has(task.id) ? (task.pending.length ? 'blocked' : 'working') : 'reviewing')
+          if (Date.now() - (this.lastRenew.get(task.id) ?? 0) > 300000) await this.publish(task, this.live.has(task.id) ? (task.pending.length ? 'blocked' : 'working') : (task.status === 'review' ? 'reviewing' : 'blocked'))
           const coordination = new RepositoryCoordination(this.shared, task.coordId as ReturnType<typeof randomUUID>)
           let offset = 0, cursor = task.inboxCursor ?? 0, peer: string | undefined
           // Board bounds are 128 agents / 256 notes. Follow all pages, including
@@ -305,9 +311,9 @@ export class AgentConsole {
       if (this.pollError) throw new Error(this.pollError)
     })
   }
-  private async publish(task: Task, state: 'working' | 'blocked' | 'reviewing' | 'done') {
+  private async publish(task: Task, state: 'working' | 'blocked' | 'reviewing' | 'done', verifiedRoot?: string) {
     const coordination = new RepositoryCoordination(this.shared, task.coordId as ReturnType<typeof randomUUID>)
-    const input = { expectedRoot: task.worktree?.state === 'ready' ? await this.executionRoot(task) : task.root, slot: 'console-' + task.id, label: ({ codex: 'Codex', claude: 'Claude', kimi: 'Kimi', ollama: 'Ollama' }[task.host]) + ' / task console', task: task.title, paths: task.paths, state, expectedRevision: task.coordRevision, ttlSeconds: 1800 }
+    const input = { expectedRoot: verifiedRoot ?? (task.worktree?.state === 'ready' ? await this.executionRoot(task) : task.root), slot: 'console-' + task.id, label: ({ codex: 'Codex', claude: 'Claude', kimi: 'Kimi', ollama: 'Ollama' }[task.host]) + ' / task console', task: task.title, paths: task.paths, state, expectedRevision: task.coordRevision, ttlSeconds: 1800 }
     let result
     try { result = await coordination.update(input) }
     catch (error) {
@@ -316,11 +322,13 @@ export class AgentConsole {
       // but still refuses to overwrite any live/newer row with this identity.
       result = await coordination.update({ ...input, expectedRevision: 0 })
     }
-    this.change(current => { const saved = current.tasks.find(item => item.id === task.id)!; saved.coordRevision = result.agent.revision; saved.overlaps = result.conflicts.map(item => ({ id: item.agentId, title: item.label, paths: item.paths })) }); this.lastRenew.set(task.id, Date.now())
+    const agent = result.agent, info = await lstat(agent.checkout.commonDirectory), board = workspaceKey('board', agent.checkout.commonDirectory + '\0' + info.dev + ':' + info.ino)
+    const observation = { groupId: workspaceKey('activity-group', board), agentId: agent.agentId, label: agent.label, task: agent.task, paths: agent.paths, state: agent.state, revision: agent.revision, checkoutRoot: agent.checkout.root, branch: agent.checkout.branch, head: agent.checkout.head, updatedAt: agent.updatedAt, expiresAt: agent.expiresAt }
+    this.change(current => { const saved = current.tasks.find(item => item.id === task.id)!; saved.coordRevision = result.agent.revision; saved.observation = observation; saved.overlaps = result.conflicts.map(item => ({ id: item.agentId, title: item.label, paths: item.paths })) }); this.lastRenew.set(task.id, Date.now())
   }
   private async launch(task: Task, live: Live, message?: string) {
-    await this.publish(task, 'working')
     const root = await this.executionRoot(task)
+    await this.publish(task, 'working', root)
     const host = await this.factories[task.host]!(root, { event: event => { void this.queue(() => this.event(task.id, event)) }, request: request => { void this.queue(() => this.hostRequest(task.id, request)) }, lost: reason => { void this.lost(task.id, reason) } })
     live.host = host
     if (this.closing || this.live.get(task.id) !== live || live.finishing) { await host.close(); return }
@@ -394,7 +402,7 @@ export class AgentConsole {
     await this.publish(this.task(id), 'done').catch(() => {})
   }
   private async audit(task: Task) {
-    const executionRoot = await this.executionRoot(task), checkout = await describeCheckout(executionRoot)
+    const checkout = await this.executionCheckout(task), executionRoot = checkout.root
     const git = await reviewGit(executionRoot)
     const [status, diff, untrackedNames] = await Promise.all([
       git(['status', '--porcelain=v1', '--untracked-files=all']),

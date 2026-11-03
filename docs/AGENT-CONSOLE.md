@@ -419,6 +419,11 @@ bound to its task's actual working copy, current HEAD/content and result. Use
 selected task. The configured process/time limits apply independently to each
 run; capacity and time bounds are not financial caps.
 
+The lower activity/ticket view includes the console’s own published task metadata,
+including managed worktrees outside the saved workspace. It does not expand
+workspace discovery or expose inbox/source content. These rows remain advisory
+activity reports, not process-liveness evidence.
+
 The task inbox stores notes in the existing encrypted control journal, with a
 128-note bound per task. Owner notes are limited to 1600 characters. An accepted
 task is closed to new owner notes. Agent notes use the existing same-owner

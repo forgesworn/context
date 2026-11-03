@@ -28,6 +28,8 @@ export async function probeConcurrentConsole(cli, inspect = async () => {}) {
       await act(task.id, 'run'); tasks.push(await wait(task.id, t => t.status === 'waiting'))
     }
     assert.equal((await read('snapshot')).active, 2)
+    const observation = await fetch(server.url + 'snapshot').then(response => response.json())
+    assert.equal(observation.tickets.filter(ticket => tasks.some(task => ticket.agents.some(agent => agent.checkoutRoot === task.executionRoot))).length, 2)
     assert.notEqual(tasks[0].executionRoot, tasks[1].executionRoot)
     const workers = []
     for (const task of tasks) {
@@ -43,6 +45,7 @@ export async function probeConcurrentConsole(cli, inspect = async () => {}) {
     assert.ok(received.messages.some(note => note.messageId === id))
     await tool(b.client, 'repository_message', { expectedRoot: b.root, slot: b.slot, recipientAgentId: tasks[1].address, messageId: randomUUID(), text: 'ACK ' + id })
     await wait(tasks[1].id, task => task.inbox.some(note => note.id === id && note.acknowledgedAt))
+    assert.equal(JSON.stringify(await fetch(server.url + 'snapshot').then(response => response.json())).includes('Handover: keep'), false) // existing note is private to the console inbox
     await inspect('handover', { server, f, tasks, read, act, wait, action })
     const before = (await readFile(f.trace, 'utf8')).trim().split('\n').map(JSON.parse), turns = before.filter(row => row.method === 'turn/start' || row.type === 'user').length
     await server.close(); server = undefined; await open()

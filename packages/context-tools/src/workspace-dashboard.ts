@@ -228,7 +228,13 @@ export async function serveWorkspaceDashboard(workspace: string, cacheDirectory:
         if (!pending) pending = readWorkspaceDashboard(workspace, cacheDirectory, options).then(value => { snapshot = value; cachedAt = Date.now(); return value }).finally(() => { pending = undefined })
         await pending
       }
-      const json = JSON.stringify(snapshot)
+      // Explicit control mode contributes only its own published metadata. Do
+      // not widen saved-catalogue discovery or expose task inbox/source content.
+      const additions = controller?.observations(options.repositoryRoot).filter(row => !snapshot.activity.rows.some(existing => existing.agentId === row.agentId && existing.checkoutRoot === row.checkoutRoot)) ?? []
+      const rows = [...additions, ...snapshot.activity.rows]
+      if (rows.length > 500) throw new Error('Combined observations exceed 500 rows; narrow with --repo')
+      const value = additions.length ? { ...snapshot, activity: { ...snapshot.activity, rows }, tickets: [...dashboardTickets(additions, []), ...snapshot.tickets], overlaps: dashboardOverlaps(rows) } : snapshot
+      const json = JSON.stringify(value)
       if (Buffer.byteLength(json) > 2 * 1024 * 1024) throw new Error('snapshot too large')
       response.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' }); response.end(json)
     } catch { fail(503, 'Observation failed. Previous data is stale; check the local cache and explicitly selected files.') }
