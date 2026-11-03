@@ -56,6 +56,9 @@ The plan view follows readiness and blockers beside actual managed-run status.
 Each run remains explicit; owner-recorded passing check evidence and exact result
 review are required before dependent steps become ready. See
 [task plans](TASK-PLANS.md) for worktree integration, recovery and limits.
+Use **Revise requirements** for a linked new contract; previous tasks become
+historical and registered workers receive private change notes with delivery/ACK
+receipts. Running hosts retain their native stop controls.
 
 ## Link an existing registered agent
 

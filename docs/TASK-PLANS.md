@@ -59,11 +59,11 @@ it does not fabricate a model attempt when none was recorded. Reconciliation is
 an owner assertion, not proof of remote cancellation or permission to bypass a
 provider refusal/spending hold.
 
-Plans are immutable task contracts. To change requirements, hosts, files, checks
-or dependencies, save a new plan. This first integration does not propagate a
-revised contract into existing agents, attach arbitrary terminal sessions to plan
-execution, import CLI workflow snapshots, schedule triggers or automatically
-commit/merge branches. The existing workflow CLI/API remains available separately.
+Each revision is an immutable task contract. Use **Revise requirements** to change
+instructions, hosts, files, checks, dependencies, title or concurrency. See the
+revision workflow below. Arbitrary terminal-session attachment, CLI workflow
+snapshot import, scheduled triggers and automatic commit/merge remain outside
+this console. The existing workflow CLI/API remains available separately.
 
 Up to 16 plans share the existing 64-task journal. One save is limited to the
 existing 16 KiB same-origin JSON mutation bound. Saves retain their original UUID
@@ -72,10 +72,65 @@ that same request and cannot create a second plan or launch a host. The journal'
 existing retention bounds apply to task output and action receipts.
 
 Existing version-1 console journals continue to open. Saving the first plan
-atomically promotes that control journal to version 2. Older consoles refuse it
+atomically promotes that control journal to version 2. Consoles before 0.22 refuse it
 rather than running plan steps without the new gates. Keep the current console
 for that journal; rollback requires a coherent earlier private backup, not removal
 of plan metadata. The workspace cache and external inbox formats are unchanged.
+
+## Change requirements and notify workers
+
+Open a current plan and choose **Revise requirements**. The form copies its steps;
+edit the required fields and explain the change. The checkout is fixed. Saving
+creates a new immutable contract with fresh draft tasks and links both revisions
+in one encrypted transaction. A no-op, changed root, stale base or second successor
+is refused. A lost save response retains the exact UUID/payload for explicit retry;
+retry returns the recorded revision rather than creating another one.
+
+The view names directly changed steps and their downstream dependants, considering
+the old and new dependency graphs. Changing the title or width affects the whole
+plan. **All** older-revision results become historical, including unchanged steps:
+acceptance is not silently carried across a contract change. The new host receives
+bounded prior result and branch references so it can inspect and reuse applicable
+work, then produce fresh evidence against the new requirements. Source branches,
+files, receipts and earlier workflow events are preserved.
+
+Previous revisions refuse new turns, owner acceptance and console approval grants.
+Decline, cancel, stop, inbox reading and outcome reconciliation remain available.
+A revision racing native startup is checked again immediately before turn dispatch.
+Delayed older browser responses cannot restore superseded approval controls. The
+new revision never starts a host or replays a turn automatically.
+
+Each prior started, non-accepted task gets a private change note when its inbox has
+capacity. It includes the new contract identity, impact, reason and instructions to
+preserve work and report status. The note grants no new authority and does not
+retarget a running turn. Existing registered workers receive it through their exact
+worktree's addressed coordination inbox; only that delivered peer's `ACK <UUID>`
+counts as acknowledgement. The same stored UUID reconciles delivery retries.
+
+**Queued**, **Stored in shared inbox** and **Acknowledged** remain distinct. No prior
+run and full inbox are explicit outcomes; retained notes are never overwritten to
+make room. Unregistered workers, including raw Ollama text inference, cannot receive
+asynchronous notes. A new explicit Ollama task receives the revised prompt through
+its host and retains that helper's smaller combined packet/prompt bounds.
+
+Running native work is not automatically cancelled. Review its status and use
+**Stop run** or the original host where appropriate. An acknowledgement does not
+prove the worker stopped, adopted the requirements or obtained new permission.
+Started older tasks retain their worktrees and consume normal console capacity
+until their actual host ends. Their earlier acceptance cannot satisfy new steps.
+
+The revision view shows previous/newer links and defaults to current revisions;
+**Show plan revisions → All revisions** includes history. Each saved revision
+counts against the existing 16-plan/64-task bounds. Its new immutable contract has
+its own explicit attempt/start window; an unchanged contract cannot be resaved
+merely to reset the budget. Revision metrics describe their own events, not a
+whole-task savings claim.
+
+The first revision atomically promotes the control journal to version 3. Consoles
+before 0.23 refuse that journal instead of ignoring the supersession guards. New
+ordinary plans retain version 3 thereafter; version-1 and version-2 journals still
+open in the new console. Workspace cache, external-inbox and MCP formats are
+unchanged. No signing keys, raw host history or arbitrary process control is read.
 
 ## Data and evidence
 
@@ -93,7 +148,14 @@ Usage and whole-task cost remain unknown here; owner check evidence and a local
 acceptance label do not establish monetary savings. Use the existing
 [usage receipts](DAILY-USAGE.md) for complete-task accounting.
 
-Verification: `console-workflow.test.ts` covers atomic/private saves, invalid
+Verification: `plan-revisions.test.ts` covers change impact, stale contracts,
+startup races, old acceptance/approvals, historical receipts, exact peer ACKs,
+full inboxes and retained journal version. The independent package/browser
+revision probes add real stdio hosts, an MCP peer, executed fixture regressions,
+lost saves, delayed UI responses and restart/history. These are deterministic
+fixtures, not new four-model adoption qualification.
+
+`console-workflow.test.ts` covers atomic/private saves, invalid
 graphs, dependencies, check identity/acceptance, parallel worktrees, restart,
 reconciliation and source changes before dispatch. The mandatory independent
 package probe runs an actual HTTP server and stdio protocol-double processes,

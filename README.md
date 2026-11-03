@@ -28,7 +28,8 @@ Live worker availability requires an eligible model on that endpoint.
 dependency/review checks, deterministic result reduction and resumable planning.
 The coding host retains execution, permissions and model selection. The local
 dashboard's [task plans](docs/TASK-PLANS.md) connect dependencies, assigned hosts,
-check evidence and owner review to explicit managed runs.
+check evidence and owner review to explicit managed runs. Versioned requirement
+changes preserve earlier work, flag old results and notify registered workers.
 
 **Use Context on your own machine and repositories:** follow the
 [Codex and Claude Code setup guide](docs/GETTING-STARTED.md), including current
