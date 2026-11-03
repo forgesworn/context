@@ -253,6 +253,10 @@ export class AgentConsole {
   observations(sourceRoot?: string): WorkspaceActivityRow[] {
     return this.state().tasks.filter(task => task.observation && (!sourceRoot || task.root === sourceRoot)).map(task => ({ ...task.observation!, active: task.observation!.expiresAt > Date.now() && task.observation!.state !== 'done' }))
   }
+  /** Associations from this console's retained task identities, never agent labels. */
+  observationProjects(sourceRoot?: string) {
+    return this.state().tasks.filter(task => task.observation && (!sourceRoot || task.root === sourceRoot)).map(task => ({sourceRoot: task.root, checkoutRoot: task.observation!.checkoutRoot, agentId: task.observation!.agentId}))
+  }
   /** Mirror addressed notes only; never submit a new turn or approve a tool. */
   async poll() {
     return this.queue(async () => {

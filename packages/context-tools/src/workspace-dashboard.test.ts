@@ -45,6 +45,19 @@ it('keeps selected Girnel tickets visible before an agent publishes, without inf
   expect(cards[0].checkoutRoots).toEqual(['/workspace/project'])
 })
 
+it('uses only the recorded console task association for source-project bindings and project filters', () => {
+  const worker = row({checkoutRoot: '/private/control/task-tree'}), projects = [{sourceRoot: '/workspace/project', checkoutRoot: worker.checkoutRoot, agentId: worker.agentId}]
+  const selected = dashboardTickets([worker], [link()], projects)
+  expect(selected).toHaveLength(1); expect(selected[0].agents[0].checkoutRoot).toBe(worker.checkoutRoot)
+  expect(selected[0].checkoutRoots).toEqual(['/workspace/project', worker.checkoutRoot])
+  // A different actor or execution root cannot inherit this association.
+  expect(dashboardTickets([row({...worker, agentId: 'other/task'})], [link()], projects)).toHaveLength(2)
+  expect(dashboardTickets([row({...worker, checkoutRoot: '/unrelated'})], [link()], projects)).toHaveLength(2)
+  const explicit = link({checkoutRoot: worker.checkoutRoot, cardId: 'exact-worktree-card'})
+  const exact = dashboardTickets([worker], [link(), explicit], projects).find(ticket => ticket.agents.length)!
+  expect(exact.girnel!.cardId).toBe(explicit.cardId)
+})
+
 async function fixture() {
   const temporary = await realpath(await mkdtemp(join(tmpdir(), 'z1p-dashboard-')))
   cleanups.push(() => rm(temporary, { recursive: true, force: true }))

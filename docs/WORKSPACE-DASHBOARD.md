@@ -107,7 +107,13 @@ z1p workspace dashboard /absolute/workspace --cache-dir /absolute/private/cache 
 
 Use actual board/card IDs and the exact published Z1P `agentId`, not matching
 titles or agent display names. An agent connection/slot can change after a
-restart, requiring a new explicit binding. One binding is allowed per checkout
+restart, requiring a new explicit binding. For a console-managed isolated task,
+use its saved source project as `checkoutRoot` and its exact console agent ID.
+Z1P 0.20.1 follows the console's retained task association into its execution
+worktree. The observation retains the actual execution root, branch and HEAD;
+project filtering also includes the saved source project. Other agents still
+need an exact checkout/agent binding. Shared names or Git ancestry grant no
+association. One binding is allowed per checkout
 and agent ID; several agents may bind to the same card. Those observations group
 into one ticket, with blockers taking precedence over working/reviewing lanes.
 The newest supplied metadata supplies its title and Girnel column. Card status
@@ -138,8 +144,9 @@ disables review. No feed is contacted before connecting.
 
 The feed shares only that card's explicitly bound task observations: agent IDs,
 labels/task text, checkout names and opaque checkout IDs, branches/HEADs, relative
-paths, reported states and lease times. It omits absolute checkout roots, source,
-checkpoints, inboxes and console/control state. The 256 KiB version-1 envelope is
+paths, reported states and lease times. It omits dedicated absolute checkout-root and source fields,
+checkpoints, inboxes and console/control state. Selected task text and labels
+are shared as supplied; they are not a secret scrubber. The 256 KiB version-1 envelope is
 `z1p-girnel-observation`; partial workspace observations remain labelled partial.
 It uses a separate random-server-secret capability and exact configured Girnel
 origin. It cannot invoke console actions. Do not share the dashboard/control URL.
