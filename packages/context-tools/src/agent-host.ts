@@ -9,6 +9,7 @@ export interface AgentHost {
   request(method: string, params: unknown): Promise<any>
   respond(id: string | number, result: unknown): void
   reject(id: string | number): void
+  validateResponse?(id: string | number, result: unknown): void
   close(): Promise<void>
 }
 export type HostFactory = (root: string, callbacks: { event: (event: HostEvent) => void; request: (request: HostRequest) => void; lost: (reason: string) => void }) => Promise<AgentHost>
