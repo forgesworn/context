@@ -442,6 +442,8 @@ For native hosts with working repository tools, each isolated turn supplies:
   then poll its own addressed notes between steps and keep its lease current.
 - The acknowledgement format `ACK <message UUID>`, sent with
   `repository_message` to the task's console endpoint after reading a note.
+  Use the registered `worker-<task UUID>` as sender `slot`, the exact working
+  copy as `expectedRoot` and the console address as `recipientAgentId`.
 
 The controller polls every five seconds and renews its own advisory activity.
 It finds the worker only by the exact slot **and** canonical checkout; ambiguous
@@ -489,5 +491,7 @@ Git worktrees and file edits/tests, two installed repository MCP clients sending
 and acknowledging a handover, restart while both runs await approval, no replay,
 explicit saved-thread continuation and two regressions that independently reject
 the original content. Browser checks cover the shared inbox/review filters and
-mobile layout. This proves the controller/transport contracts; live-model
-registration/polling under simultaneous load is a separate qualification.
+mobile layout. This proves the controller/transport contracts. The dated
+[live collaboration pilot](CONSOLE-COLLABORATION-ACCEPTANCE.md) separately records
+actual Codex/Claude/Kimi handovers, queued Ollama continuation, the observed Kimi
+sender-slot correction and the limits of that qualification.
