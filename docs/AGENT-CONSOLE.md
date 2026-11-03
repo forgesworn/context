@@ -10,8 +10,10 @@ Adapters are **Codex app-server** (qualified on CLI 0.166.0), **Claude Code**
 (ACP1 stdio; qualification below). An optional **bounded Ollama worker** lane
 uses an installed worker helper and explicit operator profile; it has no native
 coding-agent session or autonomous tools. See its separate contract below.
-Existing independent terminal/app sessions are not attached or
-imported. Oathrun/KithMoot execution routes and their grants remain separate.
+Existing independent sessions that publish Z1P activity can be explicitly linked
+for reported status and private addressed notes. Their native conversation,
+execution, approvals and stop controls stay in their original host.
+Oathrun/KithMoot execution routes and their grants remain separate.
 
 ## Start an explicit control session
 
@@ -46,6 +48,62 @@ header for mutations. Browser input cannot select an executable, supply shell
 arguments, change provider/policy, resume arbitrary thread IDs or signal arbitrary
 PIDs. The operator selects the executable at launch. No remote listener, hosted
 service, telemetry or new account is introduced.
+
+## Link an existing registered agent
+
+For an inbox without launching new hosts, provider executables are optional:
+
+```sh
+z1p workspace dashboard /absolute/workspace --cache-dir /absolute/private/cache \
+  --control-dir /absolute/private/task-console
+```
+
+1. Under **Existing agent sessions**, choose **Link an existing agent**, select a
+   saved project, then its active registered agent. Review the task, exact agent
+   ID and checkout before linking. The dashboard does not scan terminal history,
+   native session databases, credentials or arbitrary processes.
+2. Follow reported state, intended paths, checkout, branch and HEAD. The link pins
+   the exact registration and verified Git worktree, including a registered
+   worktree outside the saved catalogue. Names do not authenticate providers.
+   An expired lease, moved checkout, replaced Git identity or new registration
+   requires review and, where appropriate, explicit reselection. A lease is not
+   process liveness; reported finished is not acceptance.
+3. Send a short note through the private inbox. **Saved locally**, **Stored in
+   shared inbox** and **Acknowledged by agent** are separate receipts. Storage
+   does not establish reading or execution. The native host must poll
+   `repository_coordination` and reply using `repository_message` to the displayed
+   reply address. To acknowledge an owner note, send `ACK <message UUID>` from the
+   linked activity slot. **Mark agent note read** records only the owner's local
+   acknowledgement. Notes are untrusted task data and cannot grant new authority.
+4. The inbox and exact reply address survive a dashboard restart. Polling resumes
+   while the dashboard runs; active registrations are required for delivery.
+   Unknown HTTP outcomes retain the original request UUID for explicit retry or
+   reconciliation. There is no background daemon or offline delivery guarantee.
+5. **Remove link and local notes** deletes this local inbox and releases its
+   sender lease. It neither stops nor changes the external agent. Already shared
+   coordination notes retain their normal seven-day lifetime and cannot be recalled.
+
+This works through the shared repository protocol in Codex, Claude and Kimi.
+An Ollama coding host can use the same tools. For direct Ollama text workers, the
+host represents activity and forwards notes into the next bounded prompt; raw
+inference does not discover tools or receive asynchronous interruptions.
+No new model routing is introduced. The original host controls any context it
+submits to its provider. Linked agents do not consume managed-run capacity.
+
+The controller checks linked registrations every five seconds; the visible
+console polls every three seconds. Failures and old observations disable sending.
+Up to 32 links, 128 notes per link and 128 action receipts per link are retained;
+a full inbox refuses additional entries rather than overwriting retained notes.
+Private note text lives in the encrypted control journal and addressed coordination
+store. It is excluded from the workspace observation snapshot and Girnel feed.
+The control URL can read and send these notes: keep it private even in inbox-only
+mode. The read-only dashboard has no inbox API.
+
+The package/browser acceptance probe exercises four independent native MCP clients,
+HTTP boundaries, private notes and explicit ACKs, restart, lost-response retry,
+registered-worktree projection, inert untrusted text and stale-response fencing.
+Client labels in that probe do not establish four models' polling behaviour or
+control over arbitrary native sessions.
 
 ## Task journey
 

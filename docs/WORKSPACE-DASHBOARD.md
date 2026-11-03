@@ -1,10 +1,10 @@
 # Local workspace dashboard
 
-For task entry and managed Codex/Claude/Kimi host adapters, see the optional
-[local task console](AGENT-CONSOLE.md). Explicit `--control-dir` mode enables task
-control with operator-configured `--codex`, `--claude`, `--kimi` and/or
-`--ollama-profile ABS`;
-the default described below stays read-only.
+For task entry, managed Codex/Claude/Kimi/Ollama hosts and private notes to
+existing registered agents, see the optional [local task console](AGENT-CONSOLE.md).
+Explicit `--control-dir` mode enables external-agent linking and inboxes. Add
+operator-configured `--codex`, `--claude`, `--kimi` and/or `--ollama-profile ABS`
+to launch owned tasks as well. The default described below stays read-only.
 
 Use the local ticket viewer to see reported agent work, shared file claims and
 saved handovers across the **existing saved workspace catalogue**. It runs as an

@@ -23,9 +23,10 @@ export class RepositoryCoordination {
  constructor(readonly store:WorkspaceStore,readonly sessionId=randomUUID()){}
  private id(slot:string){return this.sessionId+'/'+slot}
  private async location(root:string){const checkout=await describeCheckout(root),identity=await lstat(checkout.commonDirectory);return {checkout,key:workspaceKey('board',checkout.commonDirectory+'\0'+identity.dev+':'+identity.ino)}}
- async update(input:z.infer<typeof updateSchema>){
+ async update(input:z.infer<typeof updateSchema>,groupId?:string){
   input=updateSchema.parse(input)
   const {checkout,key}=await this.location(input.expectedRoot),agentId=this.id(input.slot),now=Date.now()
+  if(groupId!==undefined&&workspaceKey('activity-group',key)!==groupId)throw new Error('coordination Git identity changed; reselect the intended repository')
   return this.store.transaction(()=>{
    const board=this.store.get<Board>(key)??empty()
    for(const [id,agent] of Object.entries(board.agents))if(agent.expiresAt<now-DAY)delete board.agents[id]
@@ -39,9 +40,11 @@ export class RepositoryCoordination {
    return {agent,boardRevision:board.revision,conflicts:conflicts.slice(0,16),conflictsTruncated:conflicts.length>16,advisory:true}
   })
  }
- async read(input:z.infer<typeof readSchema>){
+ async read(input:z.infer<typeof readSchema>,groupId?:string){
   input=readSchema.parse(input)
-  const {key}=await this.location(input.expectedRoot),board=this.store.get<Board>(key)??empty(),now=Date.now()
+  const {key}=await this.location(input.expectedRoot)
+  if(groupId!==undefined&&workspaceKey('activity-group',key)!==groupId)throw new Error('coordination Git identity changed; reselect the intended repository')
+  const board=this.store.get<Board>(key)??empty(),now=Date.now()
   const agents=Object.values(board.agents).filter(a=>a.updatedAt>now-DAY||a.expiresAt>now).sort((a,b)=>a.agentId.localeCompare(b.agentId))
   const notes=board.notes.filter(n=>n.to.startsWith(this.sessionId+'/')&&n.sequence>input.afterMessage&&n.sentAt>now-7*DAY)
   const result={sessionId:this.sessionId,boardRevision:board.revision,agents:[] as Array<Activity&{active:boolean}>,messages:[] as Note[],nextOffset:input.offset,nextMessage:input.afterMessage,agentsComplete:false,messagesComplete:false,minimumBytesRequired:0,advisory:true}
@@ -55,14 +58,16 @@ export class RepositoryCoordination {
   result.messagesComplete=result.messages.length===notes.length
   return result
  }
- async send(input:z.infer<typeof messageSchema>){
+ async send(input:z.infer<typeof messageSchema>,recipientCheckout?:string,groupId?:string){
   input=messageSchema.parse(input)
   const {key}=await this.location(input.expectedRoot),from=this.id(input.slot),now=Date.now()
+  if(groupId!==undefined&&workspaceKey('activity-group',key)!==groupId)throw new Error('coordination Git identity changed; reselect the intended repository')
   return this.store.transaction(()=>{
    const board=this.store.get<Board>(key)??empty()
    const old=board.notes.find(n=>n.from===from&&n.messageId===input.messageId)
    if(old){if(old.to!==input.recipientAgentId||old.text!==input.text)throw new Error('message ID reused with different content');return {message:old,duplicate:true}}
    if(!Object.hasOwn(board.agents,from)||!Object.hasOwn(board.agents,input.recipientAgentId))throw new Error('sender and recipient must first publish activity in this repository')
+    if(recipientCheckout!==undefined&&board.agents[input.recipientAgentId].checkout.root!==recipientCheckout)throw new Error('recipient checkout changed; review the selected agent before sending')
    if(board.agents[from].expiresAt<=now||board.agents[input.recipientAgentId].expiresAt<=now||board.agents[input.recipientAgentId].state==='done')throw new Error('sender or recipient lease is inactive; read current activity before sending')
    board.notes=board.notes.filter(n=>n.sentAt>now-7*DAY)
    if(board.notes.length>=256)throw new Error('message capacity reached; notes are retained for seven days')
