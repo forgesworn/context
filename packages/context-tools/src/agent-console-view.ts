@@ -1,9 +1,10 @@
 export const consoleStyle = `#managed-console{overflow-wrap:anywhere;border:1px solid #c5d2bf;border-radius:10px;background:#edf0e4;padding:20px;margin-bottom:25px}#managed-console h2{margin-top:0}#task-form{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12px}#task-form label{min-width:0;display:grid;gap:4px;font-size:13px;font-weight:650}#task-form .wide{grid-column:1/-1}textarea{font:inherit;width:100%;resize:vertical;min-height:80px;padding:10px;border:1px solid #a8b4ab;border-radius:5px;background:#fffefa;color:inherit}.console-grid{display:grid;grid-template-columns:minmax(200px,30%) 1fr;gap:20px;margin-top:20px;min-width:0}.console-grid>*{min-width:0}#task-list button{display:block;width:100%;text-align:left;margin-bottom:8px;font-weight:450}#task-detail pre{white-space:pre-wrap;overflow-wrap:anywhere;max-height:360px;overflow:auto;padding:12px;background:#fffefa;border:1px solid #d3dccb;font:12px/1.5 ui-monospace,monospace}#task-detail button{margin:6px 8px 6px 0}#task-detail fieldset{border:1px solid #a8b4ab;padding:12px;margin:12px 0}#task-detail label{display:block}#task-detail input{margin:4px 0 10px}#task-message{color:#8c3e22;overflow-wrap:anywhere}@media(max-width:750px){#task-form,.console-grid{grid-template-columns:minmax(0,1fr)}#task-form .wide{grid-column:auto}}`
-export const consoleShell = `<section id="managed-console" aria-labelledby="managed-heading"><h2 id="managed-heading">Managed tasks</h2><p>Start work here, follow its progress and review the result. The installed host keeps its model, account and execution policy.</p><details id="new-task" open><summary>New task</summary><form id="task-form"><label>Checkout<select id="task-root" required></select></label><label>Host<select id="task-host"><option value="codex" disabled>Codex · not configured</option><option value="claude" disabled>Claude · not configured</option><option disabled>Kimi · adapter pending</option><option disabled>Ollama · adapter pending</option></select></label><label class="wide">Task title<input id="task-title" maxlength="160" required></label><label class="wide">What should the agent do?<textarea id="task-objective" maxlength="8000" required></textarea></label><label class="wide">Intended files or directories (optional, one per line)<textarea id="task-paths" rows="2"></textarea></label><div class="wide"><button type="submit">Save task</button> <span id="console-bound" class="muted"></span></div></form></details><p id="task-message" role="status" aria-live="polite"></p><div class="console-grid"><nav id="task-list" aria-label="Saved managed tasks"></nav><section id="task-detail" aria-label="Selected task"><p>Select a task or save a new one.</p></section></div></section>`
+export const consoleShell = `<section id="managed-console" aria-labelledby="managed-heading"><h2 id="managed-heading">Managed tasks</h2><p>Start work here, follow its progress and review the result. The installed host keeps its model, account and execution policy.</p><details id="new-task" open><summary>New task</summary><form id="task-form"><label>Checkout<select id="task-root" required></select></label><label>Host<select id="task-host" required><option value="codex" disabled>Codex · not configured</option><option value="claude" disabled>Claude · not configured</option><option value="kimi" disabled>Kimi · not configured</option><option disabled>Ollama · adapter pending</option></select></label><label class="wide">Task title<input id="task-title" maxlength="160" required></label><label class="wide">What should the agent do?<textarea id="task-objective" maxlength="8000" required></textarea></label><label class="wide">Intended files or directories (optional, one per line)<textarea id="task-paths" rows="2"></textarea></label><div class="wide"><button type="submit">Save task</button> <span id="console-bound" class="muted"></span></div></form></details><p id="task-message" role="status" aria-live="polite"></p><div class="console-grid"><nav id="task-list" aria-label="Saved managed tasks"></nav><section id="task-detail" aria-label="Selected task"><p>Select a task or save a new one.</p></section></div></section>`
 
 export function consoleClient() {
   const el = (id: string) => document.getElementById(id)!
   const node = (tag: string, text = '') => { const value = document.createElement(tag); value.textContent = text; return value }
+  const hostLabels: Record<string, string> = { codex: 'Codex', claude: 'Claude', kimi: 'Kimi', ollama: 'Ollama' }
   const statuses: Record<string, string> = { draft: 'Saved', starting: 'Starting', running: 'Running', waiting: 'Needs your answer', stopping: 'Stopping', review: 'Ready for your review', accepted: 'Accepted locally', cancelled: 'Interrupted by host', failed: 'Host reported failure', unknown: 'Needs reconciliation' }
   let selected = '', last = '', busy = false, current: any, active = 0
   const drafts = new Map<string, string>()
@@ -32,12 +33,25 @@ export function consoleClient() {
       const box = node('fieldset'); box.append(node('legend', pending.method === 'item/tool/requestUserInput' ? 'The host has a question' : 'Host approval request'))
       // Full requested scope is visible; the client offers only one-operation decisions.
       if (pending.method === 'item/tool/requestUserInput') {
-        const answers: Record<string, HTMLInputElement> = {}
+        const answers: Record<string, () => string> = {}
+        if (pending.params.message) box.append(node('p', pending.params.message))
         for (const question of pending.params.questions ?? []) {
-          const label = node('label', question.question), input = document.createElement('input'); input.maxLength = 4000; label.append(input); box.append(label); answers[question.id] = input
+          if (question.valueType === 'array') {
+            const choices = node('fieldset'); choices.append(node('legend', question.question))
+            const inputs: HTMLInputElement[] = []
+            for (const option of question.options) { const label = node('label', option.label + (option.description ? ': ' + option.description : '')), input = document.createElement('input'); input.type = 'checkbox'; input.value = option.label; label.prepend(input); choices.append(label); inputs.push(input) }
+            box.append(choices); answers[question.id] = () => JSON.stringify(inputs.filter(input => input.checked).map(input => input.value))
+          } else {
+            const label = node('label', question.question)
+            const input = question.valueType === 'choice' ? document.createElement('select') : document.createElement('input')
+            if (input instanceof HTMLSelectElement) { input.add(new Option('Choose an answer', '')); for (const option of question.options) input.add(new Option(option.label, option.label)) }
+            else input.maxLength = question.maxLength ?? 4000
+            label.append(input); box.append(label); answers[question.id] = () => input.value
+          }
           if (question.options) box.append(node('p', question.options.map((o: any) => o.label + ': ' + o.description).join(' · ')))
         }
-        box.append(button('Send answers', () => taskAction('answer', { pendingId: pending.id, answers: Object.fromEntries(Object.entries(answers).map(([id, input]) => [id, input.value])) })))
+        box.append(button('Send answers', () => taskAction('answer', { pendingId: pending.id, answers: Object.fromEntries(Object.entries(answers).map(([id, value]) => [id, value()])) })))
+        if (pending.params.cancellable) { box.append(button('Decline question', () => taskAction('answer', { pendingId: pending.id, decision: 'decline' })), button('Cancel question', () => taskAction('answer', { pendingId: pending.id, decision: 'cancel' }))) }
       } else {
         if (pending.params.tool) box.append(node('h4', 'Requested tool: ' + pending.params.tool), node('pre', JSON.stringify(pending.params.input, null, 2)))
         if (pending.params.reason) box.append(node('p', pending.params.reason))
@@ -75,10 +89,10 @@ export function consoleClient() {
       const roots = el('task-root') as HTMLSelectElement
       if (!roots.options.length) for (const root of snapshot.roots) roots.add(new Option(root, root))
       const hostSelect = el('task-host') as HTMLSelectElement
-      for (const option of Array.from(hostSelect.options)) { const host = snapshot.hosts.find((host: any) => host.id === option.value); if (host) { option.disabled = !host.available; option.textContent = option.value === 'codex' ? 'Codex' : 'Claude'; if (!host.available) option.textContent += ' · not configured' } }
-      if (hostSelect.selectedOptions[0]?.disabled) { const first = Array.from(hostSelect.options).find(option => !option.disabled); if (first) hostSelect.value = first.value }
+      for (const option of Array.from(hostSelect.options)) { const host = snapshot.hosts.find((host: any) => host.id === option.value); if (host) { option.disabled = !host.available; option.textContent = hostLabels[option.value]; if (!host.available) option.textContent += ' · not configured' } }
+      if (!hostSelect.selectedOptions[0] || hostSelect.selectedOptions[0].disabled) { const first = Array.from(hostSelect.options).find(option => !option.disabled); if (first) hostSelect.value = first.value }
       el('console-bound').textContent = 'One active run · ' + snapshot.maxRunSeconds + ' seconds maximum per host process'
-      el('task-list').replaceChildren(...snapshot.tasks.map((task: any) => button(task.title + ' · ' + (task.host === 'claude' ? 'Claude · ' : '') + (statuses[task.status] ?? task.status), () => { selected = task.id; last = ''; void refresh() })))
+      el('task-list').replaceChildren(...snapshot.tasks.map((task: any) => button(task.title + ' · ' + (task.host !== 'codex' ? hostLabels[task.host] + ' · ' : '') + (statuses[task.status] ?? task.status), () => { selected = task.id; last = ''; void refresh() })))
       if (selected) {
         const requested = selected, task = await json('task/' + selected), signature = task.id + ':' + task.revision + ':' + task.eventSequence + ':' + task.outputSequence
         if (requested !== selected) return

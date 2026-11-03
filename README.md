@@ -19,8 +19,8 @@ overlapping paths, context health and checkpoint summaries, with explicit Girnel
 card links. Read-only, loopback-only; no ticket writes or automatic acceptance.
 
 [Local task console](docs/AGENT-CONSOLE.md): explicitly enable task entry, a
-managed Codex or Claude host session, approvals/questions, result review and saved
-conversation continuation. Kimi and Ollama execution adapters remain pending.
+managed Codex, Claude or Kimi host session, approvals/questions, result review and
+saved conversation continuation. Ollama execution remains pending.
 
 [Bounded host workflows](docs/HOST-WORKFLOWS.md): optional local task contracts,
 dependency/review checks, deterministic result reduction and resumable planning.

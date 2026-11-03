@@ -11,6 +11,7 @@ import { describeCheckout, gitEnvironment, type WorkspaceCatalogue } from './wor
 import { RepositoryCoordination } from './repository-coordination.js'
 import { codexHost } from './codex-host.js'
 import { claudeHost } from './claude-host.js'
+import { kimiHost } from './kimi-host.js'
 import type { AgentHost, HostFactory, HostRequest, HostEvent } from './agent-host.js'
 
 const exec = promisify(execFile)
@@ -18,7 +19,7 @@ const digest = (value: unknown) => createHash('sha256').update(JSON.stringify(va
 const uuid = z.string().uuid(), bounded = (max: number) => z.string().min(1).max(max).refine(value => !/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/.test(value))
 const base = { requestId: uuid, id: uuid, expectedRevision: z.number().int().nonnegative() }
 export const consoleActionSchema = z.discriminatedUnion('action', [
-  z.object({ action: z.literal('create'), requestId: uuid, root: bounded(2048), title: bounded(160), objective: bounded(8000), host: z.enum(['codex', 'claude']), paths: z.array(bounded(512)).max(32).default([]) }).strict(),
+  z.object({ action: z.literal('create'), requestId: uuid, root: bounded(2048), title: bounded(160), objective: bounded(8000), host: z.enum(['codex', 'claude', 'kimi']), paths: z.array(bounded(512)).max(32).default([]) }).strict(),
   z.object({ ...base, action: z.literal('run'), message: z.string().max(8000).optional() }).strict(),
   z.object({ ...base, action: z.literal('stop') }).strict(),
   z.object({ ...base, action: z.literal('answer'), pendingId: uuid, decision: z.enum(['accept', 'decline', 'cancel']).optional(), answers: z.record(z.string(), z.string().max(4000)).optional() }).strict(),
@@ -29,7 +30,7 @@ type Status = 'draft' | 'starting' | 'running' | 'waiting' | 'stopping' | 'revie
 type Pending = { id: string; wireId: string | number; method: string; params: any; preview?: { changes: unknown[]; hash: string } }
 interface Task {
   id: string; revision: number; eventSequence: number; createdAt: number; updatedAt: number
-  root: string; identity: string; host: 'codex' | 'claude'; title: string; objective: string; paths: string[]; status: Status
+  root: string; identity: string; host: 'codex' | 'claude' | 'kimi'; title: string; objective: string; paths: string[]; status: Status
   createHash: string; receipts: { id: string; hash: string }[]; threadId?: string; turnId?: string
   settings?: { model: string; provider: string; approvalPolicy: unknown; sandbox: unknown }
   pending: Pending[]; events: { sequence: number; text: string }[]; eventsTruncated: boolean
@@ -38,7 +39,7 @@ interface Task {
 }
 interface State { version: 1; tasks: Task[] }
 interface Live { host?: AgentHost; finishing: boolean; output: string; outputSequence: number; proposals: Map<string, unknown[]>; stopTimer?: ReturnType<typeof setTimeout> }
-export interface ConsoleOptions { directory: string; codexExecutable?: string; claudeExecutable?: string; maxRunSeconds?: number; factory?: HostFactory; allowedRoots?: string[] }
+export interface ConsoleOptions { directory: string; codexExecutable?: string; claudeExecutable?: string; kimiExecutable?: string; maxRunSeconds?: number; factory?: HostFactory; allowedRoots?: string[] }
 
 /** Optional local owner controller. The selected external harness owns execution. */
 export class AgentConsole {
@@ -54,7 +55,7 @@ export class AgentConsole {
     this.store = new WorkspaceStore(options.directory)
     try { this.shared = new WorkspaceStore(cache) } catch (error) { this.store.close(); throw error }
     this.key = workspaceKey('console', workspace)
-    this.factories = { codex: options.factory ?? (options.codexExecutable ? codexHost(options.codexExecutable, options.maxRunSeconds ?? 600) : undefined), claude: options.claudeExecutable ? claudeHost(options.claudeExecutable, options.maxRunSeconds ?? 600) : undefined }
+    this.factories = { codex: options.factory ?? (options.codexExecutable ? codexHost(options.codexExecutable, options.maxRunSeconds ?? 600) : undefined), claude: options.claudeExecutable ? claudeHost(options.claudeExecutable, options.maxRunSeconds ?? 600) : undefined, kimi: options.kimiExecutable ? kimiHost(options.kimiExecutable, options.maxRunSeconds ?? 600) : undefined }
   }
   static async open(workspace: string, cache: string, options: ConsoleOptions) {
     const max = options.maxRunSeconds ?? 600
@@ -110,7 +111,7 @@ export class AgentConsole {
     return { identity: actual, checkout: live }
   }
   snapshot() {
-    return { enabled: true, roots: this.options.allowedRoots ?? [], hosts: [{ id: 'codex', available: !!this.factories.codex }, { id: 'claude', available: !!this.factories.claude }, { id: 'kimi', available: false }, { id: 'ollama', available: false }], maxRunSeconds: this.options.maxRunSeconds ?? 600, maxActive: 1, active: this.live.size,
+    return { enabled: true, roots: this.options.allowedRoots ?? [], hosts: [{ id: 'codex', available: !!this.factories.codex }, { id: 'claude', available: !!this.factories.claude }, { id: 'kimi', available: !!this.factories.kimi }, { id: 'ollama', available: false }], maxRunSeconds: this.options.maxRunSeconds ?? 600, maxActive: 1, active: this.live.size,
       tasks: this.state().tasks.map(({ id, revision, title, root, host, status, updatedAt, eventSequence }) => ({ id, revision, title, root, host, status, updatedAt, eventSequence })) }
   }
   task(id: string) { uuid.parse(id); const task = this.state().tasks.find(task => task.id === id); if (!task) throw new Error('Task not found'); const live = this.live.get(id); return { ...task, liveOutput: live?.output ?? '', outputSequence: live?.outputSequence ?? 0 } }
@@ -152,11 +153,14 @@ export class AgentConsole {
         if (!pending || !live?.host || task.status !== 'waiting') throw new Error('This host request is no longer pending')
         let result: unknown
         if (pending.method === 'item/tool/requestUserInput') {
-          if (action.decision || !action.answers) throw new Error('Question answers required')
-          const questions = pending.params.questions
-          if (!Array.isArray(questions) || questions.some((q: any) => q.isSecret) || questions.length > 3) throw new Error('This question requires the native host')
-          if (Object.keys(action.answers).some(id => !questions.some((q: any) => q.id === id)) || questions.some((q: any) => !action.answers![q.id]?.trim())) throw new Error('Answer every requested question')
-          result = { answers: Object.fromEntries(questions.map((q: any) => [q.id, { answers: [action.answers![q.id]] }])) }
+          if (pending.params.cancellable && ['decline', 'cancel'].includes(action.decision ?? '') && !action.answers) result = { decision: action.decision }
+          else {
+            if (action.decision || !action.answers) throw new Error('Question answers required')
+            const questions = pending.params.questions
+            if (!Array.isArray(questions) || questions.some((q: any) => q.isSecret) || questions.length > 3) throw new Error('This question requires the native host')
+            if (Object.keys(action.answers).some(id => !questions.some((q: any) => q.id === id)) || questions.some((q: any) => !action.answers![q.id]?.trim())) throw new Error('Answer every requested question')
+            result = { answers: Object.fromEntries(questions.map((q: any) => [q.id, { answers: [action.answers![q.id]] }])) }
+          }
         } else {
           if (!action.decision || action.answers) throw new Error('Approval decision required')
           if (action.decision === 'accept' && pending.method === 'item/fileChange/requestApproval') {
@@ -165,6 +169,7 @@ export class AgentConsole {
           }
           result = { decision: action.decision }
         }
+        live.host.validateResponse?.(pending.wireId, result)
         task = this.record(action, hash, current => { current.pending = current.pending.filter(item => item.id !== action.pendingId); current.status = current.pending.length ? 'waiting' : 'running'; this.log(current, 'Owner answered host request: ' + (action.decision ?? 'question answer')) })
         try { live.host.respond(pending.wireId, result); await this.publish(this.task(task.id), task.pending.length ? 'blocked' : 'working') }
         catch { await this.failWithinQueue(task.id, 'Answer delivery or activity update uncertain; reconcile the host thread') }
@@ -190,7 +195,7 @@ export class AgentConsole {
   }
   private async publish(task: Task, state: 'working' | 'blocked' | 'reviewing' | 'done') {
     const coordination = new RepositoryCoordination(this.shared, task.coordId as ReturnType<typeof randomUUID>)
-    const input = { expectedRoot: task.root, slot: 'console-' + task.id, label: (task.host === 'claude' ? 'Claude' : 'Codex') + ' / task console', task: task.title, paths: task.paths, state, expectedRevision: task.coordRevision, ttlSeconds: 1800 }
+    const input = { expectedRoot: task.root, slot: 'console-' + task.id, label: ({ codex: 'Codex', claude: 'Claude', kimi: 'Kimi' }[task.host]) + ' / task console', task: task.title, paths: task.paths, state, expectedRevision: task.coordRevision, ttlSeconds: 1800 }
     let result
     try { result = await coordination.update(input) }
     catch (error) {
@@ -218,7 +223,7 @@ export class AgentConsole {
     const live = this.live.get(id), task = this.task(id)
     if (!live?.host || live.finishing) return
     if (request.params.threadId !== task.threadId || (task.turnId && request.params.turnId !== task.turnId)) { live.host.reject(request.id); return }
-    if (!(task.host === 'claude' ? ['claude/tool/requestApproval', 'item/tool/requestUserInput'] : ['item/commandExecution/requestApproval', 'item/fileChange/requestApproval', 'item/tool/requestUserInput']).includes(request.method) || (request.method === 'item/fileChange/requestApproval' && request.params.grantRoot) || (request.method === 'item/tool/requestUserInput' && (!Array.isArray(request.params.questions) || request.params.questions.length > 3 || request.params.questions.some((q: any) => q.isSecret)))) {
+    if (!(task.host === 'kimi' ? ['kimi/tool/requestApproval', 'item/tool/requestUserInput'] : task.host === 'claude' ? ['claude/tool/requestApproval', 'item/tool/requestUserInput'] : ['item/commandExecution/requestApproval', 'item/fileChange/requestApproval', 'item/tool/requestUserInput']).includes(request.method) || (request.method === 'item/fileChange/requestApproval' && request.params.grantRoot) || (request.method === 'item/tool/requestUserInput' && (!Array.isArray(request.params.questions) || request.params.questions.length > 3 || request.params.questions.some((q: any) => q.isSecret)))) {
       live.host.reject(request.id); await this.failWithinQueue(id, 'Host requested an unsupported interaction; use its native client to reconcile'); return
     }
     if (Buffer.byteLength(JSON.stringify(request.params)) > 32768 || task.pending.length >= 8) { live.host.reject(request.id); await this.failWithinQueue(id, 'Host request bound exceeded'); return }
@@ -273,7 +278,7 @@ export class AgentConsole {
   private async audit(task: Task) {
     const root = await this.root(task.root, task.identity)
     const metadata = ['-C', task.root, '-c', 'core.fsmonitor=false', '-c', 'core.hooksPath=/dev/null', '-c', 'core.untrackedCache=false']
-    const run = async (args: string[]) => (await exec('git', [...metadata, ...args], { env: gitEnvironment(), timeout: 5000, maxBuffer: 262144 })).stdout
+    const run = async (args: string[]) => (await exec('git', [...metadata, ...args], { env: { ...gitEnvironment(), GIT_OPTIONAL_LOCKS: '0' }, timeout: 5000, maxBuffer: 262144 })).stdout
     let keys = ''
     try { keys = await run(['config', '--name-only', '--get-regexp', '^filter\\..*\\.(clean|smudge|process|required)$']) }
     catch (error) { if ((error as { code?: unknown }).code !== 1) throw error }
@@ -283,9 +288,12 @@ export class AgentConsole {
     // host's sandbox. Disable every configured executable filter for this audit.
     const disabled = drivers.flatMap(driver => ['-c', driver + '.clean=', '-c', driver + '.smudge=', '-c', driver + '.process=', '-c', driver + '.required=false'])
     const git = (args: string[]) => run([...disabled, ...args])
-    const status = await git(['status', '--porcelain=v1', '--untracked-files=all'])
-    const diff = await git(['diff', '--no-ext-diff', '--no-textconv', '--binary', 'HEAD', '--'])
-    const names = (await git(['ls-files', '--others', '--exclude-standard', '-z'])).split('\0').filter(Boolean)
+    const [status, diff, untrackedNames] = await Promise.all([
+      git(['status', '--porcelain=v1', '--untracked-files=all']),
+      git(['diff', '--no-ext-diff', '--no-textconv', '--binary', 'HEAD', '--']),
+      git(['ls-files', '--others', '--exclude-standard', '-z']),
+    ])
+    const names = untrackedNames.split('\0').filter(Boolean)
     if (names.length > 64) throw new Error('Untracked file bound')
     let bytes = 0
     const untracked = []
@@ -304,7 +312,12 @@ export class AgentConsole {
         untracked.push({ name, hash: createHash('sha256').update(content).digest('hex'), text })
       } finally { await file.close() }
     }
-    if ((await git(['status', '--porcelain=v1', '--untracked-files=all'])) !== status || (await git(['diff', '--no-ext-diff', '--no-textconv', '--binary', 'HEAD', '--'])) !== diff || (await describeCheckout(task.root)).head !== root.checkout.head) throw new Error('Checkout changed while reviewing')
+    const [afterStatus, afterDiff, afterCheckout] = await Promise.all([
+      git(['status', '--porcelain=v1', '--untracked-files=all']),
+      git(['diff', '--no-ext-diff', '--no-textconv', '--binary', 'HEAD', '--']),
+      describeCheckout(task.root),
+    ])
+    if (afterStatus !== status || afterDiff !== diff || afterCheckout.head !== root.checkout.head) throw new Error('Checkout changed while reviewing')
     const value = { head: root.checkout.head, status, diff, untracked }
     return { ...value, hash: digest({ ...value, untracked, result: task.result, hostDiff: task.diff, thread: task.threadId, turn: task.turnId }) }
   }

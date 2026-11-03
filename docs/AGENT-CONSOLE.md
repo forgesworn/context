@@ -5,9 +5,9 @@ installed coding host, answer its supported questions/approvals, inspect changes
 and tests, and continue its saved conversation. Local result acceptance is
 separate from committing, merging, deployment and Girnel acceptance.
 
-Adapters are **Codex app-server** (qualified on CLI 0.166.0) and **Claude Code**
-(stream-json/control protocol, qualified on CLI 2.1.316).
-Kimi and Ollama remain pending adapters and cannot be launched by this version.
+Adapters are **Codex app-server** (qualified on CLI 0.166.0), **Claude Code**
+(stream-json/control protocol, qualified on CLI 2.1.316) and **Kimi Code**
+(ACP1 stdio; qualification below). Ollama execution remains pending.
 Existing independent terminal/app sessions are not attached or
 imported. Oathrun/KithMoot execution routes and their grants remain separate.
 
@@ -19,13 +19,13 @@ z1p workspace dashboard /absolute/workspace --cache-dir /absolute/private/cache 
   --max-run-seconds 600
 ```
 
-Use `command -v codex` and `command -v claude` to find installed executables.
-Supply `--codex`, `--claude`, or both; only configured hosts are selectable:
+Use `command -v codex`, `command -v claude` and `command -v kimi` to find installed executables.
+Supply any combination of `--codex`, `--claude` and `--kimi`; only configured hosts are selectable:
 
 ```sh
 z1p workspace dashboard /absolute/workspace --cache-dir /absolute/private/cache \
   --control-dir /absolute/private/task-console --codex /absolute/path/to/codex \
-  --claude /absolute/path/to/claude
+  --claude /absolute/path/to/claude --kimi /absolute/path/to/kimi
 ```
 
 Add `--repo` to restrict the console's selection to one canonical saved-catalogue checkout. Existing
@@ -54,7 +54,8 @@ service, telemetry or new account is introduced.
    uses `--print --verbose --input-format stream-json --output-format stream-json
    --include-partial-messages --permission-prompt-tool stdio` plus its owned session
    UUID (`--session-id=...` or `--resume=...`). It inherits the installed account,
-   model/provider, reasoning, sandbox and approval configuration.
+   model/provider, reasoning, sandbox and approval configuration. Kimi uses only
+   `acp`, without client filesystem/terminal capabilities or execution overrides.
    The adapter sends no model, provider or permission overrides. Effective host
    settings are shown once its thread is created.
 3. Follow streamed response text, completed command/test output and file-change
@@ -161,12 +162,57 @@ Follow-ups start a fresh process using only the stored UUID and refuse changed
 reported model/provider before a new prompt. A native init reporting another
 session, checkout or model aborts the run. Session history remains in Claude's own
 storage as well as the console's bounded journal. The one-active-host limit spans
-both adapters. No unrelated terminal/app session is attached.
+all three adapters. No unrelated terminal/app session is attached.
 
 This follows the [official approval and question contract](https://code.claude.com/docs/en/agent-sdk/user-input)
 and the [official SDK control transport](https://github.com/anthropics/claude-agent-sdk-python/blob/main/src/claude_agent_sdk/_internal/query.py),
 checked against the installed CLI. The adapter remains responsible for its own
 bounded native-protocol qualification; SDK documentation alone is not acceptance.
+
+## Kimi native controls
+
+Kimi uses the installed `kimi acp` process and ACP version1 JSON-RPC. Before any
+prompt, `initialize` must advertise history-free `session/resume`; `session/new`
+or `session/resume` must report a scoped provider/model and native permission mode.
+The console makes no mode/model/thinking/authentication calls and sends no CLI
+overrides. Native hooks, skills, permissions and configured servers remain the
+harness's responsibility. `mcpServers: []` adds no ephemeral client servers.
+Only this task's stored `session_<uuid>` can be resumed. A changed model/provider
+or a mismatched returned session refuses a new prompt. No history import/replay
+or unrelated session attachment is implemented.
+
+Only form elicitation is advertised. Up to3required ordinary fields can be text,
+single choices or multiple choices. The form shows the native question and choices;
+answers remain editable until Send answers. Decline and Cancel return the matching
+native form outcome. Choice/length/required-field validation happens before the
+pending request is consumed, so an invalid answer leaves it open. URL, secret,
+optional/nested/unsupported forms require reconciliation in Kimi's native client.
+Text inputs are not a secret vault.
+
+An approval merges the native tool-call update with its preceding operation record
+and displays the full bounded raw input, locations and supplied content/diff. When
+Kimi requests approval before rawInput metadata arrives, only complete JSON object
+arguments from that same call's preceding cumulative stream can supply the input;
+partial JSON and display summaries alone cannot be approved. Only
+a unique `allow_once` or `reject_once` option can be selected; session-wide options
+are never offered or chosen. Cancellation returns ACP's cancelled outcome. Missing
+operation input, mode-changing requests, changed pending operation details, unknown
+reverse RPCs and oversized requests are refused. Client filesystem, terminal,
+authentication and generic RPC execution are not advertised or provided. Native
+auto-approved tools still follow the installed policy.
+
+Response text and completed tool results stream into the existing task view.
+`session/cancel` is only a stop request: the matching prompt's `stopReason: cancelled`
+receipt is required before showing Interrupted. A success racing with Stop, missing
+terminal receipt, disconnect or error remains Needs reconciliation; no automatic
+retry starts. The independent watchdog, one-active-host rule and exact working-tree
+review apply to all three adapters. No financial cap or whole-task savings is claimed.
+
+The adapter follows the [official Kimi ACP contract](https://moonshotai.github.io/kimi-code/en/reference/kimi-acp)
+and [ACP1 tool approvals](https://agentclientprotocol.com/protocol/v1/tool-calls),
+[forms](https://agentclientprotocol.com/protocol/v1/elicitation) and
+[sessions](https://agentclientprotocol.com/protocol/v1/session-setup). Installed-host
+qualification is separate from protocol documentation and deterministic doubles.
 
 ## Girnel and other hosts
 
@@ -174,7 +220,7 @@ Girnel still owns its board/card status. Existing explicit card metadata links
 remain an observation adapter. Console tasks are local durable work records;
 creating/accepting them does not create/complete Girnel cards or KithMoot
 assignments. Remaining integrations include an explicitly authorised selected-card browser
-adapter, qualified Kimi/Ollama execution adapters and concurrent task isolation. Direct
+adapter, qualified Ollama execution and concurrent task isolation. Direct
 Ollama must reuse its existing worker controls rather than introducing a raw-API
 executor beside them.
 
@@ -218,5 +264,28 @@ Deterministic Claude wire tests also cover changed model/provider before a secon
 prompt, missing settings, one-operation decline/cancel, cancelled stale approvals,
 unsupported/secret/oversized requests, wrong-session messages, interrupt-only
 acknowledgements and successful results racing with Stop. Packaged HTTP/stdio
-consumers cover both adapters; browser fixtures cover task selection, approvals,
+consumers cover all three adapters; browser fixtures cover task selection, approvals,
 review, desktop/mobile layout and accessibility without model inference.
+
+
+On 3 November 2026 Kimi Code 2.4.1 completed a disposable-fixture two-turn
+journey with its configured `kimi-code/k3.1-pro` profile and `default` native
+mode, without model/provider/thinking/permission overrides. The console returned
+its native verification choice, displayed individually reviewed Bash requests,
+streamed an actual edit and passing regression, and resumed the same stored
+session in a fresh owned process. An independent baseline mutation made the
+regression fail; the fixture driver accepted the second result. Fixture-scoped
+context metadata and the requested question were handled by a deterministic test
+driver; native auto-approved tools retained their installed policy. This is
+fixture qualification, not owner acceptance or a whole-task billing measurement.
+
+Two preceding one-turn attempts were reconciled before proceeding: the first
+exposed approval before rawInput metadata, repaired by accepting only complete
+same-call streamed JSON; the second exhausted its 240-second wall allowance
+while waiting for operator decisions, with source unchanged. The final fixture
+used the two remaining turns of the original four-turn allocation and the native
+600-second default wall bound per process. It completed in approximately430seconds,
+including review waits. Failed evidence and cleanup receipts were retained; no
+provider refusal or uncertain result was automatically retried. Native context
+calls also exposed unsupported `.txt` packet sources and an invalid checkpoint
+state; Kimi recovered through supported source evidence and a valid saved checkpoint.

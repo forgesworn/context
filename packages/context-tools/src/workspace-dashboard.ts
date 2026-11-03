@@ -22,7 +22,7 @@ const cardSchema = z.object({
 }).strict()
 const linksSchema = z.object({ version: z.literal(1), cards: z.array(cardSchema).max(500) }).strict()
 export type GirnelCardLink = z.infer<typeof cardSchema>
-export interface DashboardOptions { repositoryRoot?: string; handoverBase?: string; girnelLinks?: string; controlDirectory?: string; codexExecutable?: string; claudeExecutable?: string; maxRunSeconds?: number }
+export interface DashboardOptions { repositoryRoot?: string; handoverBase?: string; girnelLinks?: string; controlDirectory?: string; codexExecutable?: string; claudeExecutable?: string; kimiExecutable?: string; maxRunSeconds?: number }
 export interface DashboardTicket {
   id: string; title: string; lane: 'working' | 'blocked' | 'reviewing' | 'done' | 'inactive'
   agents: WorkspaceActivityRow[]; checkoutRoots: string[]; girnel: (GirnelCardLink & { href: string }) | null
@@ -181,12 +181,12 @@ export async function serveWorkspaceDashboard(workspace: string, cacheDirectory:
   let controller: import('./agent-console.js').AgentConsole | undefined
   if (options.controlDirectory) {
     if (!isAbsolute(options.controlDirectory) || resolve(options.controlDirectory) !== options.controlDirectory || await realpath(dirname(options.controlDirectory)) !== dirname(options.controlDirectory) || await realpath(options.controlDirectory).catch(() => options.controlDirectory) !== options.controlDirectory) throw new Error('control directory must be canonical with an existing parent')
-    if (!options.codexExecutable && !options.claudeExecutable) throw new Error('Control mode requires an installed absolute --codex or --claude executable')
-    for (const [host, executable] of [['codex', options.codexExecutable], ['claude', options.claudeExecutable]]) if (executable && (!isAbsolute(executable) || !(await lstat(await realpath(executable))).isFile())) throw new Error('Control mode requires an installed absolute --' + host + ' executable')
+    if (!options.codexExecutable && !options.claudeExecutable && !options.kimiExecutable) throw new Error('Control mode requires an installed absolute --codex, --claude or --kimi executable')
+    for (const [host, executable] of [['codex', options.codexExecutable], ['claude', options.claudeExecutable], ['kimi', options.kimiExecutable]]) if (executable && (!isAbsolute(executable) || !(await lstat(await realpath(executable))).isFile())) throw new Error('Control mode requires an installed absolute --' + host + ' executable')
     await initialiseWorkspaceStore(options.controlDirectory)
     const { AgentConsole } = await import('./agent-console.js')
-    controller = await AgentConsole.open(workspace, cacheDirectory, { directory: options.controlDirectory, codexExecutable: options.codexExecutable, claudeExecutable: options.claudeExecutable, maxRunSeconds: options.maxRunSeconds, allowedRoots: snapshot.projects.map(project => project.root) })
-  } else if (options.codexExecutable || options.claudeExecutable || options.maxRunSeconds !== undefined) throw new Error('Host settings require --control-dir')
+    controller = await AgentConsole.open(workspace, cacheDirectory, { directory: options.controlDirectory, codexExecutable: options.codexExecutable, claudeExecutable: options.claudeExecutable, kimiExecutable: options.kimiExecutable, maxRunSeconds: options.maxRunSeconds, allowedRoots: snapshot.projects.map(project => project.root) })
+  } else if (options.codexExecutable || options.claudeExecutable || options.kimiExecutable || options.maxRunSeconds !== undefined) throw new Error('Host settings require --control-dir')
   const page = renderWorkspaceDashboard(!!controller)
   let origin = ''
   const server = createServer(async (request, response) => {
@@ -246,11 +246,11 @@ export async function serveWorkspaceDashboard(workspace: string, cacheDirectory:
 export async function runWorkspaceDashboardCli(args: string[]) {
   const { positionals, values } = parseArgs({ args, allowPositionals: true, options: {
     'cache-dir': { type: 'string' }, repo: { type: 'string' }, 'handover-base': { type: 'string' }, 'girnel-links': { type: 'string' },
-    'control-dir': { type: 'string' }, codex: { type: 'string' }, claude: { type: 'string' }, 'max-run-seconds': { type: 'string' },
+    'control-dir': { type: 'string' }, codex: { type: 'string' }, claude: { type: 'string' }, kimi: { type: 'string' }, 'max-run-seconds': { type: 'string' },
   } })
   if (positionals.length !== 1 || !values['cache-dir']) throw new Error('workspace dashboard ROOT --cache-dir ABS [--repo ABS] [--handover-base ABS] [--girnel-links ABS]')
   const maxRunSeconds = values['max-run-seconds'] === undefined ? undefined : /^\d+$/.test(values['max-run-seconds']) ? Number(values['max-run-seconds']) : NaN
-  const dashboard = await serveWorkspaceDashboard(positionals[0], values['cache-dir'], { repositoryRoot: values.repo, handoverBase: values['handover-base'], girnelLinks: values['girnel-links'], controlDirectory: values['control-dir'], codexExecutable: values.codex, claudeExecutable: values.claude, maxRunSeconds })
+  const dashboard = await serveWorkspaceDashboard(positionals[0], values['cache-dir'], { repositoryRoot: values.repo, handoverBase: values['handover-base'], girnelLinks: values['girnel-links'], controlDirectory: values['control-dir'], codexExecutable: values.codex, claudeExecutable: values.claude, kimiExecutable: values.kimi, maxRunSeconds })
   const stop = () => {
     process.off('SIGINT', stop); process.off('SIGTERM', stop)
     void dashboard.close().catch(() => { process.exitCode = 1 })
