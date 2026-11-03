@@ -1,5 +1,11 @@
 # Bounded workflows for coding hosts
 
+The optional control-enabled dashboard now connects this planner to
+[managed task plans](TASK-PLANS.md): atomic draft creation, explicit per-step
+dispatch, fresh source-packet receipts, prerequisite checks and exact owner review.
+The offline CLI/API below remains independent. Neither surface schedules work or
+grants native execution authority by itself.
+
 The optional `@forgesworn/context-tools/host-workflow` API and `workflow` CLI
 provide structured task records, dependency checks, deterministic result
 reduction and resumable planning. They run locally with no account, model,

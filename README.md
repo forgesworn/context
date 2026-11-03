@@ -26,7 +26,9 @@ Live worker availability requires an eligible model on that endpoint.
 
 [Bounded host workflows](docs/HOST-WORKFLOWS.md): optional local task contracts,
 dependency/review checks, deterministic result reduction and resumable planning.
-The coding host retains execution, permissions and model selection.
+The coding host retains execution, permissions and model selection. The local
+dashboard's [task plans](docs/TASK-PLANS.md) connect dependencies, assigned hosts,
+check evidence and owner review to explicit managed runs.
 
 **Use Context on your own machine and repositories:** follow the
 [Codex and Claude Code setup guide](docs/GETTING-STARTED.md), including current

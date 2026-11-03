@@ -287,6 +287,10 @@ export async function serveWorkspaceDashboard(workspace: string, cacheDirectory:
       try { const value = JSON.stringify(controller.task(request.url.slice((prefix + 'console/task/').length))); if (Buffer.byteLength(value) > 1048576) throw new Error(); response.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' }); response.end(value) } catch { fail(404, 'Task unavailable or exceeds the response bound') }
       return
     }
+    if (controller && request.url?.startsWith(prefix + 'console/plan/')) {
+      try { const value = JSON.stringify(controller.plan(request.url.slice((prefix + 'console/plan/').length))); if (Buffer.byteLength(value) > 1048576) throw new Error(); response.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' }); response.end(value) } catch { fail(404, 'Task plan unavailable or exceeds the response bound') }
+      return
+    }
     if (request.url === prefix) {
       response.setHeader('Content-Security-Policy', page.csp)
       response.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' }); response.end(page.html); return
