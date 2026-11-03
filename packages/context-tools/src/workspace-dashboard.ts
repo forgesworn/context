@@ -13,6 +13,7 @@ import { readHandoverSummary } from './task-handover.mjs'
 import { WorkspaceStore, workspaceKey, initialiseWorkspaceStore } from './workspace-store.js'
 import { RepositoryNavigation } from './repository-navigation.js'
 import { renderWorkspaceDashboard } from './workspace-dashboard-view.js'
+import { girnelObservation, girnelObservationPath } from './girnel-observation.js'
 
 const text = z.string().min(1).max(2048).refine(value => !/[\u0000-\u001f\u007f]/.test(value))
 const id = z.string().min(1).max(128).regex(/^[A-Za-z0-9_-]+$/)
@@ -26,6 +27,16 @@ export interface DashboardOptions { repositoryRoot?: string; handoverBase?: stri
 export interface DashboardTicket {
   id: string; title: string; lane: 'working' | 'blocked' | 'reviewing' | 'done' | 'inactive'
   agents: WorkspaceActivityRow[]; checkoutRoots: string[]; girnel: (GirnelCardLink & { href: string }) | null
+  observationUrl?: string
+}
+
+function dashboardRoots(workspace: string, store: WorkspaceStore) {
+  const catalogue = store.get<WorkspaceCatalogue>(workspaceKey('catalogue', workspace))
+  if (!catalogue) throw new Error('A saved workspace catalogue is required')
+  return catalogue.repositories.map(repo => repo.root).filter(root => {
+    const rel = relative(workspace, root)
+    return isAbsolute(root) && resolve(root) === root && rel !== '..' && !rel.startsWith('../') && !isAbsolute(rel)
+  })
 }
 
 /** The file is an explicit selection of card metadata, never a Girnel key/DB export. */
@@ -138,11 +149,7 @@ export async function readWorkspaceDashboard(workspace: string, cacheDirectory: 
   const store = new WorkspaceStore(cacheDirectory, undefined, { readOnly: true })
   try {
     const activity = await readWorkspaceActivity(workspace, store, { includeInactive: true, repositoryRoot: options.repositoryRoot, limit: 500, maxBytes: 262144 })
-    const catalogue = store.get<WorkspaceCatalogue>(workspaceKey('catalogue', workspace))!
-    const roots = catalogue.repositories.map(repo => repo.root).filter(root => {
-      const rel = relative(workspace, root)
-      return isAbsolute(root) && resolve(root) === root && rel !== '..' && !rel.startsWith('../') && !isAbsolute(rel)
-    })
+    const roots = dashboardRoots(workspace, store)
     const links = options.girnelLinks ? await readGirnelLinks(options.girnelLinks, new Set(roots)) : []
     const projects = roots.filter(root => !options.repositoryRoot || root === options.repositoryRoot).map(root => ({ root, cachedIndex: store.has(workspaceKey('index', root)), freshness: 'not-checked' as 'not-checked' | 'current' | 'stale' | 'unknown' | 'unavailable', checkedAt: null as number | null }))
     // Live hash checks are limited to the explicitly selected --repo. Never build an index here.
@@ -178,6 +185,7 @@ export async function serveWorkspaceDashboard(workspace: string, cacheDirectory:
   if (Buffer.byteLength(JSON.stringify(snapshot)) > 2 * 1024 * 1024) throw new Error('dashboard snapshot exceeds 2 MiB; narrow with --repo')
   let cachedAt = Date.now(), pending: Promise<typeof snapshot> | undefined
   const prefix = '/' + randomBytes(24).toString('hex') + '/'
+  const feedSecret = randomBytes(32)
   let controller: import('./agent-console.js').AgentConsole | undefined
   if (options.controlDirectory) {
     if (!isAbsolute(options.controlDirectory) || resolve(options.controlDirectory) !== options.controlDirectory || await realpath(dirname(options.controlDirectory)) !== dirname(options.controlDirectory) || await realpath(options.controlDirectory).catch(() => options.controlDirectory) !== options.controlDirectory) throw new Error('control directory must be canonical with an existing parent')
@@ -189,6 +197,26 @@ export async function serveWorkspaceDashboard(workspace: string, cacheDirectory:
   } else if (options.codexExecutable || options.claudeExecutable || options.kimiExecutable || options.ollamaProfile || options.maxRunSeconds !== undefined || options.maxActive !== undefined) throw new Error('Host settings require --control-dir')
   const page = renderWorkspaceDashboard(!!controller)
   let origin = ''
+  const observe = async () => {
+    if (Date.now() - cachedAt >= 5000) {
+      if (!pending) pending = readWorkspaceDashboard(workspace, cacheDirectory, options).then(value => { snapshot = value; cachedAt = Date.now(); return value }).finally(() => { pending = undefined })
+      await pending
+    }
+    // Reread bindings on every request, including removals. Cached observations
+    // must never keep a revoked card feed or a removed agent binding alive.
+    let links: GirnelCardLink[] = []
+    if (options.girnelLinks) {
+      const store = new WorkspaceStore(cacheDirectory, undefined, { readOnly: true })
+      try { links = await readGirnelLinks(options.girnelLinks, new Set(dashboardRoots(workspace, store))) }
+      finally { store.close() }
+    }
+    const selectedLinks = options.repositoryRoot ? links.filter(link => link.checkoutRoot === options.repositoryRoot) : links
+    const additions = controller?.observations(options.repositoryRoot).filter(row => !snapshot.activity.rows.some(existing => existing.agentId === row.agentId && existing.checkoutRoot === row.checkoutRoot)) ?? []
+    const rows = [...additions, ...snapshot.activity.rows]
+    if (rows.length > 500) throw new Error('Combined observations exceed 500 rows; narrow with --repo')
+    const tickets = dashboardTickets(rows, selectedLinks).map(ticket => ticket.girnel ? { ...ticket, observationUrl: origin + girnelObservationPath(ticket, feedSecret) } : ticket)
+    return { ...snapshot, activity: { ...snapshot.activity, rows }, tickets, overlaps: dashboardOverlaps(rows), girnel: { ...snapshot.girnel, bindings: links.length } }
+  }
   const server = createServer(async (request, response) => {
     response.setHeader('Cache-Control', 'no-store')
     response.setHeader('X-Content-Type-Options', 'nosniff')
@@ -196,7 +224,30 @@ export async function serveWorkspaceDashboard(workspace: string, cacheDirectory:
     response.setHeader('X-Frame-Options', 'DENY')
     response.setHeader('Cross-Origin-Resource-Policy', 'same-origin')
     const fail = (code: number, message: string) => { response.writeHead(code, { 'Content-Type': 'text/plain; charset=utf-8' }); response.end(message) }
-    if (request.headers.host !== new URL(origin).host || (request.headers.origin !== undefined && request.headers.origin !== origin) || request.headers['sec-fetch-site'] === 'cross-site') return fail(403, 'Forbidden')
+    if (request.headers.host !== new URL(origin).host) return fail(403, 'Forbidden')
+    if (request.url?.startsWith('/girnel-observation/')) {
+      try {
+        const value = await observe(), ticket = value.tickets.find(ticket => ticket.observationUrl === origin + request.url)
+        if (!ticket?.girnel) return fail(404, 'Card feed unavailable')
+        const allowedOrigin = new URL(ticket.girnel.appUrl).origin
+        if (request.headers.origin !== allowedOrigin) return fail(403, 'This feed is restricted to the selected Girnel origin')
+        response.setHeader('Access-Control-Allow-Origin', allowedOrigin)
+        response.setHeader('Vary', 'Origin')
+        response.setHeader('Cross-Origin-Resource-Policy', 'cross-origin')
+        if (request.method === 'OPTIONS') {
+          if (request.headers['access-control-request-method'] !== 'GET' || request.headers['access-control-request-headers']) return fail(403, 'Only a credential-free read is supported')
+          response.setHeader('Access-Control-Allow-Methods', 'GET')
+          if (request.headers['access-control-request-private-network'] === 'true') response.setHeader('Access-Control-Allow-Private-Network', 'true')
+          response.writeHead(204); response.end(); return
+        }
+        if (request.method !== 'GET') return fail(405, 'This feed is read-only')
+        const json = JSON.stringify(girnelObservation(ticket, value.activity.observedAt, value.activity.complete))
+        if (Buffer.byteLength(json) > 262144) return fail(503, 'Selected observations exceed 256 KiB')
+        response.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' }); response.end(json)
+      } catch { fail(503, 'Card observations unavailable; reconnect after checking the selected bindings') }
+      return
+    }
+    if ((request.headers.origin !== undefined && request.headers.origin !== origin) || request.headers['sec-fetch-site'] === 'cross-site') return fail(403, 'Forbidden')
     if (controller && request.url === prefix + 'console/action' && request.method === 'POST') {
       if (request.headers.origin !== origin || request.headers['x-z1p-console'] !== '1' || !/^application\/json(?:;.*)?$/i.test(request.headers['content-type'] ?? '')) return fail(403, 'Console requests require same-origin JSON and explicit client header')
       try {
@@ -224,16 +275,7 @@ export async function serveWorkspaceDashboard(workspace: string, cacheDirectory:
     }
     if (request.url !== prefix + 'snapshot') return fail(404, 'Not found')
     try {
-      if (Date.now() - cachedAt >= 5000) {
-        if (!pending) pending = readWorkspaceDashboard(workspace, cacheDirectory, options).then(value => { snapshot = value; cachedAt = Date.now(); return value }).finally(() => { pending = undefined })
-        await pending
-      }
-      // Explicit control mode contributes only its own published metadata. Do
-      // not widen saved-catalogue discovery or expose task inbox/source content.
-      const additions = controller?.observations(options.repositoryRoot).filter(row => !snapshot.activity.rows.some(existing => existing.agentId === row.agentId && existing.checkoutRoot === row.checkoutRoot)) ?? []
-      const rows = [...additions, ...snapshot.activity.rows]
-      if (rows.length > 500) throw new Error('Combined observations exceed 500 rows; narrow with --repo')
-      const value = additions.length ? { ...snapshot, activity: { ...snapshot.activity, rows }, tickets: [...dashboardTickets(additions, []), ...snapshot.tickets], overlaps: dashboardOverlaps(rows) } : snapshot
+      const value = await observe()
       const json = JSON.stringify(value)
       if (Buffer.byteLength(json) > 2 * 1024 * 1024) throw new Error('snapshot too large')
       response.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' }); response.end(json)
