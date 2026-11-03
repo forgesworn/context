@@ -134,3 +134,10 @@ source pointer contains enough code to answer.
 The smoke test builds real tarballs and installs them outside the workspace to
 check exports, browser isolation, CLI/MCP behaviour and licence notices.
 See [extraction evidence](EXTRACTION.md) for provenance and publication status.
+
+
+The optional [local task console](docs/AGENT-CONSOLE.md) supports Codex, Claude,
+Kimi and bounded Ollama workers, with isolated task worktrees, concurrent runs,
+a shared addressed inbox and a review queue. Native worker notes use existing
+repository tools; Ollama receives queued notes on explicit continuation. Host
+permissions and model accounts remain operator-owned.

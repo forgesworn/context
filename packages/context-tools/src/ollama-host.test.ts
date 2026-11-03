@@ -79,3 +79,12 @@ it('rejects a non-private profile before starting a console', async () => {
   const { AgentConsole } = await import(pathToFileURL(fileURLToPath(new URL('../dist/agent-console.js', import.meta.url))).href)
   await expect(AgentConsole.open(f.workspace, f.cache, { directory: f.control, ollamaProfile: f.profile, maxRunSeconds: 60 })).rejects.toThrow('private')
 })
+
+it('keeps one Ollama request lane even when separate worktrees and spare console slots exist', async () => {
+  const f = await fixture()
+  const create = () => f.console.action({ action: 'create', requestId: randomUUID(), root: f.root, host: 'ollama', isolation: 'worktree', title: 'Isolated bounded worker', objective: 'Review selected source only.', paths: ['source.mjs'] })
+  const a = await create(), b = await create(); await f.act(a.id, 'run'); await f.wait(a.id, task => task.status === 'waiting')
+  await expect(f.act(b.id, 'run')).rejects.toThrow('One Ollama request lane')
+  expect(f.console.task(a.id).pending[0].params.tool).toBe('Send bounded worker packet')
+  expect((await f.trace()).some((row: any) => row.command === 'run')).toBe(false)
+}, 15000)

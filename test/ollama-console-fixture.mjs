@@ -6,6 +6,7 @@ import { consoleFixture } from './agent-console-fixture.mjs'
 export async function ollamaConsoleFixture(dist) {
   const f = await consoleFixture(dist), profile = join(f.temp, 'ollama-profile.json'), mode = join(f.temp, 'worker-mode'), workerTrace = join(f.temp, 'worker-trace.jsonl'), helper = join(f.temp, 'worker-helper.mjs')
   await writeFile(join(f.root, 'source.mjs'), "export const value = 'before'\n")
+  f.git(['add', 'source.mjs']); f.git(['-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.invalid', '-c', 'commit.gpgsign=false', '-c', 'core.hooksPath=/dev/null', 'commit', '-qm', 'bounded worker source fixture'])
   const settings = { version: 1, python: process.execPath, helper, engineeringAdapter: helper, endpoint: 'http://127.0.0.1:11435', model: 'deepseek-v4.1-flash:cloud', think: 'false', maxOutput: 4096, timeoutSeconds: 5, routeReason: 'Deterministic fixture only; no model inference', verification: { executable: process.execPath, args: ['--test', '--test-reporter=tap', 'regression.test.mjs'], timeoutSeconds: 10 } }
   await writeFile(profile, JSON.stringify(settings), { mode: 0o600 }); await chmod(profile, 0o600)
   await writeFile(mode, '')

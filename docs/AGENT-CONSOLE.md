@@ -18,7 +18,7 @@ imported. Oathrun/KithMoot execution routes and their grants remain separate.
 ```sh
 z1p workspace dashboard /absolute/workspace --cache-dir /absolute/private/cache \
   --control-dir /absolute/private/task-console --codex /absolute/path/to/codex \
-  --max-run-seconds 600
+  --max-run-seconds 600 --max-active 3
 ```
 
 Use `command -v codex`, `command -v claude` and `command -v kimi` to find installed executables.
@@ -50,9 +50,11 @@ service, telemetry or new account is introduced.
 ## Task journey
 
 1. Select a checkout from the launch-time saved catalogue. Enter the title,
-   objective and optional relative intended paths. Save the task.
+   objective and optional relative intended paths. The browser defaults to a new
+   isolated branch/worktree from committed HEAD. Choose the selected checkout
+   explicitly to include its current local changes. Save the task.
 2. Select **Run task**. The console publishes advisory activity and starts a new
-   child host in that checkout. Codex uses `app-server --listen stdio://`; Claude
+   child host in the task’s working copy. Codex uses `app-server --listen stdio://`; Claude
    uses `--print --verbose --input-format stream-json --output-format stream-json
    --include-partial-messages --permission-prompt-tool stdio` plus its owned session
    UUID (`--session-id=...` or `--resume=...`). It inherits the installed account,
@@ -72,7 +74,7 @@ service, telemetry or new account is introduced.
    reconciliation in this release.
 5. A completed turn becomes **Ready for your review**. Inspect the current whole
    working-tree status/diff, previews of bounded new UTF-8 files, result and run
-   log. This can include changes that predated the task; it is not task ownership
+   log. A selected-checkout task can include changes that predated the task; it is not task ownership
    attribution. Command exit status is reported host evidence, not independent
    reviewer acceptance.
 6. Accept the reviewed result locally, or request changes and enter a follow-up.
@@ -93,7 +95,11 @@ stopping the console closes its owned hosts.
 
 ## Recovery and bounds
 
-One host run is active per console. A host process, including startup and approval
+Up to three host runs are active per console by default; `--max-active 1–4`
+sets the operator limit. Concurrent runs in the same Git repository require
+separate managed worktrees. A selected-checkout run excludes other runs in its
+repository. The installed Ollama helper retains one active request lane, so two
+Ollama tasks cannot run concurrently in the same console. A host process, including startup and approval
 wait, has a 10–900 second wall bound (600 by default). A separate POSIX watchdog
 enforces the wall bound and reacts to parent loss, checking process start identity
 before signalling its owned process group. Host processes close after turns to
@@ -222,7 +228,7 @@ Girnel still owns its board/card status. Existing explicit card metadata links
 remain an observation adapter. Console tasks are local durable work records;
 creating/accepting them does not create/complete Girnel cards or KithMoot
 assignments. Remaining integrations include an explicitly authorised selected-card browser
-adapter, live Ollama model qualification and concurrent task isolation. Direct
+adapter and live Ollama model qualification (now delivered below). Direct
 Ollama must reuse its existing worker controls rather than introducing a raw-API
 executor beside them.
 
@@ -389,3 +395,94 @@ reported usage, partial/accepted helper reviews and cleanup evidence were retain
 This qualifies one bounded worker journey, not model-side session/KV reuse,
 owner acceptance, every provider, account totals or whole-task billing/savings.
 Deterministic controlled-endpoint/helper/browser evidence remains separate.
+
+
+## Concurrent work and shared inbox (0.19.0)
+
+The browser defaults to **New isolated branch and worktree**. At the first run,
+the console journals allocation, then creates `z1p/task-<task UUID>` at
+`CONTROL_DIR/worktrees/<task UUID>`, starting from the selected checkout's exact
+committed HEAD. The original checkout's uncommitted/untracked files are not
+copied. Dependencies, ignored build output, submodules and local environment
+files are not installed or copied automatically; the host can request the
+necessary setup under its normal controls. Choose **Selected checkout** when
+that existing local state is required; such runs are exclusive within their Git
+repository. API clients retain the previous `isolation: "checkout"` default.
+
+Worktrees separate files and branches; they share Git metadata and are **not OS
+sandboxes**. Native permissions remain those of the installed host. Intended
+paths and overlap warnings are advisory. The console never silently combines
+branches or edits the source checkout when a result is accepted. Each review is
+bound to its task's actual working copy, current HEAD/content and result. Use
+**Needs an answer or review** to see outstanding decisions across projects;
+**Unread inbox notes** filters the shared inbox by task. Stop affects only the
+selected task. The configured process/time limits apply independently to each
+run; capacity and time bounds are not financial caps.
+
+The task inbox stores notes in the existing encrypted control journal, with a
+128-note bound per task. Owner notes are limited to 1600 characters. An accepted
+task is closed to new owner notes. Agent notes use the existing same-owner
+repository coordination transport (2000 characters, seven-day transport
+retention, 256 notes per Git repository); saved console copies remain until the
+operator archives the control data. A full inbox is reported and does not evict
+unread notes. A broken task's inbox does not stop other tasks being polled.
+There is no new messaging service, account, listener or cloud destination.
+Worktree files and host-owned artefacts remain ordinary local files, not
+journal-encrypted content. Keep the control directory private and out of Git.
+
+For native hosts with working repository tools, each isolated turn supplies:
+
+- This task's canonical working copy, task UUID and console inbox endpoint.
+- A request to register activity as `worker-<task UUID>` in that exact worktree,
+  then poll its own addressed notes between steps and keep its lease current.
+- The acknowledgement format `ACK <message UUID>`, sent with
+  `repository_message` to the task's console endpoint after reading a note.
+
+The controller polls every five seconds and renews its own advisory activity.
+It finds the worker only by the exact slot **and** canonical checkout; ambiguous
+claims stop delivery for that task. It forwards owner/peer notes to that worker
+using the same message UUID for unknown-send reconciliation. Agents can address
+questions, progress or handovers to another console task endpoint listed by
+`repository_coordination`; the destination forwards the note to its registered
+worker. Coordination only spans a Git repository and its verified worktrees;
+there is no ambient cross-project conversation sharing. Addresses are local
+same-owner observations, not authenticated remote principals or permissions.
+
+The UI distinguishes queued notes, delivered notes, explicit agent ACKs and the
+owner's **Mark note read**. Delivery is not proof the model read or obeyed a note.
+Only an ACK from the recorded delivery recipient acknowledges that note. Notes
+never approve tools, widen scope, start turns or override owner instructions.
+A model must actually adopt the supplied registration/polling instructions;
+configuration or prompts alone do not prove that adoption.
+
+If a worker has no registered repository tools, queued notes are included as
+untrusted data in its next **explicit** continuation (up to eight per turn).
+They are labelled submitted, with acknowledgement unconfirmed. This also applies
+to bounded Ollama workers: there is no live tool loop, background inference or
+interruption merely because a note arrives. Existing Ollama dispatch, exact
+replacement, verification and helper receipt controls still apply.
+
+Browser reload reconnects to the running controller. Controller shutdown/crash
+retains worktrees, inboxes, host thread IDs and reviews. In-flight runs become
+**Needs reconciliation**, with no automatic host restart or request replay.
+After checking the native outcome, enter explicit follow-up instructions to
+resume the same task/thread in the same verified worktree. This does not attach
+to an independently running native session or promise seamless crash recovery.
+A changed branch/common Git directory, existing allocation path, or uncertain
+worktree creation is refused; preserve and inspect its recorded path/branch
+manually rather than retrying or deleting it.
+
+Worktrees are retained for review and delivery. After committing, pushing and
+merging a task's changes through the project's normal process, verify its branch
+is merged, the worktree is clean and nothing is unpushed, then use
+`git worktree remove <saved path>` and `git worktree prune`. Remove the merged
+branch only after that verification. The console does not force-delete work,
+install dependencies, merge results or mutate Girnel tickets.
+
+Acceptance exercises two simultaneous Codex/Claude **protocol doubles**, actual
+Git worktrees and file edits/tests, two installed repository MCP clients sending
+and acknowledging a handover, restart while both runs await approval, no replay,
+explicit saved-thread continuation and two regressions that independently reject
+the original content. Browser checks cover the shared inbox/review filters and
+mobile layout. This proves the controller/transport contracts; live-model
+registration/polling under simultaneous load is a separate qualification.
