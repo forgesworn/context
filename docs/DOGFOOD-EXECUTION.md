@@ -1737,3 +1737,36 @@ record. Final source/hosted gates and merge identity are recorded against their
 exact commits. This is developer source tooling available from any working
 directory by absolute script path. The installed 0.10.0 package versions and
 runtime behaviour do not change in this slice.
+
+## 2–3 November: optional owner dashboard and task console (0.14.0–0.23.0)
+
+Releases 0.11.0–0.13.2 are recorded in [project workflow delivery](PROJECT-WORKFLOW-DELIVERY.md).
+The following releases were shipped through normal PRs, hosted CI and GitHub
+releases, then installed from the public downloads:
+
+| Release | Scope | Local tests at ship |
+| --- | --- | --- |
+| 0.14.0 | Read-only loopback ticket dashboard with explicit Girnel card links | 619 |
+| 0.15.0–0.16.0 | Local task console for Codex, then Claude Code (PR #53, #54) | 634, 648 |
+| 0.17.0–0.18.0 | Kimi sessions (PR #55); reviewed Ollama worker lane (PR #56) | 669, 697 |
+| 0.19.0–0.19.1 | Isolated concurrent worktree tasks and shared inbox; ACK sender clarified (PR #58) | 713 (0.19.0) |
+| 0.20.0–0.20.1 | Girnel card observation feeds and managed-worktree bindings (PR #59, #60) | 715 (0.20.1) |
+| 0.21.0 | Linked existing-agent status and private inboxes (PR #61) | 730 |
+| 0.22.0 | Task plans connected to managed runs and review (PR #62) | 740 |
+| 0.23.0 | Versioned plan requirements and worker notifications (PR #63) | 751 |
+
+For 0.21.0–0.23.0, PR and main CI passed, all five benchmark gates passed
+unchanged, real HTTP/stdio browser journeys recorded zero accessibility
+violations and zero JavaScript errors, each older installed release refused the
+newer journal, and fresh configured Codex/Claude/Kimi MCP clients resumed the
+final checkpoint. Those three releases dispatched no new model inference. Earlier
+console slices ran bounded native-host fixture trials, including a live Kimi
+collaboration fixture; their failed attempts and repairs are retained.
+Evidence is in private dated records, one per slice, under the local acceptance
+directory.
+
+Not established: any real project task or plan run through the console, a bound
+owner Girnel card, adoption by four models, automatic stopping, or savings. Fixture
+host labels do not show how models poll the inbox. The npm registry still carries
+0.3.3; no registry release was authorised. These releases do not close OS0, OS1e,
+OS2 or OS6.
