@@ -71,7 +71,7 @@
       "paid": false,
       "steps": [
         "Packet sufficiency: deterministic check that a bounded packet holds each task's required evidence; record bytes; uncovered tasks are recorded gaps, not removed.",
-        "Transcript metrics on Codex --json streams: readsAfterPacket and toolErrorRate, tested on recorded streams.",
+        "Transcript metrics on Codex exec --json streams: metrics.mjs with fixture tests (done). September streams not found at the recorded path, so the metric is unvalidated on the known bad case; the write probe checks field names and phase 1 gives the first real measurement.",
         "Harness tests for rotation, third arm, incomplete usage and the no-alias rule."
       ]
     },
@@ -104,12 +104,14 @@
     }
   },
   "metrics": {
-    "readsAfterPacket": "Direct reads (shell cat, sed, rg on a path) of lines already returned by a packet in the same session, divided by packet-covered files.",
-    "toolErrorRate": "Error tool results divided by all tool results.",
+    "readsAfterPacket": "Distinct packet-covered files later read directly (cat, nl, head, tail, sed -n ranges, awk NR ranges) with a range overlapping one already returned by a packet, divided by distinct packet-covered files; no range means whole file; reads before the covering packet do not count. Implemented in metrics.mjs.",
+    "toolErrorRate": "Failed or declined tool calls and MCP isError results divided by all tool results; a command that ran and exited non-zero is a nonZeroExit, not a tool error.",
     "missedOrIncorrectDependencies": "Counted after acceptance against the hidden dependency set, by checker and scope check; independent of acceptance (an accepted outcome can still miss a dependency) and never shown to executor or reviewer.",
     "firstPassAccepted": "Code-change checker passes on the executor's first self-check.",
     "totalTokens": "Executor plus reviewer input and output, including cached input, setup, repairs and failed attempts.",
-    "reviewerSeconds": "Reviewer wall seconds."
+    "reviewerSeconds": "Reviewer wall seconds.",
+    "searchesAfterPacket": "rg, grep, git grep and find after the first packet; reported separately, outside the threshold.",
+    "unclassifiedSegments": "Command segments the classifier does not recognise; reported."
   },
   "qualityGate": {
     "primary": "missedOrIncorrectDependencies (alternative: firstPassAccepted; choose before lock)",

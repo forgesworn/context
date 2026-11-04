@@ -137,15 +137,37 @@ pooled with v1, v2, S5, v3, the repeated Pro run or the 0.4.0 screen.
    whether a bounded Context packet built from the task's required evidence
    contains it all, and records the bytes. A task that Context cannot cover
    within budget is recorded as a known gap. It is not removed from the pack.
-2. **Transcript metrics.** Extend the
-   [`analyse.mjs`](../retrieval-recall-20260923/analyse.mjs) approach to
-   Codex `--json` event streams. Define:
-   - *reads after packet*: a direct file read (shell `cat`, `sed`, `rg` on a
-     path) of lines already returned by a packet in the same session, divided
-     by the number of packet-covered files;
-   - *tool error rate*: error results divided by all tool results.
+2. **Transcript metrics.** Built in [`metrics.mjs`](metrics.mjs), with
+   fixture tests in [`metrics.test.mjs`](metrics.test.mjs) (run with
+   `node --test`; the repository's CI does not run experiment tests). It reads
+   one `codex exec --json` stream as the v3 runner records it:
+   - *reads after packet*: distinct packet-covered files later read directly
+     (`cat`, `nl`, `head`, `tail`, `sed -n` ranges, `awk` NR ranges) with a
+     line range that overlaps one a packet already returned, divided by
+     distinct packet-covered files. A command with no range counts as the
+     whole file. Reads before the covering packet do not count;
+   - *searches after packet* (`rg`, `grep`, `git grep`, `find`): reported
+     separately and outside the threshold, because bounded search is what
+     the plain arm is told to do;
+   - *unclassified segments*: commands the classifier does not recognise,
+     reported so its coverage is visible;
+   - *tool error rate*: failed or declined tool calls and MCP `isError`
+     results, divided by all tool results. A command that ran and exited
+     non-zero (for example `rg` with no match) is counted as a non-zero
+     exit, not a tool error.
 
-   Test both metrics on recorded streams before lock.
+   The field names were confirmed from the Codex 0.166.0 binary and the v3
+   runner. They are checked against a real 0.166.0 stream from the write
+   probe; nothing earlier is paid.
+
+   The September executor streams are not at the recorded private path
+   (`.cache/z1p-delivery` under the home directory). A search of the home
+   directory and the M4 found only MCP log files. So the measure has not been
+   shown to flag the known bad case: diagnosis-context, with 10 to 14 packets
+   followed by up to 24 direct reads. Those streams were also Claude Code
+   stream-json, not Codex. If the owner can locate them, a stream-json reader
+   can be added to test against them. Otherwise the phase 1 pair is the first
+   real measurement, and the 0.25 threshold stays proposed until then.
 3. **Harness tests.** Cover rotation, the third arm, incomplete-usage
    handling and the no-alias rule, all with fixtures and no model.
 
