@@ -286,6 +286,24 @@ test('builds deterministic exact excerpts and absent allowed state', async () =>
   assert.match(one.policy.policyDigest, /^[0-9a-f]{64}$/);
 });
 
+test('builds exact excerpts from web, Svelte and shell sources', async () => {
+  const root = await fixture();
+  const files = { 'site/index.html': '<main>\n<h1>Soon</h1>\n</main>\n', 'site/style.css': 'main {\n  margin: 0;\n}\n', 'web/App.svelte': '<script>\nlet n = 1\n</script>\n', 'deploy/run.sh': '#!/bin/sh\nset -eu\necho ok\n' };
+  for (const [path, text] of Object.entries(files)) {
+    await mkdir(join(root, dirname(path)), { recursive: true });
+    await writeFile(join(root, path), text);
+  }
+  await exec('git', ['-C', root, 'add', '.']);
+  await exec('git', ['-C', root, 'commit', '-qm', 'web']);
+  const sources = Object.keys(files).map((path) => ({ path, startLine: 2, endLine: 2 }));
+  const packet = await buildPacket({ root, spec: await spec(root, base({ allowedFiles: Object.keys(files), sources })) });
+  assert.deepEqual(packet.sources.map((source) => [source.path, source.lines[0].content]), [
+    ['deploy/run.sh', 'set -eu'], ['site/index.html', '<h1>Soon</h1>'], ['site/style.css', '  margin: 0;'], ['web/App.svelte', 'let n = 1'],
+  ]);
+  await writeFile(join(root, 'Dockerfile'), 'FROM scratch\n');
+  await assert.rejects(buildPacket({ root, spec: await spec(root, base({ sources: [{ path: 'Dockerfile', startLine: 1, endLine: 1 }] })) }), /source extension is unsupported/);
+});
+
 test('rejects a symlink root before canonicalisation', async () => {
   const root = await fixture();
   const linked = `${root}-linked`;

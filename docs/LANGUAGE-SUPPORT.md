@@ -17,6 +17,9 @@ can still exclude eligible files.
 | `.h` | Yes | Classified as C; lexical extraction | Yes | Unsupported |
 | `.hh`, `.hpp`, `.hxx` | Yes | C++ lexical extraction | Yes | Unsupported |
 | `.dart` | Yes | Unsupported | Yes | Unsupported |
+| `.json`, `.jsonc`, `.toml`, `.yaml`, `.yml` | No | Unsupported | Yes | Unsupported |
+| `.html`, `.htm`, `.css`, `.scss`, `.svelte` | No | Unsupported | Yes (from 0.25.0) | Unsupported |
+| `.sh`, `.bash`, `.zsh` | No | Unsupported | Yes (from 0.25.0) | Unsupported |
 | `.ts` | Yes | Not handled by this scanner; separate TS/JS scanner exists | Yes | TypeScript syntax blocks |
 
 The source contracts are
@@ -24,6 +27,9 @@ The source contracts are
 [the broad scanner's language map and lexical rules](../packages/context-tools/src/broad-source-scan.ts),
 [the TS/JS scanner](../packages/context-tools/src/source-scan.ts), and
 [packet source/plan allowlists and guards](../packages/context-tools/src/source-packet.mjs).
+Configuration, web and shell files are exact packet sources only: they are not
+indexed, so search and explore do not find them. Extensionless scripts and
+Dockerfiles are outside both lists.
 
 
 Navigation provides exact-token line lookup. Broad scanning uses regular
