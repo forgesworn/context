@@ -35,6 +35,13 @@ to an included path remain traversable. Missing `include` means all otherwise
 eligible paths; an explicit empty list includes none. `exclude` always wins.
 Include entries cannot override `.gitignore`, hidden-file or symlink exclusions.
 
+When a root policy has an include list or exclude rules, search and explore
+results carry `policyScope` (include mode and rule counts) plus a note line under
+the text header, so an absent match is not mistaken for absence from the
+repository. Default exclusions and `.gitignore` alone do not add it, and nested policy files are not summarised. Review an
+untracked local policy file periodically: a narrow allowlist left in place
+hides the rest of the checkout from every agent.
+
 Unknown fields, unsupported versions, malformed paths and unreadable policies
 are errors. Policy reads reject symlinks and non-regular files, invalid UTF-8,
 files over 64 KiB, and totals over 256 policy files or 1 MiB per discovery.

@@ -198,6 +198,31 @@ describe('RepositoryNavigation', () => {
     expect((await nav.search({ term: 'shared' })).results).toEqual([]);
   });
 
+  it('marks search and explore results narrowed by a root navigation policy', async () => {
+    const root = await mkFixture();
+    await writeFile(root, '.z1p-navigation.json', '{"version":1,"include":["src"],"exclude":["src/gen"]}\n');
+    await writeFile(root, 'src/a.ts', 'export function shared() {}\n');
+    await writeFile(root, 'site/b.ts', 'shared()\n');
+    const nav = new RepositoryNavigation(root);
+    await nav.refresh();
+    const search = await nav.search({ term: 'shared' });
+    expect(search.results.map(record => record.path)).toEqual(['src/a.ts']);
+    expect(search.policyScope).toEqual({ includeMode: 'prefixes', include: 1, exclude: 1 });
+    expect((await nav.explore({ symbol: 'shared' })).policyScope).toEqual({ includeMode: 'prefixes', include: 1, exclude: 1 });
+  });
+
+  it('leaves results unmarked when only defaults and .gitignore exclude files', async () => {
+    const root = await mkFixture();
+    await writeFile(root, '.gitignore', 'ignored.ts\n');
+    await writeFile(root, 'ignored.ts', 'shared denied\n');
+    await writeFile(root, 'kept.ts', 'export const shared = 1\n');
+    const nav = new RepositoryNavigation(root);
+    const status = await nav.refresh();
+    expect(status.exclusions.policy).toBeGreaterThan(0);
+    expect((await nav.search({ term: 'shared' })).policyScope).toBeUndefined();
+    expect((await nav.explore({ symbol: 'shared' })).policyScope).toBeUndefined();
+  });
+
   it('reports unknown freshness on inspection failure while retaining the prior generation and cursor', async () => {
     const root = await mkFixture();
     await writeFile(root, 'a.ts', 'shared one\nshared two\n');

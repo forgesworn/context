@@ -87,6 +87,31 @@ export interface ExploreResult extends ExploreAnalysis {
   otherCaseLines: number
   scanTruncated: boolean
   omitted: ExploreOmitted
+  policyScope?: PolicyScope
+}
+
+/** A root `.z1p-navigation.json` that narrows the index beyond the default
+ * exclusions and .gitignore. Results carry it only when it does, so a caller
+ * knows that absent matches may lie outside the policy. */
+export interface PolicyScope {
+  includeMode: 'all' | 'prefixes' | 'none'
+  include: number
+  exclude: number
+}
+
+export function policyScopeOf(
+  summary: { includeMode: PolicyScope['includeMode']; include: number; exclude: number } | undefined,
+): PolicyScope | undefined {
+  if (!summary || (summary.includeMode === 'all' && summary.exclude === 0)) return undefined
+  return { includeMode: summary.includeMode, include: summary.include, exclude: summary.exclude }
+}
+
+export function renderPolicyScope(scope: PolicyScope): string {
+  const parts: string[] = []
+  if (scope.includeMode === 'none') parts.push('empty include list')
+  else if (scope.includeMode === 'prefixes') parts.push(`only ${scope.include} include ${scope.include === 1 ? 'path' : 'paths'}`)
+  if (scope.exclude) parts.push(`${scope.exclude} exclude ${scope.exclude === 1 ? 'rule' : 'rules'}`)
+  return `note: scope narrowed by .z1p-navigation.json (${parts.join(', ')}); matches outside it are not indexed, see repository_status`
 }
 
 export const EXPLORE_SYMBOL = /^[A-Za-z_$][A-Za-z0-9_$]{0,127}(\.[A-Za-z_$#][A-Za-z0-9_$]{0,127})?$/
@@ -412,6 +437,7 @@ export function renderExplore(result: ExploreResult): string {
     result.scanTruncated ? `scan truncated at ${EXPLORE_MAX_HITS} lines` : '',
   ].filter(Boolean)
   out.push(`explore ${result.symbol}  ${result.matchedLines} lines in ${result.files} files${flags.length ? `  (${flags.join('; ')})` : ''}  generation ${result.generation}  revision ${short(result.revision)}  freshness current`)
+  if (result.policyScope) out.push(renderPolicyScope(result.policyScope))
   if (result.definitions.length === 0) out.push(`definition none resolved${result.omitted.definitions ? ` (${result.omitted.definitions} omitted)` : ''}; declaration syntax supports TypeScript/JavaScript/Rust/Kotlin`)
   for (const definition of result.definitions) {
     out.push(`definition ${definition.path}:${definition.startLine}-${definition.endLine}  ${definition.exported ? 'exported' : 'local'} ${definition.kind} ${definition.name}  sha256 ${short(definition.sha256)}${definition.outline ? '  (outline)' : ''}`)
