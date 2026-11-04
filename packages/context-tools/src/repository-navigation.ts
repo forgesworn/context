@@ -136,6 +136,9 @@ const EXTENSIONS = new Set([
   '.py', '.rs', '.go', '.java', '.kt', '.kts', '.swift',
   '.c', '.cc', '.cpp', '.cxx', '.h', '.hh', '.hpp', '.hxx',
   '.cs', '.rb', '.php', '.dart', '.md',
+  // Web, Svelte and shell sources are indexed lexically. Configuration formats
+  // (JSON, TOML, YAML) stay packet-only: lockfiles and data would flood search.
+  '.html', '.htm', '.css', '.scss', '.svelte', '.sh', '.bash', '.zsh',
 ]);
 
 const EXCLUDED_DIRS = new Set([

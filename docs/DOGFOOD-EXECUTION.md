@@ -1845,5 +1845,8 @@ by name.
 
 Correction, same day: packets already accepted JSON, TOML and YAML. HTML, CSS,
 SCSS, Svelte and shell (`.sh`, `.bash`, `.zsh`) were not accepted, and now are as
-exact `build` sources (OS4). None of these formats is indexed for search or
-explore, and extensionless scripts and Dockerfiles remain outside both lists.
+exact `build` sources (OS4) in 0.25.0. From 0.26.0, the web, Svelte and shell
+types are also indexed lexically for search and explore; JSON, TOML and YAML stay
+packet-only, and extensionless scripts and Dockerfiles remain outside both lists.
+Across the checkouts surveyed this adds, for example, 83 CSS files in v4v, 39
+Svelte files in sapwood, and 40 HTML, CSS and shell files in kithmoot.
