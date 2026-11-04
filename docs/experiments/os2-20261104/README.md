@@ -360,6 +360,55 @@ A failed qualification is recorded. Its observed cause is fixed and released
 as its own change, and phase 1 runs again under a new draft revision.
 Phase 2 is not run after a failure.
 
+#### Attempt 1 (2026-11-04): invalid, runner defect
+
+h3-code-change on this Mac, Codex 0.166.0, Context 0.26.0, Sol/high; Context
+ran first (cell-001), then plain (cell-002). The blind workspace and the
+author transcript were moved to the M4 while executors ran (tar hash matched
+on both machines) and restored for assessment. Four sessions were spent.
+
+**Defect.** Each cell is a copy of the template at a new path. pnpm 11 treats
+the copy as stale and reinstalls before every `pnpm <bin>`. Inside Codex's
+workspace-write sandbox that reinstall cannot write the global store, fails
+offline and purges `node_modules`. Neither executor could run tests (each
+tried twice), the hidden checker exited 127 in both cells, and both reviewers
+saw a failed checker and rejected. This is not a phase 1 result in either
+direction.
+
+Observations under the broken environment, not a comparison:
+
+| | Context | Plain |
+|---|---|---|
+| Seconds | 398.5 | 288.7 |
+| Total tokens | 2,125,752 | 924,423 |
+| Uncached input | 70,596 | 43,789 |
+| Output | 15,220 | 11,386 |
+| Files changed | 5 | 4 |
+| Hidden checker after relink (no reviewer) | passed | passed |
+| Missed or incorrect dependencies | 0 | 0 |
+
+The Context arm used 12 packets, with no reads after a packet and a tool error
+rate of 2.3%.
+
+**Fix.** The runner relinks every copy offline before any model starts, then
+runs `pnpm vitest --version` under Codex's own sandbox (`codex sandbox`) and
+refuses to start the executor if either fails. It records whether the tool
+chain still works after the run, relinks the checker's copy, and can run the
+checker alone (`assess --checker-only`, no reviewer). Without the relink the
+probe fails under Codex's sandbox; with it, it passes. 28 harness tests.
+
+**For the protocol review:**
+
+- the outside-reference audit flagged glob patterns such as `*/vitest.mjs`
+  (fixed);
+- `/tmp` is exempt from that audit: cell-001 moved a stray `.pnpm-store` to
+  `/private/tmp` unflagged (removed afterwards), and `/tmp` is shared by cells;
+- the reviewer runs inside the cell directory, whose parent holds the
+  executor's config and prompt, which name the arm. Both reviewers' audits
+  showed no outside reads.
+
+Attempt 2 needs its own approval: four more Sol/high sessions on the plan.
+
 ### Independent protocol review (paid, needs approval)
 
 A fresh Sol/high session reviews the frozen protocol, harness diff and phase 1
@@ -450,18 +499,10 @@ Phase 2 is of that order. Phase 1 is one pair. No prices were looked up.
 1. ~~The write-capability probe~~ (run and passed 2026-11-04).
 2. ~~The blind task-author session~~ (run 2026-11-04; see Task pack as
    authored).
-3. Phase 1.
+3. Phase 1: attempt 1 run 2026-11-04 on h3-code-change, this Mac, and
+   invalid on a runner defect (see Attempt 1). Attempt 2, same task and
+   host, needs approval.
 4. The protocol review and phase 2, only if phase 1 passes.
-
-Phase 0 is complete. Choices for phase 1:
-
-- **The task:** one impact or code-change task. h3-code-change or
-  bray-code-change is suggested, because their checkers are verified and the
-  author's leak did not concern them.
-- **The host.** Either:
-  - this Mac, with the blind workspace moved off it while executors run;
-  - or the M4, which first needs Codex 0.166.0 and Context 0.26.0 installed,
-    and the private acceptance copy removed during execute.
 
 ## Not claimed
 

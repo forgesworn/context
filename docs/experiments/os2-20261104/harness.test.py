@@ -2,6 +2,7 @@
 """Fixture tests for harness.py. Model-free: Codex is a fake that records any call."""
 import importlib.util
 import json
+import shutil
 import os
 import pathlib
 import stat
@@ -218,8 +219,10 @@ class PlanDryRun(unittest.TestCase):
 
 
 FAKE_CODEX = r'''#!/usr/bin/env python3
-import sys, json, pathlib
+import sys, json, pathlib, subprocess
 a = sys.argv
+if a[1] == 'sandbox':
+    sys.exit(subprocess.run(a[a.index('-c') + 2:]).returncode)
 cwd = pathlib.Path(a[a.index('-C') + 1]); out = pathlib.Path(a[a.index('-o') + 1])
 U = {"input_tokens": 100, "cached_input_tokens": 40, "output_tokens": 10, "reasoning_output_tokens": 2, "cache_write_input_tokens": 0}
 if a[a.index('--sandbox') + 1] == 'workspace-write':
@@ -264,7 +267,12 @@ class ExecutionPath(unittest.TestCase):
         self.archives = d / 'archives.json'
         self.archives.write_text(json.dumps({'r-code-change': h.sha256_file(self.archive_dir / 'r-code-change.tar')}))
 
+        self.saved = dict(h.RELINK), dict(h.READY)
+        h.RELINK['r'] = 'mkdir -p node_modules && touch node_modules/relinked'
+        h.READY['r'] = 'test -f node_modules/relinked'
+
     def tearDown(self):
+        h.RELINK.clear(); h.RELINK.update(self.saved[0]); h.READY.clear(); h.READY.update(self.saved[1])
         self.tmp.cleanup()
 
     def run_all(self, forbid=()):
@@ -301,6 +309,9 @@ class ExecutionPath(unittest.TestCase):
             self.assertEqual(ex['usage']['total'], 110)
             self.assertEqual(ex['outsideReferences'], ['/etc/hosts'])
             self.assertIn('fixed', (cell / 'executor.diff').read_text())
+            self.assertEqual(ex['environment']['relink']['exitCode'], 0)
+            self.assertEqual(ex['environment']['ready']['exitCode'], 0)
+            self.assertTrue(ex['environment']['intactAfterRun'])
         self.assertEqual(h.main(['assess', *common, '--acceptance', str(self.acc), '--repos', str(self.d / 'repos')]), 0)
         for cell in cells:
             a = json.loads((cell / 'assessment.json').read_text())
@@ -308,8 +319,38 @@ class ExecutionPath(unittest.TestCase):
             self.assertEqual(a['dependencies'], {'missed': 0, 'incorrect': 0, 'total': 0})
             self.assertTrue(a['reviewer']['valid'])
             self.assertTrue(a['accepted'])
+            self.assertEqual(a['checker']['relinkExit'], 0)
             self.assertEqual(a['totalTokens'], 220)
             self.assertFalse((cell / 'check').exists())
+
+    def test_no_model_starts_unless_the_copy_is_relinked_and_ready(self):
+        for relink, ready in (('exit 3', 'true'), ('true', 'test -f node_modules/relinked')):
+            with self.subTest(relink=relink, ready=ready):
+                for x in ('plan', 'templates'):
+                    shutil.rmtree(self.d / x, ignore_errors=True)
+                h.RELINK['r'], h.READY['r'] = relink, ready
+                with self.assertRaises(SystemExit):
+                    self.run_all()
+                cell = self.d / 'plan' / 'cell-001'
+                self.assertFalse((cell / 'executor.json').exists())
+                self.assertFalse((cell / 'executor-events.jsonl').exists())
+                self.assertFalse((cell / 'escape.txt').exists())
+                self.assertFalse((cell / 'workspace').exists())
+                self.assertTrue((cell / 'environment.json').is_file())
+
+    def test_checker_only_runs_no_reviewer(self):
+        code, common = self.run_all()
+        self.assertEqual(h.main(['assess', *common, '--acceptance', str(self.acc), '--repos', str(self.d / 'repos'), '--checker-only']), 0)
+        for cell in sorted((self.d / 'plan').glob('cell-*')):
+            rec = json.loads((cell / 'checker-only.json').read_text())
+            self.assertTrue(rec['checkerPassed'])
+            self.assertFalse((cell / 'review').exists())
+            self.assertFalse((cell / 'assessment.json').exists())
+
+    def test_glob_patterns_are_not_outside_references(self):
+        line = json.dumps({'type': 'item.completed', 'item': {'type': 'command_execution',
+                           'command': "/bin/zsh -lc \"rg -g 'test/**/*.ts' x; find node_modules -path '*/vitest.mjs'; cat /etc/passwd\""}})
+        self.assertEqual(h.outside_references(line, pathlib.Path('/w')), ['/etc/passwd'])
 
     def test_a_failed_checker_is_never_accepted(self):
         code, common = self.run_all()

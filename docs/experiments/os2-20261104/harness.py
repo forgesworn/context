@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """OS2 runner, phase 0 part: schedule, arm setup, commands, usage and the cost gate.
 
-Model-free. `plan` writes every cell's Codex home config, prompt and argument list
-to a new directory and never starts Codex. Executing cells is not implemented here:
-it needs the task pack (preparer, checker, citation scope) and separate approval.
+`plan` writes every cell's Codex home config, prompt and argument list to a new
+directory and never starts Codex. `prepare` and `assess --checker-only` start no
+model either; `execute` and `assess` do, and each run needs its own approval.
 
 Derived from ../d5-20260921-v3/run-pair.py, which stays locked and unchanged.
 Differences: the arm order rotates; arms are data (plain, context, graphify);
@@ -262,6 +262,13 @@ import time
 import datetime as dt
 
 INSTALL = {'bray': 'npm ci && npm run build', 'h3': 'pnpm install --frozen-lockfile'}
+# A copied pnpm tree is stale to pnpm 11, which reinstalls before every `pnpm <bin>`.
+# Inside Codex's sandbox that reinstall cannot write the global store, fails offline
+# and purges node_modules (phase 1 attempt 1). So each copy is relinked offline,
+# outside the sandbox, and READY is then run under Codex's own sandbox before any
+# model starts.
+RELINK = {'h3': 'pnpm install --frozen-lockfile --offline'}
+READY = {'h3': 'pnpm vitest --version'}
 OFFLINE = ('(version 1)(allow default)(deny network-outbound)(allow network-outbound (remote ip "localhost:*"))'
            '(allow network-outbound (remote unix-socket))')
 SYSTEM_PREFIXES = ('/bin/', '/usr/', '/opt/homebrew/', '/dev/null', '/dev/stdin', '/dev/stdout', '/dev/stderr', '/tmp/', '/private/tmp/')
@@ -347,7 +354,7 @@ def outside_references(events_text, workspace):
             continue
         cmd = item.get('command') or ''
         cmd = ' '.join(cmd) if isinstance(cmd, list) else cmd
-        for token in re.findall(r"(?<![\w.])(~[^\s'\";|&)]*|\$HOME[^\s'\";|&)]*|/[^\s'\";|&)]+)", cmd):
+        for token in re.findall(r"(?<![\w.*}])(~[^\s'\";|&)]*|\$HOME[^\s'\";|&)]*|/[^\s'\";|&)]+)", cmd):
             if token.startswith(ws) or token.startswith(SYSTEM_PREFIXES) or token in ('/bin/zsh', '/bin/bash', '/bin/sh'):
                 continue
             if token.startswith('/') and token.count('/') == 1 and len(token) < 3:
@@ -356,9 +363,39 @@ def outside_references(events_text, workspace):
     return sorted(hits)
 
 
+def sandbox_probe(codex, home, ws, command_text, timeout=300):
+    """Run one command under Codex's own workspace-write sandbox, with no model,
+    to check the tool chain works where the executor will run it."""
+    home.mkdir(mode=0o700, exist_ok=True)
+    argv = [str(codex), 'sandbox', '-c', 'sandbox_mode="workspace-write"', '/bin/zsh', '-lc', command_text]
+    started = time.monotonic()
+    try:
+        p = subprocess.run(argv, cwd=ws, env={**os.environ, 'CODEX_HOME': str(home)}, text=True, capture_output=True, timeout=timeout)
+        code, out = p.returncode, p.stdout + p.stderr
+    except subprocess.TimeoutExpired as exc:
+        code, out = 'timeout', str(exc)
+    return {'exitCode': code, 'seconds': round(time.monotonic() - started, 1), 'tail': out[-2000:]}
+
+
+def ready_environment(codex, cell_dir, ws, repository):
+    """Relink the copied tree, then probe it under the sandbox. Raises before any
+    model starts if either fails, removing the copy so the cell can be rerun."""
+    env = {'relink': None, 'ready': None}
+    if RELINK.get(repository):
+        env['relink'] = shell(RELINK[repository], ws, offline=True)
+    if READY.get(repository) and (env['relink'] is None or env['relink']['exitCode'] == 0):
+        env['ready'] = sandbox_probe(codex, cell_dir / 'probe-home', ws, READY[repository])
+    write_json(cell_dir / 'environment.json', env)
+    if any(v is not None and v['exitCode'] != 0 for v in env.values()):
+        shutil.rmtree(ws, ignore_errors=True)
+        raise SystemExit(f'{cell_dir.name}: environment not ready, no model started (see environment.json)')
+    return env
+
+
 def run_executor(codex, cell_dir, arm, task, template, auth, node, navigation_cli, timeout):
     ws = cell_dir / 'workspace'
     clone_tree(template, ws)
+    environment = ready_environment(codex, cell_dir, ws, task['repository'])
     home = cell_dir / 'executor-home'
     home.mkdir(mode=0o700)
     (home / 'auth.json').symlink_to(auth)
@@ -384,7 +421,10 @@ def run_executor(codex, cell_dir, arm, task, template, auth, node, navigation_cl
     changed = [f for f in git(ws, 'diff', '--cached', '--name-only', check=False).stdout.splitlines() if f]
     metrics = subprocess.run([str(node), str(HERE / 'metrics.mjs'), str(cell_dir / 'executor-events.jsonl'), '--root', str(ws)],
                              capture_output=True, text=True)
-    return {'startedAt': started, 'seconds': seconds, 'exitCode': code, 'command': argv,
+    # After the diff is taken: does the tool chain still work, or did the run break it?
+    after = sandbox_probe(codex, cell_dir / 'probe-home', ws, READY[task['repository']]) if READY.get(task['repository']) else None
+    environment['intactAfterRun'] = None if after is None else after['exitCode'] == 0
+    return {'startedAt': started, 'seconds': seconds, 'exitCode': code, 'command': argv, 'environment': environment,
             'usage': {k: v for k, v in usage(out).items() if k != 'raw'}, 'changedFiles': changed,
             'answerPresent': (ws / 'answer.json').is_file(),
             'metrics': json.loads(metrics.stdout) if metrics.returncode == 0 else {'error': metrics.stderr[-500:]},
@@ -434,7 +474,8 @@ def review_outcome(report, rubric_ids):
     return {'valid': valid, 'accepted': accepted}
 
 
-def assess_cell(codex, cell_dir, task, acc, repo, auth, timeout):
+def run_checker(cell_dir, task, acc, repo):
+    """Hidden checker and dependency count for one cell, with no model."""
     ws = cell_dir / 'workspace'
     receipt = json.loads((cell_dir / 'executor.json').read_text(encoding='utf8'))
     try:
@@ -445,18 +486,26 @@ def assess_cell(codex, cell_dir, task, acc, repo, auth, timeout):
     checker = {'ran': False}
     if task['class'] in ('code-change', 'diagnosis'):
         check_ws = cell_dir / 'check'
+        shutil.rmtree(check_ws, ignore_errors=True)
         clone_tree(ws, check_ws)
+        if RELINK.get(task['repository']):
+            checker['relinkExit'] = shell(RELINK[task['repository']], check_ws, offline=True)['exitCode']
         for rel in acc['checker']['testFiles']:
             content = git(repo, 'show', f"{acc['sourceChange']}:{rel}").stdout
             target = check_ws / rel
             target.parent.mkdir(parents=True, exist_ok=True)
             target.write_text(content, encoding='utf8')
         result = shell(acc['checker']['command'], check_ws, offline=True, timeout=900)
-        checker = {'ran': True, 'passed': result['exitCode'] == 0, **result}
+        checker = {**checker, 'ran': True, 'passed': result['exitCode'] == 0, **result}
         shutil.rmtree(check_ws, ignore_errors=True)
     base_paths = set(git(repo, 'ls-tree', '-r', '--name-only', task['baseCommit']).stdout.splitlines())
     deps = dependency_count(task, acc, answer, receipt.get('changedFiles', []), base_paths)
+    return receipt, answer, checker, deps
 
+
+def assess_cell(codex, cell_dir, task, acc, repo, auth, timeout):
+    receipt, answer, checker, deps = run_checker(cell_dir, task, acc, repo)
+    ws = cell_dir / 'workspace'
     review = cell_dir / 'review'
     review.mkdir(mode=0o700)
     write_json(review / 'task.json', {k: task[k] for k in ('id', 'repository', 'class', 'statement', 'answerFormat')})
@@ -495,7 +544,7 @@ def assess_cell(codex, cell_dir, task, acc, repo, auth, timeout):
     reviewer_usage = {k: v for k, v in usage(out).items() if k != 'raw'}
     accepted = bool(verdict['accepted'] and answer is not None and code == 0
                     and (not checker['ran'] or checker['passed']))
-    result = {'checker': {k: checker.get(k) for k in ('ran', 'passed', 'exitCode', 'seconds')}, 'dependencies': deps,
+    result = {'checker': {k: checker.get(k) for k in ('ran', 'passed', 'exitCode', 'seconds', 'relinkExit')}, 'dependencies': deps,
               'reviewer': {'exitCode': code, 'seconds': seconds, 'usage': reviewer_usage, **verdict},
               'accepted': accepted,
               'totalTokens': cell_total([receipt['usage'], reviewer_usage]),
@@ -532,10 +581,19 @@ def assess(args):
     tasks = {t['id']: t for t in (json.loads(p.read_text(encoding='utf8')) for p in args.tasks.glob('*.json') if p.name != 'manifest.json')}
     for cell in plan_doc['cells']:
         cell_dir = args.plan / cell['directory']
-        if (args.only and cell['directory'] not in args.only) or not (cell_dir / 'executor.json').exists() or (cell_dir / 'assessment.json').exists():
+        done = cell_dir / ('checker-only.json' if args.checker_only else 'assessment.json')
+        if (args.only and cell['directory'] not in args.only) or not (cell_dir / 'executor.json').exists() or done.exists():
             continue
         task = tasks[cell['task']]
         acc = json.loads((args.acceptance / f"{task['id']}.json").read_text(encoding='utf8'))
+        if args.checker_only:
+            # No reviewer: checker pass/fail and dependency counts only, never the checker output.
+            _, answer, checker, deps = run_checker(cell_dir, task, acc, args.repos / task['repository'])
+            rec = {'cell': cell['directory'], 'answerPresent': answer is not None, 'checkerRan': checker['ran'],
+                   'checkerPassed': checker.get('passed'), 'relinkExit': checker.get('relinkExit'), 'dependencies': deps}
+            write_json(cell_dir / 'checker-only.json', rec)
+            print(json.dumps(rec))
+            continue
         result = assess_cell(codex, cell_dir, task, acc, args.repos / task['repository'], args.auth_file, args.timeout)
         print(json.dumps({'cell': cell['directory'], 'accepted': result['accepted'], 'totalTokens': result['totalTokens'],
                           'dependencies': result['dependencies']}))
@@ -575,6 +633,7 @@ def main(argv=None):
         else:
             q.add_argument('--acceptance', required=True, type=pathlib.Path)
             q.add_argument('--repos', required=True, type=pathlib.Path)
+            q.add_argument('--checker-only', action='store_true', help='run the hidden checker and dependency count only; no reviewer, no model')
     q = sub.add_parser('prepare')
     q.add_argument('--tasks', required=True, type=pathlib.Path)
     q.add_argument('--archives', required=True, type=pathlib.Path, help='JSON map task id -> archive sha256')

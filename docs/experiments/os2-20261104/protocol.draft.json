@@ -1,5 +1,5 @@
 {
-  "version": 0,
+  "version": 1,
   "status": "draft-unlocked",
   "experimentId": "os2-codex-sol-high-context-0.26.0",
   "draftedAt": "2026-11-04",
@@ -209,7 +209,67 @@
         "readsAfterPacketMax": 0.25,
         "contextToolErrorRateMax": 0.05
       },
-      "onFailure": "Record; fix the observed cause as its own release; rerun phase 1 under a new draft revision. Phase 2 is not run."
+      "onFailure": "Record; fix the observed cause as its own release; rerun phase 1 under a new draft revision. Phase 2 is not run.",
+      "attempts": [
+        {
+          "attempt": 1,
+          "ranAt": "2026-11-04",
+          "status": "invalid-runner-defect",
+          "task": "h3-code-change",
+          "host": "this Mac",
+          "codex": "0.166.0",
+          "context": "0.26.0",
+          "settings": "gpt-5.6-sol/high",
+          "order": [
+            "context (cell-001)",
+            "plain (cell-002)"
+          ],
+          "readExposure": "blind workspace and author transcript moved to the M4 during execute (tar sha256 matched both ends), restored for assess",
+          "sessionsSpent": 4,
+          "defect": "Cells are copies of the template at a new path. pnpm 11 treats the copy as stale and reinstalls before every `pnpm <bin>`; inside the workspace-write sandbox it cannot write the global store, fails offline and purges node_modules. Neither executor could run tests (each tried twice); the hidden checker exited 127 in both cells; both reviewers saw a failed checker and rejected.",
+          "observationsNotAComparison": {
+            "context": {
+              "seconds": 398.5,
+              "total": 2125752,
+              "uncached": 70596,
+              "output": 15220,
+              "packets": 12,
+              "readsAfterPacket": 0,
+              "toolErrorRate": 0.023,
+              "changedFiles": 5,
+              "reviewerTotal": 72679
+            },
+            "plain": {
+              "seconds": 288.7,
+              "total": 924423,
+              "uncached": 43789,
+              "output": 11386,
+              "changedFiles": 4,
+              "reviewerTotal": 71092
+            },
+            "checkerOnlyAfterRelink": {
+              "context": "passed",
+              "plain": "passed"
+            },
+            "dependencies": {
+              "context": {
+                "missed": 0,
+                "incorrect": 0
+              },
+              "plain": {
+                "missed": 0,
+                "incorrect": 0
+              }
+            }
+          },
+          "fix": "harness: offline relink of every copy (RELINK), readiness probe under `codex sandbox` workspace-write before any model starts (READY) with refusal on failure, intactAfterRun recorded, checker clone relinked, assess --checker-only. Verified: without relink the probe fails under Codex sandbox, with it it passes; 28 harness tests.",
+          "forProtocolReview": [
+            "outsideReferences flagged glob patterns such as */vitest.mjs (fixed)",
+            "/tmp is exempt from outsideReferences: cell-001 moved a stray .pnpm-store to /private/tmp unflagged (removed afterwards); /tmp is shared across cells",
+            "the reviewer runs inside the cell directory, whose parent holds executor-config.toml and executor-prompt.txt, which name the arm; reviewer outsideReferences were 0 in both cells"
+          ]
+        }
+      ]
     },
     "protocolReview": {
       "paid": true,
@@ -274,7 +334,7 @@
     "screen-pro-040-20260923"
   ],
   "openDecisions": [
-    "Phase 1 approval and host",
+    "Phase 1 attempt 2 (four Sol/high sessions on the plan)",
     "Protocol review and phase 2 only if phase 1 passes",
     "Whether the protocol review replaces the tasks touched by the author's leak"
   ],
