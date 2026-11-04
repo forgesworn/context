@@ -16,9 +16,11 @@ import {
   exploreMatcher,
   isScriptPath,
   parseExploreSymbol,
+  policyScopeOf,
   type ExploreFileInput,
   type ExploreHit,
   type ExploreResult,
+  type PolicyScope,
 } from './repository-explore.js';
 
 export type { ExploreResult } from './repository-explore.js';
@@ -108,6 +110,7 @@ export interface NavigationResult {
   complete: boolean;
   stopReason: NavigationStopReason;
   nextCursor?: string;
+  policyScope?: PolicyScope;
 }
 
 export interface NavigationSearchOptions {
@@ -699,6 +702,7 @@ export class RepositoryNavigation {
     const nextCursorToken = randomUUID().replace(/-/g, '');
     const postings = literal ? literalPostings(gen, literal) : gen.byToken.get(token) ?? [];
     const results: NavigationResultRecord[] = [];
+    const policyScope = policyScopeOf(gen.policySummary);
 
     const buildResult = (
       complete: boolean,
@@ -711,6 +715,7 @@ export class RepositoryNavigation {
       freshness: freshnessAtStart.freshness,
       ...(freshnessAtStart.error ? { freshnessError: freshnessAtStart.error } : {}),
       policy: { freshness: freshnessAtStart.policy.freshness, digest: freshnessAtStart.policy.digest },
+      ...(policyScope ? { policyScope } : {}),
       term: token,
       ...(pathPrefix !== undefined ? { pathPrefix } : {}),
       results,
@@ -982,6 +987,7 @@ export class RepositoryNavigation {
       files.push({ path: rel, sha256: entry.sha256, hits: entry.hits, ...(text !== undefined ? { text } : {}), ...(syntax ? { syntax } : {}), ...(parseFailed ? { parseFailed } : {}) });
     }
     const analysis = analyseExplore(symbol, files);
+    const exploreScope = policyScopeOf(gen.policySummary);
     return makeFrozen({
       trust: 'local-source-unsigned' as const,
       generation: gen.id,
@@ -996,6 +1002,7 @@ export class RepositoryNavigation {
       scanTruncated,
       ...analysis,
       omitted: { definitions: 0, references: 0, tests: 0 },
+      ...(exploreScope ? { policyScope: exploreScope } : {}),
     });
   }
 

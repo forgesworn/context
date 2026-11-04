@@ -8,7 +8,7 @@ import { promisify } from 'node:util'
 import { Client } from '@modelcontextprotocol/sdk/client/index.js'
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js'
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js'
-import { createRepositoryNavigationServer, resolveCheckoutRoot } from './repository-navigation-mcp.js'
+import { createRepositoryNavigationServer, renderSearch, resolveCheckoutRoot } from './repository-navigation-mcp.js'
 
 const exec = promisify(execFile)
 const CLI = fileURLToPath(new URL('../bin/encrypted-context.mjs', import.meta.url))
@@ -616,4 +616,17 @@ describe('navigate without a directory', () => {
       await client.close()
     }
   }, 20000)
+})
+
+describe('search rendering', () => {
+  it('adds the narrowing policy note under the header only when present', () => {
+    const base = {
+      trust: 'local-source-unsigned' as const, generation: 'g', freshness: 'current' as const,
+      policy: { freshness: 'current' as const, digest: 'd' }, term: 'shared', results: [],
+      bytesUsed: 0, maxBytes: 1024, visited: 0, complete: true, stopReason: 'exhausted' as const,
+    }
+    expect(renderSearch(base).split('\n')).toHaveLength(1)
+    const lines = renderSearch({ ...base, policyScope: { includeMode: 'prefixes', include: 2, exclude: 0 } }).split('\n')
+    expect(lines[1]).toBe('note: scope narrowed by .z1p-navigation.json (only 2 include paths); matches outside it are not indexed, see repository_status')
+  })
 })

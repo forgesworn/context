@@ -8,7 +8,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { z } from 'zod'
 import { RepositoryNavigation, type NavigationResult, type NavigationStatus } from './repository-navigation.js'
-import { EXPLORE_SYMBOL, fitExplore, type ExploreResult } from './repository-explore.js'
+import { EXPLORE_SYMBOL, fitExplore, renderPolicyScope, type ExploreResult } from './repository-explore.js'
 import { COVERAGE_MAX_ANSWER_BYTES, COVERAGE_MAX_QUOTE_CHARS, COVERAGE_MAX_QUOTES, COVERAGE_MAX_SYMBOLS, COVERAGE_MAX_SYMBOLS_ACCEPTED, analyseCoverage, checkQuotes, renderCoverage, type CoverageResult } from './repository-coverage.js'
 import { registerRepositoryHandovers } from './repository-handover-mcp.js'
 import { buildPacketInline, outlineSource, planPacketInline } from './source-packet.mjs'
@@ -478,6 +478,7 @@ export function renderSearch(result: NavigationResult): string {
     (result.freshnessError ? ` (${result.freshnessError})` : '') +
     `  policy ${result.policy.freshness}`,
   )
+  if (result.policyScope) out.push(renderPolicyScope(result.policyScope))
   for (const [path, file] of files) {
     out.push(`${path}  ${short(file.sha256)}`)
     for (const row of file.rows) out.push(`  ${row.line}: ${row.text}`)

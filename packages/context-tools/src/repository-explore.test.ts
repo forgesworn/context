@@ -4,8 +4,8 @@ import * as os from 'node:os'
 import * as path from 'node:path'
 import { RepositoryNavigation } from './repository-navigation.js'
 import {
-  analyseExplore, exploreMatcher, fitExplore, parseExploreSymbol, parseScript, renderExplore,
-  type ExploreResult,
+  analyseExplore, exploreMatcher, fitExplore, parseExploreSymbol, parseScript, policyScopeOf, renderExplore,
+  renderPolicyScope, type ExploreResult,
 } from './repository-explore.js'
 
 const owned: string[] = []
@@ -168,6 +168,18 @@ describe('explore rendering and budget', () => {
     expect(text).toContain('references 2 lines in 2 files\nsrc/ref0.ts\n  1 in caller: call ownerOptions(0)\nsrc/ref1.ts\n  2 in caller: call ownerOptions(1)')
     expect(text).toContain('imports 1 files: src/server.ts')
     expect(lines.at(-1)).toMatch(/^note: exact-token matches/)
+  })
+
+  it('names a narrowing root policy under the header and omits it otherwise', () => {
+    expect(policyScopeOf(undefined)).toBeUndefined()
+    expect(policyScopeOf({ includeMode: 'all', include: 0, exclude: 0 })).toBeUndefined()
+    expect(policyScopeOf({ includeMode: 'all', include: 0, exclude: 2 })).toEqual({ includeMode: 'all', include: 0, exclude: 2 })
+    expect(renderPolicyScope({ includeMode: 'prefixes', include: 3, exclude: 0 })).toBe(
+      'note: scope narrowed by .z1p-navigation.json (only 3 include paths); matches outside it are not indexed, see repository_status')
+    expect(renderPolicyScope({ includeMode: 'none', include: 0, exclude: 1 })).toContain('(empty include list, 1 exclude rule)')
+    const narrowed = renderExplore(sample({ policyScope: { includeMode: 'prefixes', include: 1, exclude: 0 } })).split('\n')
+    expect(narrowed[1]).toBe(renderPolicyScope({ includeMode: 'prefixes', include: 1, exclude: 0 }))
+    expect(renderExplore(sample())).not.toContain('scope narrowed')
   })
 
   it('drops references, then tests, then definition lines to fit the budget and reports omissions', () => {

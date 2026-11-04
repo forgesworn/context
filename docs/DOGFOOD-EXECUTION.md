@@ -1812,7 +1812,7 @@ separate review time was recorded.
 Findings for later goals:
 
 - **Packet sufficiency (OS4):** for the website task the packet held only the
-  README. Website, test and deploy paths sit outside the default policy, and
+  README. Website, test and deploy paths sat outside a stale local policy (see the follow-up below), and
   HTML/CSS are not packet sources, so the host fell back to direct reads.
 - **Accounting (FS2):** a Claude Code transcript running a non-Anthropic model
   produced conflicting streamed usage copies, leaving the host total incomplete.
@@ -1822,3 +1822,23 @@ Findings for later goals:
 
 Receipts, specifications, capture hashes and the summary are kept in a private
 dated record. Session copies were deleted after import.
+
+The owner accepted OS0 on this evidence the same day.
+
+### Follow-up: stale local allowlists and a scope notice
+
+The website packet gap was mostly local configuration, not the default policy.
+kithmoot carried an untracked, git-excluded `.z1p-navigation.json` from the
+21 September pilot that included only `src`, `packages` and `README.md`, hiding
+about 380 TypeScript and 50 `.mjs` files under `site/`, `test/` and `deploy/`.
+Two more checkouts (heartwood-esp32 and oathrun) had the same kind of
+include-only file. With the owner's approval all three were backed up privately
+and removed. Tracked policy files that only exclude vendor or media paths were
+left in place.
+
+Search and explore previously reported such a narrowed scope as `complete`
+without naming the policy, which is how this went unnoticed. Results now carry
+`policyScope` and a note line under the header whenever a root
+`.z1p-navigation.json` has an include list or exclude rules. Default exclusions
+and `.gitignore` alone do not trigger it. Packets already refuse excluded paths
+by name. HTML, CSS, shell and JSON files are still not packet sources (OS4).
