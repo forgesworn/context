@@ -131,6 +131,12 @@ class Usage(unittest.TestCase):
             self.assertFalse(u['complete'])
             self.assertIsNone(u['total'])
 
+    def test_cache_writes_are_reported_and_flagged_but_not_added_to_the_total(self):
+        u = h.usage(stream({**self.U, 'cache_write_input_tokens': 0}))
+        self.assertEqual((u['cacheWrite'], u['cacheWriteSeen'], u['total']), (0, False, 1200))
+        u = h.usage(stream({**self.U, 'cache_write_input_tokens': 70}))
+        self.assertEqual((u['cacheWrite'], u['cacheWriteSeen'], u['total']), (70, True, 1200))
+
     def test_raw_unwrapped_lines_and_junk_are_handled(self):
         text = 'junk\n' + json.dumps({'type': 'turn.completed', 'usage': self.U})
         self.assertEqual(h.usage(text)['total'], 1200)

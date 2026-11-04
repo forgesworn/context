@@ -203,8 +203,7 @@ Results are never pooled with v1, v2, S5, v3, the repeated Pro run or the
      exit, not a tool error.
 
    The field names were confirmed from the Codex 0.166.0 binary and the v3
-   runner. They are checked against a real 0.166.0 stream from the write
-   probe; nothing earlier is paid.
+   runner, then on the real write-probe stream (see Write probe below).
 
    The September executor streams are not at the recorded private path
    (`.cache/z1p-delivery` under the home directory). A search of the home
@@ -215,7 +214,7 @@ Results are never pooled with v1, v2, S5, v3, the repeated Pro run or the
    can be added to test against them. Otherwise the phase 1 pair is the first
    real measurement, and the 0.25 threshold stays proposed until then.
 3. **Harness tests.** Built in [`harness.test.py`](harness.test.py) (run
-   with `python3 harness.test.py`), 19 tests:
+   with `python3 harness.test.py`), 20 tests:
    - rotation for 48 and 72 cells, checked against the formula;
    - arm setup, including that only the Context arm gets the server, bound to
      its own workspace;
@@ -233,9 +232,39 @@ Results are never pooled with v1, v2, S5, v3, the repeated Pro run or the
    threshold, incomplete-as-zero, a dropped bypass flag and a dropped
    `repository_packet`.
 
-   Usage assumptions to confirm on a real stream (the write probe): cached
-   input is within input, reasoning is within output, and usage is reported
-   per turn rather than cumulatively. Raw usage events are kept.
+   Usage assumptions: cached input is within input, reasoning is within
+   output, and cache writes are within input. Raw usage events are kept.
+
+### Write probe (paid; run 2026-11-04, passed)
+
+[`write-probe.py`](write-probe.py) ran two Sol/high sessions on a throwaway
+40-line repository, with Codex 0.166.0 (binary sha256 `39acf979…a7db7c1`)
+and the harness's own config and commands. Streams and the receipt are kept
+privately under `.cache/z1p-delivery/os2-write-probe-20261104`.
+
+| Session | Sandbox | Asked to | Result | Seconds | Input (cached) | Output (reasoning) |
+| --- | --- | --- | --- | --- | --- | --- |
+| Executor, Context arm config | `workspace-write` | status, refresh, packet `src/a.ts:1-20`, `cat src/a.ts`, write a file | File written; all three MCP calls completed | 32.0 | 86,960 (81,152) | 578 (200) |
+| Reviewer config, no MCP | `read-only` | write a file with the shell | Refused: "operation not permitted"; no file | 38.6 | 41,856 (39,424) | 279 (67) |
+
+What it confirmed:
+
+- The v2 defect is absent: the executor can write, and the reviewer cannot.
+- `metrics.mjs` reads the real stream: 1 packet, 1 covered file, the
+  prescribed `cat` counted as a re-read (reads after packet 1.0, as
+  instructed), 5 tool results, 0 tool errors, 0 unclassified segments.
+  Commands arrive as `/bin/zsh -lc '<script>'`, which `innerScript` unwraps.
+- Usage: one `turn.completed` per exec, aggregating every model call in the
+  turn. Fields present: `input_tokens`, `cached_input_tokens`,
+  `output_tokens`, `reasoning_output_tokens`, and an unexpected
+  `cache_write_input_tokens` (0 in both). The harness reports it separately
+  and flags any cell where it is non-zero; whether it is within
+  `input_tokens` is settled before lock if it appears.
+- Even a trivial session costs about 42,000 (reviewer) to 87,000 (Context
+  executor) input tokens, mostly cached. This fixed overhead per session is
+  part of every cell's total.
+- Codex runs agent commands through the owner's login shell (`zsh -l`), the
+  same in every arm.
 
 ### Phase 1: one-pair qualification (paid, needs approval)
 
@@ -337,9 +366,11 @@ Phase 2 is of that order. Phase 1 is one pair. No prices were looked up.
 
 ## Still needs separate approval, in this order
 
-1. The write-capability probe (one small Sol call; it also checks the metric
-   and usage field names).
-2. The blind task-author session.
+1. ~~The write-capability probe~~ (run and passed 2026-11-04).
+2. The blind task-author session. `claude --bare` skips CLAUDE.md, hooks
+   and memory but accepts only an API key, which is metered cash billing. A
+   plan-billed session needs another way to keep the global instructions
+   out, to be chosen by the owner.
 3. Phase 1.
 4. The protocol review and phase 2, only if phase 1 passes.
 

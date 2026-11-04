@@ -66,7 +66,7 @@
   },
   "executor": {
     "client": "codex-cli",
-    "clientVersion": "pin at lock (0.166.0 on 2026-11-04)",
+    "clientVersion": "0.166.0 (binary sha256 39acf979729dd290f9a24ee38b2914e036c91b65952872e28ae2a6b88a7db7c1); pin at lock",
     "model": "gpt-5.6-sol",
     "effort": "high",
     "sandbox": "workspace-write",
@@ -111,7 +111,52 @@
     "writeProbe": {
       "paid": true,
       "approval": "required",
-      "purpose": "Recheck the v2 read-only sandbox defect on the pinned Codex version."
+      "purpose": "Recheck the v2 read-only sandbox defect on the pinned Codex version.",
+      "status": "passed",
+      "ranAt": "2026-11-04",
+      "script": "write-probe.py",
+      "results": {
+        "executor": {
+          "sandbox": "workspace-write",
+          "wroteFile": true,
+          "mcpCalls": [
+            "repository_status",
+            "repository_refresh",
+            "repository_packet"
+          ],
+          "seconds": 32,
+          "usage": {
+            "input": 86960,
+            "cached": 81152,
+            "cacheWrite": 0,
+            "output": 578,
+            "reasoning": 200
+          }
+        },
+        "reviewer": {
+          "sandbox": "read-only",
+          "writeRefused": true,
+          "seconds": 38.6,
+          "usage": {
+            "input": 41856,
+            "cached": 39424,
+            "cacheWrite": 0,
+            "output": 279,
+            "reasoning": 67
+          }
+        },
+        "metrics": {
+          "packets": 1,
+          "packetCoveredFiles": 1,
+          "readsAfterPacket": 1,
+          "toolResults": 5,
+          "toolErrors": 0,
+          "unclassifiedSegments": 0,
+          "note": "the cat re-read was prescribed by the probe"
+        },
+        "usageShape": "one turn.completed per exec aggregating all model calls; fields input_tokens, cached_input_tokens, cache_write_input_tokens, output_tokens, reasoning_output_tokens"
+      },
+      "privateRecord": ".cache/z1p-delivery/os2-write-probe-20261104 under the home directory"
     },
     "phase1": {
       "paid": true,
@@ -139,7 +184,8 @@
       "paid": true,
       "approval": "required",
       "session": "fresh Claude session without the Context docs, skill or these prompts",
-      "countedAs": "setup"
+      "countedAs": "setup",
+      "launch": "claude --bare excludes CLAUDE.md, hooks and memory but needs an API key (metered cash); a plan-billed launch that keeps global instructions out is an owner choice"
     }
   },
   "metrics": {
@@ -154,8 +200,8 @@
     "usageAssumptions": [
       "cached_input_tokens within input_tokens",
       "reasoning_output_tokens within output_tokens",
-      "per-turn, not cumulative, usage in turn.completed",
-      "the write probe records which optional usage fields (cached_input_tokens, reasoning_output_tokens) are present; absent ones are summed as 0"
+      "cache_write_input_tokens within input_tokens (0 in the probe; cells with non-zero values are flagged and settled before lock)",
+      "one turn.completed per exec (confirmed by the probe)"
     ]
   },
   "qualityGate": {
@@ -185,7 +231,8 @@
     "screen-pro-040-20260923"
   ],
   "openDecisions": [
-    "Separate approvals, in order: write probe, blind task-author session, phase 1, then protocol review and phase 2 only if phase 1 passes"
+    "Approval and launch method for the blind task-author session",
+    "Then, separately: phase 1; then protocol review and phase 2 only if phase 1 passes"
   ],
   "revisedAt": "2026-11-04",
   "ownerDecisions": {

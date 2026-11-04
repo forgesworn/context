@@ -16,6 +16,11 @@ Usage assumptions, to be confirmed by the write probe on a real 0.166.0 stream:
   A2 reasoning_output_tokens is a subset of output_tokens;
   A3 one `codex exec` emits one turn.completed per model turn, each with
      per-turn (not cumulative) usage.
+  A4 cache_write_input_tokens (seen in the 0.166.0 probe, 0 there) is within
+     input_tokens. Unconfirmed: a cell where it is non-zero is flagged
+     cacheWriteSeen so the accounting can be settled before lock.
+The write probe (2026-11-04) saw one turn.completed per exec, aggregating
+every model call in that turn, with all four usage fields plus cache writes.
 """
 import argparse
 import json
@@ -146,17 +151,18 @@ def usage(events):
         if kind == 'turn.completed':
             turns += 1
             raw.append(event.get('usage'))
-    fields = ('input_tokens', 'cached_input_tokens', 'output_tokens', 'reasoning_output_tokens')
+    fields = ('input_tokens', 'cached_input_tokens', 'output_tokens', 'reasoning_output_tokens', 'cache_write_input_tokens')
     complete = turns > 0 and not abnormal and all(
         isinstance(u, dict) and isinstance(u.get('input_tokens'), int) and isinstance(u.get('output_tokens'), int) for u in raw)
     result = {'turns': turns, 'raw': raw, 'abnormal': abnormal, 'complete': complete,
-              'assumptions': ['A1 cached within input', 'A2 reasoning within output', 'A3 per-turn usage']}
+              'assumptions': ['A1 cached within input', 'A2 reasoning within output', 'A3 per-turn usage', 'A4 cache writes within input'],
+              'cacheWriteSeen': any(isinstance(u, dict) and (u.get('cache_write_input_tokens') or 0) > 0 for u in raw)}
     if not complete:
-        result.update({f: None for f in ('input', 'cached', 'uncached', 'output', 'reasoning', 'total')})
+        result.update({f: None for f in ('input', 'cached', 'uncached', 'cacheWrite', 'output', 'reasoning', 'total')})
         return result
     s = {f: sum(int(u.get(f) or 0) for u in raw) for f in fields}
     result.update({'input': s['input_tokens'], 'cached': s['cached_input_tokens'],
-                   'uncached': s['input_tokens'] - s['cached_input_tokens'], 'output': s['output_tokens'],
+                   'uncached': s['input_tokens'] - s['cached_input_tokens'], 'cacheWrite': s['cache_write_input_tokens'], 'output': s['output_tokens'],
                    'reasoning': s['reasoning_output_tokens'], 'total': s['input_tokens'] + s['output_tokens']})
     return result
 
