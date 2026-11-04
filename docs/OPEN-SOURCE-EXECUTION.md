@@ -124,6 +124,19 @@ not a new inference runner or packaged MCP operation. See
 [CLI usage imports](DAILY-USAGE.md#import-an-explicit-cli-invocation) and the
 execution ledger for the qualified shapes and retained-record replay.
 
+The 2–3 November releases 0.14.0–0.23.0 add an optional loopback owner
+dashboard and local task console: ticket cards with explicitly selected Girnel
+card links, Codex/Claude/Kimi sessions and a bounded Ollama worker lane, isolated
+concurrent worktree tasks, a shared private inbox, linked existing-agent status,
+task plans and versioned requirements. See the [local task console](AGENT-CONSOLE.md),
+[workspace dashboard](WORKSPACE-DASHBOARD.md), [task plans](TASK-PLANS.md) and
+[collaboration acceptance](CONSOLE-COLLABORATION-ACCEPTANCE.md). It sits outside
+the OS0–OS6 queue: it does not close OS0 (no real project task has yet run through
+it), OS1e, OS2 or OS6. These releases are GitHub releases; the npm registry still
+carries 0.3.3. Whether the console belongs in Z1P Core, given that coding clients
+own execution and Context "does not need to become a worker supervisor", is an
+open product-boundary decision for the owner, not settled by shipping it.
+
 The owner's 22 September priority is [deterministic code intelligence and better
 developer results](DETERMINISTIC-CODE-INTELLIGENCE.md). Begin OS4b-1 with the
 reproduced shadowed-call correctness defect, then OS4b-2 symbol resolution and
