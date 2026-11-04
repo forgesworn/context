@@ -1,0 +1,72 @@
+{
+  "authoredAt": "2026-11-04",
+  "rejectedCandidates": 8,
+  "tasks": [
+    {
+      "id": "bray-orientation",
+      "repository": "bray",
+      "class": "orientation",
+      "baseCommit": "8d6713d8d68b3cecfc42630642ab4fada67968a6",
+      "taskSha256": "7c045db6adcf891d3dfeb3eb877b71cf4f8778a084926a9b974b5299367dd918",
+      "acceptanceSha256": "7956e85c1810511590f9987252d399ebf3d99cbbda21becb18c6c4dca6770c4f"
+    },
+    {
+      "id": "bray-impact",
+      "repository": "bray",
+      "class": "impact",
+      "baseCommit": "f49cada6779ac787a099dc698e0a93c1830d4ed1",
+      "taskSha256": "4f95f2c1d74982e6cc368530293f560612f4e41af874da5541f54edc6900af12",
+      "acceptanceSha256": "add0d44847a09daec309ef52418527fc6f80af0467f68a3d03d453dd7a21a6e6"
+    },
+    {
+      "id": "bray-diagnosis",
+      "repository": "bray",
+      "class": "diagnosis",
+      "baseCommit": "264acc6f7c76fb4c4720f9c928d338ca71f38c23",
+      "taskSha256": "956f6fc6f03866756ff679e3b4ca37ced71c583a3ef5852da15e38092ad12bab",
+      "acceptanceSha256": "a2ae70e50255eaf374bf204728407a987ccb1d4c080000b285b2d2aa735df640"
+    },
+    {
+      "id": "bray-code-change",
+      "repository": "bray",
+      "class": "code-change",
+      "baseCommit": "0cac309e1dfbf76a4865c0e34b33ebe16fb6ec8d",
+      "taskSha256": "291518f777a6326700d65d3f445e2546b0a8032069b29c4520041d51d1a4e00e",
+      "acceptanceSha256": "9356af29aa6a1b4f335c192b429bd848e316ded26bf39c73705ce75f1223e089"
+    },
+    {
+      "id": "h3-orientation",
+      "repository": "h3",
+      "class": "orientation",
+      "baseCommit": "f0e17808ac2439b6434bb10609a961067f4d555b",
+      "taskSha256": "07c5a9aeec0944ed1d10c00f08e9993e2f01b1e7b5e04229874e733c7500383d",
+      "acceptanceSha256": "896f58cfb662d4da2a94ee05828a695f3e15f1abbfc4dfb6dd20743f5908a401"
+    },
+    {
+      "id": "h3-impact",
+      "repository": "h3",
+      "class": "impact",
+      "baseCommit": "2a164f3651bf9bde25749c12a5270b01c9c2b2c4",
+      "taskSha256": "119b3328554293c0afce102d86563370dec0a215ba5acfcc08382cc040e0c5eb",
+      "acceptanceSha256": "81cfcce27a1d76e0c01c60d27d4cca6ab190297a43b45ff069cb8bead30261ba"
+    },
+    {
+      "id": "h3-diagnosis",
+      "repository": "h3",
+      "class": "diagnosis",
+      "baseCommit": "ae4d6ee0bc371688b666044fbbd0064f3b6ac076",
+      "taskSha256": "4344a84aeff747a611812f1473f7de3e45fff72ced6ed585f90d893845a51a53",
+      "acceptanceSha256": "6a5ea3f5076c89390e4f8df72bf5b64e68dc4d951dc353c8f6694f524cfec81f"
+    },
+    {
+      "id": "h3-code-change",
+      "repository": "h3",
+      "class": "code-change",
+      "baseCommit": "3eb3a57f9c5c3cc6dfc8daefefa78393fa8fdbd2",
+      "taskSha256": "c4ba962b5a308f20946b7503c999f708538a383788688f80e42d5837489dcc91",
+      "acceptanceSha256": "49ce8377eac7d544a1eb3f9d99210d1f150ffabb87ced62b6c7a83cbd4c49135"
+    }
+  ],
+  "privateManifestSha256": "6b0fe9756b17c2111d8f2a1a1e3387e17681a21c09deb9e6e34daf80cd232d82",
+  "note": "Acceptance files are private and unread by the tool side; only their hashes are recorded. The private manifest also holds the author's problem notes."
+}

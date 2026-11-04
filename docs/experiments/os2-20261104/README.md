@@ -131,6 +131,59 @@ Why these repositories:
   This shows no network references are needed at those commits. Each task's
   own commit is checked again when it is frozen.
 
+## Task pack as authored (2026-11-04)
+
+The public statements are in [`tasks/`](tasks), with hashes in
+[`tasks/manifest.json`](tasks/manifest.json). The acceptance files are kept
+private and are unread by the tool side; their hashes are in the protocol.
+
+| Task | Class | Base commit | Base date |
+| --- | --- | --- | --- |
+| bray-orientation | orientation | `8d6713d8` | 2026-11-02 |
+| bray-impact | impact | `f49cada6` | 2026-09-03 |
+| bray-diagnosis | diagnosis | `264acc6f` | 2026-10-29 |
+| bray-code-change | code-change | `0cac309e` | 2026-07-28 |
+| h3-orientation | orientation | `f0e17808` | 2026-10-22 |
+| h3-impact | impact | `2a164f36` | 2026-07-02 |
+| h3-diagnosis | diagnosis | `ae4d6ee0` | 2026-07-22 |
+| h3-code-change | code-change | `3eb3a57f` | 2026-07-09 |
+
+The author examined and rejected eight other candidates.
+
+How the author session ran:
+
+- Claude Code headless, Opus 5.5, on the owner's plan. 70 turns, 626 seconds;
+  about 8.1M cached input read, 0.2M cache writes and 50,000 output tokens
+  (about $4.26 at API rates; not billed as cash).
+- Isolation:
+  - `CLAUDE_CODE_DISABLE_CLAUDE_MDS=1`, auto-memory off, project settings
+    only, skills off, no MCP servers, and web and agent tools disallowed;
+  - the shell sandboxed through `--settings` to deny every outbound domain
+    and any write outside its folder;
+  - git remotes removed from its repository copies.
+- Checks:
+  - a test session reported no user or project instructions;
+  - the brief's first step confirmed that outbound HTTPS was refused and a
+    write outside the folder was refused.
+- Before that:
+  - two Opus attempts stopped at that first step because the network was
+    still open: Claude Code ignores a project settings file in an untrusted
+    folder;
+  - three one-turn Haiku probes found the network setting that works.
+
+Known issues, for the protocol review:
+
+- **Partial leak.** Despite the brief, the author's final reply gave partial
+  hints about the hidden answers for bray-impact and bray-diagnosis, and said
+  the two h3 code tasks touch one shared source file. The tool side has seen
+  those hints. The protocol review decides whether to replace those tasks.
+- **Checkers not yet verified on clean installs.** The checkers were verified
+  against each repository's current `node_modules`, not a clean install at
+  each base commit. Freezing each task repeats the check from a clean
+  install, run by a script that reports only pass or fail.
+- **Orientation line ranges** were read by hand, so reviewers allow small
+  offsets.
+
 ## Executor, reviewer and harness
 
 - Executor: Codex CLI, `gpt-5.6-sol`, reasoning effort `high`. Both arms run in
@@ -367,16 +420,17 @@ Phase 2 is of that order. Phase 1 is one pair. No prices were looked up.
 ## Still needs separate approval, in this order
 
 1. ~~The write-capability probe~~ (run and passed 2026-11-04).
-2. The blind task-author session. `claude --bare` skips CLAUDE.md, hooks
-   and memory but accepts only an API key, which is metered cash billing. A
-   plan-billed session needs another way to keep the global instructions
-   out, to be chosen by the owner.
+2. ~~The blind task-author session~~ (run 2026-11-04; see Task pack as
+   authored).
 3. Phase 1.
 4. The protocol review and phase 2, only if phase 1 passes.
 
-Free work left before phase 1: freezing each task's archive and preparer,
-the per-task checker, packet sufficiency, and the execution path in the
-harness.
+Free work left before phase 1:
+
+- freezing each task's archive and preparer;
+- a blind checker run from clean installs (reporting pass or fail only);
+- packet sufficiency, also run blind, since required evidence is private;
+- the execution path in the harness.
 
 ## Not claimed
 

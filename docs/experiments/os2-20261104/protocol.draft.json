@@ -16,7 +16,7 @@
     "repinRule": "A phase 0 or phase 1 fix ships as its own release; this block is repinned before lock."
   },
   "taskPack": {
-    "status": "repositories chosen; tasks to write",
+    "status": "authored 2026-11-04; archives, preparer and checker runs to freeze",
     "shape": "Eight tasks: four on bray and four on h3; per repository one orientation, impact, diagnosis and code-change task.",
     "repositories": {
       "forgesworn": {
@@ -38,7 +38,16 @@
     },
     "excluded": "The eight d5-20260921 tasks are not reused: both repositories are ForgeSworn and the 0.4.0 fixes were found on that set.",
     "hiddenAcceptance": "Required evidence, dependency set, checker and scope rules per task. Mined tasks take them from the merged change; the blind Claude session writes the rest and vets all. Hashes recorded here at lock; unread by the tool side, including the owner, until results are recorded.",
-    "hiddenAcceptanceSha256": {},
+    "hiddenAcceptanceSha256": {
+      "bray-orientation": "7956e85c1810511590f9987252d399ebf3d99cbbda21becb18c6c4dca6770c4f",
+      "bray-impact": "add0d44847a09daec309ef52418527fc6f80af0467f68a3d03d453dd7a21a6e6",
+      "bray-diagnosis": "a2ae70e50255eaf374bf204728407a987ccb1d4c080000b285b2d2aa735df640",
+      "bray-code-change": "9356af29aa6a1b4f335c192b429bd848e316ded26bf39c73705ce75f1223e089",
+      "h3-orientation": "896f58cfb662d4da2a94ee05828a695f3e15f1abbfc4dfb6dd20743f5908a401",
+      "h3-impact": "81cfcce27a1d76e0c01c60d27d4cca6ab190297a43b45ff069cb8bead30261ba",
+      "h3-diagnosis": "6a5ea3f5076c89390e4f8df72bf5b64e68dc4d951dc353c8f6694f524cfec81f",
+      "h3-code-change": "49ce8377eac7d544a1eb3f9d99210d1f150ffabb87ced62b6c7a83cbd4c49135"
+    },
     "source": {
       "impactAndCodeChange": "Merged first-parent changes selected by history-candidates.mjs, which prints counts only. The pool is rebuildable from public history; the blind author's picks and the private acceptance files are what stay hidden.",
       "candidateCounts": {
@@ -62,6 +71,28 @@
       "bray": "119 files, 1852 tests passed",
       "h3": "72 files passed, 1 skipped; 3112 tests passed, 69 skipped",
       "note": "Rechecked for each task commit at freeze."
+    },
+    "tasks": "tasks/*.json (public statements); tasks/manifest.json (hashes)",
+    "author": {
+      "session": "Claude Code 2.1.318 headless, claude-opus-5-5, plan-billed",
+      "isolation": "CLAUDE_CODE_DISABLE_CLAUDE_MDS=1, CLAUDE_CODE_DISABLE_AUTO_MEMORY=1, --setting-sources project, --disable-slash-commands, empty strict MCP config, web/agent tools disallowed; sandbox via --settings denying all outbound domains and writes outside its folder; git remotes removed from the repository copies",
+      "checks": "A test session reported no user or project instructions; the brief's first step confirmed outbound HTTPS denied (403 from the sandbox proxy) and a write outside its folder refused",
+      "attempts": "Two Opus attempts stopped at that first step because network was open (project settings ignored in an untrusted folder); three one-turn Haiku probes found the working network setting; one Opus and two earlier Opus test turns checked instruction loading",
+      "run": {
+        "turns": 70,
+        "seconds": 626,
+        "inputTokens": 136,
+        "cacheReadInputTokens": 8148952,
+        "cacheCreationInputTokens": 203440,
+        "outputTokens": 50328,
+        "thinkingTokens": 14178,
+        "apiRateEquivalentUSD": 4.26
+      },
+      "leak": "The author's final reply, despite the brief, gave partial hints about the hidden answers for bray-impact and bray-diagnosis and said the two h3 code tasks touch one shared source file. The tool side has seen those hints; the protocol review decides whether to replace those tasks.",
+      "openPoints": [
+        "Checkers were verified against HEAD node_modules, not clean installs at each base commit",
+        "Orientation rubric line ranges were read by hand; reviewers allow small offsets"
+      ]
     }
   },
   "executor": {
@@ -185,7 +216,8 @@
       "approval": "required",
       "session": "fresh Claude session without the Context docs, skill or these prompts",
       "countedAs": "setup",
-      "launch": "claude --bare excludes CLAUDE.md, hooks and memory but needs an API key (metered cash); a plan-billed launch that keeps global instructions out is an owner choice"
+      "launch": "claude --bare excludes CLAUDE.md, hooks and memory but needs an API key (metered cash); a plan-billed launch that keeps global instructions out is an owner choice",
+      "status": "run 2026-11-04"
     }
   },
   "metrics": {
@@ -231,8 +263,9 @@
     "screen-pro-040-20260923"
   ],
   "openDecisions": [
-    "Approval and launch method for the blind task-author session",
-    "Then, separately: phase 1; then protocol review and phase 2 only if phase 1 passes"
+    "Phase 1 approval (one impact or code-change task, plain and context, one reviewer each)",
+    "Protocol review and phase 2 only if phase 1 passes",
+    "Whether the protocol review replaces the tasks touched by the author's leak"
   ],
   "revisedAt": "2026-11-04",
   "ownerDecisions": {
