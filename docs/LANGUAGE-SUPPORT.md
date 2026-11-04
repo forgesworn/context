@@ -18,8 +18,8 @@ can still exclude eligible files.
 | `.hh`, `.hpp`, `.hxx` | Yes | C++ lexical extraction | Yes | Unsupported |
 | `.dart` | Yes | Unsupported | Yes | Unsupported |
 | `.json`, `.jsonc`, `.toml`, `.yaml`, `.yml` | No | Unsupported | Yes | Unsupported |
-| `.html`, `.htm`, `.css`, `.scss`, `.svelte` | No | Unsupported | Yes (from 0.25.0) | Unsupported |
-| `.sh`, `.bash`, `.zsh` | No | Unsupported | Yes (from 0.25.0) | Unsupported |
+| `.html`, `.htm`, `.css`, `.scss`, `.svelte` | Yes, lexical (from 0.26.0) | Unsupported | Yes (from 0.25.0) | Unsupported |
+| `.sh`, `.bash`, `.zsh` | Yes, lexical (from 0.26.0) | Unsupported | Yes (from 0.25.0) | Unsupported |
 | `.ts` | Yes | Not handled by this scanner; separate TS/JS scanner exists | Yes | TypeScript syntax blocks |
 
 The source contracts are
@@ -27,9 +27,13 @@ The source contracts are
 [the broad scanner's language map and lexical rules](../packages/context-tools/src/broad-source-scan.ts),
 [the TS/JS scanner](../packages/context-tools/src/source-scan.ts), and
 [packet source/plan allowlists and guards](../packages/context-tools/src/source-packet.mjs).
-Configuration, web and shell files are exact packet sources only: they are not
-indexed, so search and explore do not find them. Extensionless scripts and
-Dockerfiles are outside both lists.
+Configuration files (JSON, TOML, YAML) are exact packet sources only: they are
+not indexed, so search and explore do not find them, because lockfiles and data
+would flood results. Web, Svelte and shell files are indexed lexically: exact
+tokens and lines, with no declarations or scopes. Extensionless scripts and
+Dockerfiles are outside both lists. An index snapshot from an earlier release is
+rejected on restore once newly eligible files exist, and the next refresh adds
+them.
 
 
 Navigation provides exact-token line lookup. Broad scanning uses regular

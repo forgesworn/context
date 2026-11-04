@@ -36,6 +36,14 @@ it('reopens current indexes, invalidates cursor identity and incrementally reuse
  await rm(join(f.root,'b.ts'));await writeFile(join(f.root,'c.ts'),'export const addedMarker = 4\n')
  const deleted=await next.refresh();expect(deleted.reuse?.removedFiles).toBe(1);expect((await next.search({term:'unchangedMarker'})).results).toHaveLength(0)
 })
+it('rejects a snapshot that lacks a newly eligible file and indexes it on refresh',async()=>{
+ // A snapshot from a release that did not index HTML lists no .html files; the live walk does.
+ const f=await fixture();await new RepositoryNavigation(f.root,undefined,f.store).refresh()
+ await mkdir(join(f.root,'site'));await writeFile(join(f.root,'site','index.html'),'<h1>siteMarker</h1>\n')
+ const next=new RepositoryNavigation(f.root,undefined,f.store);expect(await next.restoreFromCache()).toBe(false);expect(next.built).toBe(false)
+ const refreshed=await next.refresh();expect(refreshed.reuse).toEqual({restored:false,reusedFiles:2,parsedFiles:1,removedFiles:0})
+ expect((await next.search({term:'siteMarker'})).results.map(r=>r.path)).toEqual(['site/index.html'])
+})
 it('does not reuse foreign-root snapshots or policy-excluded evidence',async()=>{
  const f=await fixture(),a=new RepositoryNavigation(f.root,undefined,f.store);await a.refresh()
  f.store.put(workspaceKey('index',f.second),'index',f.store.get(workspaceKey('index',f.root)))

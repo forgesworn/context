@@ -211,6 +211,19 @@ describe('RepositoryNavigation', () => {
     expect((await nav.explore({ symbol: 'shared' })).policyScope).toEqual({ includeMode: 'prefixes', include: 1, exclude: 1 });
   });
 
+  it('indexes web, Svelte and shell sources but not configuration formats', async () => {
+    const root = await mkFixture();
+    const indexed = ['site/index.html', 'site/old.htm', 'site/style.css', 'site/theme.scss', 'web/App.svelte', 'deploy/run.sh', 'deploy/lib.bash', 'deploy/env.zsh'];
+    for (const rel of indexed) await writeFile(root, rel, `placeholderMarker in ${rel}\n`);
+    for (const rel of ['config/app.yml', 'config/app.yaml', 'Cargo.toml', 'data.json']) await writeFile(root, rel, 'placeholderMarker\n');
+    const nav = new RepositoryNavigation(root);
+    const status = await nav.refresh();
+    expect(status.counts.files).toBe(indexed.length);
+    expect(status.exclusions.unsupported).toBe(4);
+    const found = (await nav.search({ term: 'placeholderMarker' })).results.map(record => record.path).sort();
+    expect(found).toEqual([...indexed].sort());
+  });
+
   it('leaves results unmarked when only defaults and .gitignore exclude files', async () => {
     const root = await mkFixture();
     await writeFile(root, '.gitignore', 'ignored.ts\n');
