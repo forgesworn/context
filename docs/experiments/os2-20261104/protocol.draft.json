@@ -16,24 +16,53 @@
     "repinRule": "A phase 0 or phase 1 fix ships as its own release; this block is repinned before lock."
   },
   "taskPack": {
-    "status": "to-write",
-    "shape": "Eight tasks: four on one ForgeSworn repository and four on one repository outside ForgeSworn; per repository one orientation, impact, diagnosis and code-change task.",
+    "status": "repositories chosen; tasks to write",
+    "shape": "Eight tasks: four on bray and four on h3; per repository one orientation, impact, diagnosis and code-change task.",
     "repositories": {
       "forgesworn": {
-        "name": null,
-        "commit": null,
-        "archiveSha256": null
+        "name": "forgesworn/bray",
+        "licence": "MIT",
+        "headChecked": "8d6713d8d68b3cecfc42630642ab4fada67968a6",
+        "install": "npm ci && npm run build",
+        "test": "vitest run",
+        "taskCommits": "per task, at freeze"
       },
       "external": {
-        "name": null,
-        "commit": null,
-        "archiveSha256": null,
-        "licence": null
+        "name": "h3js/h3",
+        "licence": "MIT",
+        "headChecked": "f0e17808ac2439b6434bb10609a961067f4d555b",
+        "install": "pnpm install --frozen-lockfile (pnpm 12.3.4 via packageManager)",
+        "test": "vitest --run (not the package test script, which adds lint and typecheck)",
+        "taskCommits": "per task, at freeze"
       }
     },
     "excluded": "The eight d5-20260921 tasks are not reused: both repositories are ForgeSworn and the 0.4.0 fixes were found on that set.",
-    "hiddenAcceptance": "Required evidence, dependency set, checker and scope rules per task, written and hashed by a session that has not designed Context tools, instructions or prompts. Hashes recorded here at lock; contents unread by the tool side until results are recorded.",
-    "hiddenAcceptanceSha256": {}
+    "hiddenAcceptance": "Required evidence, dependency set, checker and scope rules per task. Mined tasks take them from the merged change; the blind Claude session writes the rest and vets all. Hashes recorded here at lock; unread by the tool side, including the owner, until results are recorded.",
+    "hiddenAcceptanceSha256": {},
+    "source": {
+      "impactAndCodeChange": "Merged first-parent changes selected by history-candidates.mjs; the selecting session sees counts only.",
+      "candidateCounts": {
+        "since": "2025-01-01",
+        "bray": {
+          "scanned": 512,
+          "eligible": 79,
+          "since20260701": 14
+        },
+        "h3": {
+          "scanned": 732,
+          "eligible": 99,
+          "since20260701": 43
+        }
+      },
+      "preference": "Most recent eligible changes first, to reduce memorisation.",
+      "orientationAndDiagnosis": "Written by the blind Claude session, which also vets mined tasks."
+    },
+    "offlineCheck": {
+      "host": "M4, macOS sandbox-exec denying outbound network except localhost and Unix sockets; profile verified to block outbound HTTPS and allow loopback first",
+      "bray": "119 files, 1852 tests passed",
+      "h3": "72 files passed, 1 skipped; 3112 tests passed, 69 skipped",
+      "note": "Rechecked for each task commit at freeze."
+    }
   },
   "executor": {
     "client": "codex-cli",
@@ -43,7 +72,8 @@
     "sandbox": "workspace-write",
     "session": "fresh, --ephemeral, per-arm CODEX_HOME",
     "invocation": "absolute binary path with explicit flags, no shell, no inherited aliases",
-    "maxTurns": null
+    "maxTurns": null,
+    "harness": "harness.py (derived from d5-20260921-v3/run-pair.py, which is unchanged); Context arm enables all seven 0.26.0 retrieval tools via `navigate <workspace>`"
   },
   "reviewer": {
     "client": "codex-cli",
@@ -57,22 +87,24 @@
     "plain": "Built-in shell, read and edit; no MCP server.",
     "context": "As plain, plus the pinned 0.26.0 repository MCP server bound to the arm's prepared root; fresh server per arm.",
     "graphify": {
-      "optional": true,
       "description": "As plain, plus a graph prebuilt with `graphify update <workspace>` (no model).",
       "package": "graphifyy",
-      "packageVersion": "0.9.65"
+      "packageVersion": "0.9.65",
+      "status": "later round, not in this run"
     }
   },
   "retrievalInstructionRule": "Each arm's prompt begins with one retrieval instruction of similar length and force.",
   "repetitions": 3,
-  "armOrderRule": "Repetition r (1 to 3) of task i (1 to 8) uses the arm order rotated by (i + r - 1) mod n, where n is the number of arms.",
+  "armOrderRule": "Repetition r (1 to 3) of task i (1 to 8) uses the arm list rotated left by (i + r - 1) mod n, where n is the number of arms. Implemented in harness.py schedule().",
   "phases": {
     "phase0": {
       "paid": false,
       "steps": [
-        "Packet sufficiency: deterministic check that a bounded packet holds each task's required evidence; record bytes; uncovered tasks are recorded gaps, not removed.",
+        "Packet sufficiency: deterministic check that a bounded packet holds each task's required evidence; record bytes; uncovered tasks are recorded gaps, not removed. Waits for the task pack.",
         "Transcript metrics on Codex exec --json streams: metrics.mjs with fixture tests (done). September streams not found at the recorded path, so the metric is unvalidated on the known bad case; the write probe checks field names and phase 1 gives the first real measurement.",
-        "Harness tests for rotation, third arm, incomplete usage and the no-alias rule."
+        "Harness: harness.py with 19 fixture tests (done): rotation, arm setup, no-alias rule, incomplete usage, cost gate and a dry-run plan. Five seeded bugs caught. Execution path waits for the task pack.",
+        "Offline tests for both repositories (done at the heads checked).",
+        "History candidates: history-candidates.mjs with tests (done; counts only)."
       ]
     },
     "writeProbe": {
@@ -100,21 +132,32 @@
     "phase2": {
       "paid": true,
       "approval": "required, separate",
-      "cells": "8 tasks x 3 repetitions x 2 or 3 arms, plus one reviewer per cell"
+      "cells": "8 tasks x 3 repetitions x 2 arms, plus one reviewer per cell"
+    },
+    "blindAuthor": {
+      "paid": true,
+      "approval": "required",
+      "session": "fresh Claude session without the Context docs, skill or these prompts",
+      "countedAs": "setup"
     }
   },
   "metrics": {
     "readsAfterPacket": "Distinct packet-covered files later read directly (cat, nl, head, tail, sed -n ranges, awk NR ranges) with a range overlapping one already returned by a packet, divided by distinct packet-covered files; no range means whole file; reads before the covering packet do not count. Implemented in metrics.mjs.",
     "toolErrorRate": "Failed or declined tool calls and MCP isError results divided by all tool results; a command that ran and exited non-zero is a nonZeroExit, not a tool error.",
     "missedOrIncorrectDependencies": "Counted after acceptance against the hidden dependency set, by checker and scope check; independent of acceptance (an accepted outcome can still miss a dependency) and never shown to executor or reviewer.",
-    "firstPassAccepted": "Code-change checker passes on the executor's first self-check.",
+    "firstPassAccepted": "Code-change checker passes on the executor's first self-check. Reported only.",
     "totalTokens": "Executor plus reviewer input and output, including cached input, setup, repairs and failed attempts.",
     "reviewerSeconds": "Reviewer wall seconds.",
     "searchesAfterPacket": "rg, grep, git grep and find after the first packet; reported separately, outside the threshold.",
-    "unclassifiedSegments": "Command segments the classifier does not recognise; reported."
+    "unclassifiedSegments": "Command segments the classifier does not recognise; reported.",
+    "usageAssumptions": [
+      "cached_input_tokens within input_tokens",
+      "reasoning_output_tokens within output_tokens",
+      "per-turn, not cumulative, usage in turn.completed"
+    ]
   },
   "qualityGate": {
-    "primary": "missedOrIncorrectDependencies (alternative: firstPassAccepted; choose before lock)",
+    "primary": "missedOrIncorrectDependencies (owner decision 2026-11-04); firstPassAccepted reported only",
     "rule": "Per-task median lower than the comparator on at least two tasks and higher on none, with no Context outcome rejected.",
     "perfectBaseline": "No claim; a prospectively written harder task class replaces that class.",
     "structuredAcceptance": "Checker passed and blind reviewer accepted."
@@ -124,8 +167,9 @@
     "rule": "Context at least 20% below each comparator, and sum of per-task median reviewerSeconds no higher.",
     "reportedOnly": "Geometric mean of per-task ratios with a 90% bootstrap interval (10,000 draws, seed fixed at lock).",
     "accounting": "Codex --json event stream usage; cached, uncached, output and reasoning subset reported separately, never added twice.",
-    "incomplete": "Missing usage marks a cell incomplete, never zero; an incomplete cell fails the cost gate for its task.",
-    "money": "Billing route unknown; cash savings remain unproven."
+    "incomplete": "Missing usage marks a cell incomplete, never zero; an incomplete cell in either compared arm fails the cost gate.",
+    "money": "ChatGPT plan allowance: token reduction and plan headroom only; cash savings not claimed.",
+    "implementation": "harness.py cost_gate()"
   },
   "notPooledWith": [
     "d5-20260921",
@@ -139,10 +183,16 @@
     "screen-pro-040-20260923"
   ],
   "openDecisions": [
-    "External repository and commit",
-    "Two or three arms",
-    "Author of hidden rubrics and dependency sets",
-    "Sol billing route",
-    "Separate approvals for write probe, phase 1, protocol review and phase 2"
-  ]
+    "Separate approvals, in order: write probe, blind task-author session, phase 1, then protocol review and phase 2 only if phase 1 passes"
+  ],
+  "revisedAt": "2026-11-04",
+  "ownerDecisions": {
+    "recordedAt": "2026-11-04",
+    "repositories": "bray (ForgeSworn) and h3js/h3 (outside); each task pinned at its own commit",
+    "arms": "plain and context; graphify is a later round with its own approval, run only if the pair passes",
+    "hiddenSets": "impact and code-change tasks taken from merged history (diff gives the dependency set, its tests give the checker); orientation, diagnosis and vetting by a fresh Claude session started without the global instructions that load the Context skill",
+    "billing": "Codex reports \"Logged in using ChatGPT\": plan allowance, not metered; report tokens and headroom, no cash claim",
+    "qualityMeasure": "missedOrIncorrectDependencies"
+  },
+  "repetitionsCells": "8 tasks x 2 arms x 3 repetitions = 48 executor cells, each with a reviewer"
 }

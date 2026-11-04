@@ -157,8 +157,10 @@ checks. Model routing stays client-owned; no new paid trial is started by this p
 | **OS6 — Dependable open-source release. Open** | Consolidate intended changes, finish applicable G0–G4 checks, document supported capability set and publish through the release process when authorised | Context lead + the product owner: Context packages, CI, `RELEASE_EVIDENCE.md`, README/changelog and registry acceptance | Deterministic build/install/checks; Flash/off for release docs; Terra/medium for packaging repairs | Terra/medium release review; Sol/high signs off unresolved consequential boundaries and savings evidence | Named commit, matching CI, clean independent install, exact published registry smoke and real external usage; honest scope/gaps, measured benefits and licence/notices inventory |
 
 The unlocked OS2 draft protocol is in
-[`experiments/os2-20261104`](experiments/os2-20261104/README.md); nothing has
-run under it and each paid step needs separate approval.
+[`experiments/os2-20261104`](experiments/os2-20261104/README.md). The owner
+chose bray and h3, two arms (plain and Context), tasks taken from merged
+history and a token-only result, as Sol runs on the ChatGPT plan. Nothing
+has run under it and each paid step needs separate approval.
 
 The OS2 token threshold is a proposed decision rule for a **new** prospective
 protocol, to be fixed before running arms. Existing D5 v1/v2/v3 protocols and

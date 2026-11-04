@@ -70,27 +70,64 @@ used, for two reasons:
 
 The new pack:
 
-- Eight tasks: four on one ForgeSworn repository and four on one repository
-  outside ForgeSworn, each pinned at a commit and frozen as an archive.
+- Eight tasks: four on [forgesworn/bray](https://github.com/forgesworn/bray)
+  and four on [h3js/h3](https://github.com/h3js/h3), outside ForgeSworn. Each
+  task is pinned at its own commit and frozen as an archive.
 - Per repository: one orientation, one impact, one diagnosis and one code
   change. Impact and code-change tasks carry the quality measure.
 - Each task has a public statement and a private acceptance file. The private
   file holds required evidence, the dependency set a correct answer or diff
   must touch, and the checker and scope rules.
-- The rubrics and dependency sets are written and hashed by a session that has
-  not designed Context tools, instructions or these prompts. That excludes the
-  session that wrote this draft. Nobody on the tool side reads them before
-  results are recorded.
+- Nobody on the tool side reads the private files before results are
+  recorded. The owner designed Context, so the owner does not write them
+  either.
 
-Criteria for the external repository (the owner chooses it):
+Where the tasks come from:
 
-- public, with a permissive licence;
-- TypeScript or JavaScript in most of the code, so syntax-aware `plan`
-  packets are exercised; mixed-language coverage is a separate question;
-- tests run offline with a pinned toolchain, so code changes can be checked
-  deterministically;
-- large enough that grep and read is not trivially sufficient, and small
-  enough to freeze and prepare per arm.
+- **Impact and code-change tasks are taken from merged history.** Each one
+  redoes a real merged change from its parent commit. That change's diff gives
+  the dependency set, and the tests it added give the checker. This keeps the
+  hidden sets objective. [`history-candidates.mjs`](history-candidates.mjs)
+  lists eligible changes into a private file and prints counts only, so this
+  session has not seen which changes qualified. Since 2025-01-01:
+
+  | Repository | Head checked | First-parent changes | Eligible | Since 2026-07-01 |
+  | --- | --- | --- | --- | --- |
+  | bray | `8d6713d8` (2026-11-02) | 512 | 79 | 14 |
+  | h3 | `f0e17808` (2026-10-22) | 732 | 99 | 43 |
+
+  The most recent eligible changes are preferred, because the model is less
+  likely to have seen them.
+- **Orientation and diagnosis tasks, and the vetting of mined tasks,** are
+  done by a fresh Claude session that has not seen the Context docs, tools or
+  these prompts. Using a different model family from the Sol executor avoids
+  shared blind spots. On this machine every Claude session loads the Context
+  skill from the global instructions at startup, so that session must be
+  started where those instructions are not loaded. It uses model tokens and
+  needs its own approval.
+
+Why these repositories:
+
+- bray: about 70,000 lines of TypeScript and 119 test files, the largest
+  ForgeSworn TypeScript repository checked. context (the tool's own
+  repository) and kithmoot (where the 0.4.0 fixes were found) are excluded.
+- h3: MIT, almost entirely TypeScript, vitest, about 5,500 stars. Version 2
+  is a recent rewrite, so the model is less likely to answer from memory than
+  with a more famous repository.
+- Both are MIT and use vitest. Their tests pass with outbound network denied
+  on the M4 (macOS `sandbox-exec`; the profile was first checked to block an
+  outbound HTTPS request and allow loopback):
+
+  | Repository | Install | Test command | Result |
+  | --- | --- | --- | --- |
+  | bray `8d6713d8` | `npm ci && npm run build` | `vitest run` | 119 files, 1,852 tests passed |
+  | h3 `f0e17808` | `pnpm install --frozen-lockfile` (pnpm 12.3.4, pinned by `packageManager`) | `vitest --run` | 72 files passed, 1 skipped; 3,112 tests passed, 69 skipped |
+
+  bray's test files mention relay URLs and WebSocket (63 and 8 files), so the
+  passing run, not the absence of references, is the evidence. h3's own
+  `test` script also runs lint and a typecheck; the checker runs vitest only.
+  This shows no network references are needed at those commits. Each task's
+  own commit is checked again when it is frozen.
 
 ## Executor, reviewer and harness
 
@@ -100,11 +137,15 @@ Criteria for the external repository (the owner chooses it):
 - Reviewer: a fresh `gpt-5.6-sol`/high session with a read-only sandbox. It is
   blind to the arm and sees only the answer or diff, the checker result, the
   private rubric and the cited frozen source.
-- Harness: [`d5-20260921-v3/run-pair.py`](../d5-20260921-v3/run-pair.py) is the
-  base. It already uses `codex exec --json`, per-arm `CODEX_HOME`,
-  `--sandbox workspace-write` for executors and `read-only` for reviewers. It
-  needs repetitions, arm rotation and a third arm added, with tests, before
-  lock.
+- Harness: [`harness.py`](harness.py), derived from
+  [`d5-20260921-v3/run-pair.py`](../d5-20260921-v3/run-pair.py), which stays
+  locked and unchanged. It keeps `codex exec --json`, per-arm `CODEX_HOME`,
+  `--sandbox workspace-write` for executors and `read-only` for reviewers, and
+  adds rotation, arms as data, one source for model and effort, and the seven
+  0.26.0 retrieval tools for the Context arm. (v3 enabled only status, refresh
+  and search, which would leave `repository_packet` unavailable and the
+  reads-after-packet measure undefined.) It currently only plans cells; running
+  them waits for the task pack.
 - No recorded cell can be reused as a comparator. Every earlier cell used
   Luna/medium or DeepSeek V4 Pro, so all arms run fresh.
 - The harness calls the Codex binary by absolute path with explicit flags. It
@@ -120,14 +161,17 @@ Criteria for the external repository (the owner chooses it):
 | --- | --- | --- |
 | plain | Codex built-in shell, read and edit; no MCP | Retrieval instruction of similar length and force to the other arms |
 | context | Same, plus the pinned 0.26.0 repository MCP server bound to the arm's prepared root | Fresh server per arm; refresh before the first packet |
-| graphify (optional) | Same as plain, plus a graph prebuilt with `graphify update` (no model) from `graphifyy` 0.9.65 | Version from the September protocols; repin at lock if changed |
+| graphify (later round) | Same as plain, plus a graph prebuilt with `graphify update` (no model) from `graphifyy` 0.9.65 | Not in this run; see below |
 
-The OS2 row needs only the pair (plain against Context). The acceptance
-contract also wants a Graphify comparison. With Graphify the run is
-8 × 3 × 3 = 72 executor cells; without it, 8 × 2 × 3 = 48. Either way every
-cell gets a reviewer session. Repetition r of task i uses arm order
-(i + r - 1) mod n, as in the September repeated design. Results are never
-pooled with v1, v2, S5, v3, the repeated Pro run or the 0.4.0 screen.
+This run uses two arms: 8 × 2 × 3 = 48 executor cells, each with a reviewer
+session. The OS2 row needs only the pair. The acceptance contract also wants a
+Graphify comparison, and in the September repeated run Context used 1.31 times
+Graphify's input tokens, so it is a serious comparator. It runs as a separate
+later round, with its own approval, only if the pair passes. The harness
+already supports a third arm. Repetition r of task i uses the arm list
+rotated left by (i + r - 1) mod n, as in the September repeated design.
+Results are never pooled with v1, v2, S5, v3, the repeated Pro run or the
+0.4.0 screen.
 
 ## Phases
 
@@ -168,8 +212,28 @@ pooled with v1, v2, S5, v3, the repeated Pro run or the 0.4.0 screen.
    stream-json, not Codex. If the owner can locate them, a stream-json reader
    can be added to test against them. Otherwise the phase 1 pair is the first
    real measurement, and the 0.25 threshold stays proposed until then.
-3. **Harness tests.** Cover rotation, the third arm, incomplete-usage
-   handling and the no-alias rule, all with fixtures and no model.
+3. **Harness tests.** Built in [`harness.test.py`](harness.test.py) (run
+   with `python3 harness.test.py`), 19 tests:
+   - rotation for 48 and 72 cells, checked against the formula;
+   - arm setup, including that only the Context arm gets the server, bound to
+     its own workspace;
+   - model and effort agreeing between config and command, and instructions
+     of similar length;
+   - the no-alias rule: commands are argument lists, start with the resolved
+     absolute Codex binary, carry exactly one allowed sandbox, and reject
+     bypass flags, `-s`, `-c` sandbox overrides, shells and strings;
+   - usage that is incomplete, never zero, when missing or failed;
+   - the cost gate, with medians, the 20% threshold, reviewer time,
+     incomplete cells and each comparator;
+   - a dry-run plan of 48 cells that never starts a fake Codex.
+
+   Five deliberate bugs were each caught: the rotation formula, the
+   threshold, incomplete-as-zero, a dropped bypass flag and a dropped
+   `repository_packet`.
+
+   Usage assumptions to confirm on a real stream (the write probe): cached
+   input is within input, reasoning is within output, and usage is reported
+   per turn rather than cumulatively. Raw usage events are kept.
 
 ### Phase 1: one-pair qualification (paid, needs approval)
 
@@ -192,16 +256,16 @@ is counted as setup.
 
 ### Phase 2: full comparison (paid, needs separate approval)
 
-Eight tasks, three repetitions, two or three arms, run as locked.
+Eight tasks, three repetitions, two arms (48 executor and 48 reviewer sessions), run as locked.
 
-## Quality gate (choose one before lock)
+## Quality gate
 
-The proposed primary measure is **missed or incorrect dependencies** on impact
-and code-change tasks. These are counted against the hidden dependency set by
-the checker and the scope check, not by a reviewer reading prose.
-
-The alternative is **first-pass accepted changes**: the code-change checker
-passes on the executor's first self-check.
+The primary measure is **missed or incorrect dependencies** on impact and
+code-change tasks (owner decision, 2026-11-04). These are counted against the
+hidden dependency set by the checker and the scope check, not by a reviewer
+reading prose. Tasks taken from merged history give that set directly. First-pass
+accepted changes is reported, but does not decide, because Context has no
+clear reason to improve it.
 
 The dependency count is independent of acceptance. An outcome can pass its
 checker and review and still miss a dependency in the hidden set, for example
@@ -237,9 +301,14 @@ decide.
 
 Cached input, uncached input, output and the reasoning subset are reported
 separately and never added twice. Usage comes from the Codex `--json` event
-stream, as in v3. A cell with missing usage is marked incomplete, never zero,
-and an incomplete cell fails the cost gate for that task. The billing route
-for Sol is not known, so cash savings stay unproven whatever the token result.
+stream, as in v3. A cell with missing usage is marked incomplete, never zero.
+An incomplete cell in either compared arm fails the cost gate, since the
+statistic cannot then be computed.
+
+Codex on this machine reports "Logged in using ChatGPT", so Sol usage comes
+from the plan allowance, not metered API billing. The result is reported as
+token reduction and plan headroom, never as cash saved. A full Sol/high run
+may meet the plan's rate limits.
 
 ## Scale (not a price)
 
@@ -252,15 +321,29 @@ These volumes come from the record and give scale only; Sol/high will differ:
 
 Phase 2 is of that order. Phase 1 is one pair. No prices were looked up.
 
-## Decisions for the owner
+## Owner decisions (2026-11-04)
 
-1. Which repository outside ForgeSworn, and at which commit.
-2. Two arms (plain and Context) or three (adding Graphify).
-3. Who writes and hashes the hidden rubrics and dependency sets.
-4. How Sol usage is billed (subscription allowance or metered), which decides
-   whether any cash figure can be reported.
-5. Approval, separately, for: the write-capability probe, phase 1, the
-   protocol review and phase 2.
+1. Repositories: bray (ForgeSworn) and h3 (outside), each task pinned at its
+   own commit.
+2. Two arms, plain and Context. Graphify is a later round, run only if the
+   pair passes.
+3. Hidden sets: impact and code-change tasks taken from merged history;
+   orientation, diagnosis and vetting by a fresh Claude session without the
+   Context docs or skill.
+4. Billing: ChatGPT plan allowance; tokens and headroom, no cash claim.
+5. Quality measure: missed or incorrect dependencies.
+
+## Still needs separate approval, in this order
+
+1. The write-capability probe (one small Sol call; it also checks the metric
+   and usage field names).
+2. The blind task-author session.
+3. Phase 1.
+4. The protocol review and phase 2, only if phase 1 passes.
+
+Free work left before phase 1: freezing each task's archive and preparer,
+the per-task checker, packet sufficiency, and the execution path in the
+harness.
 
 ## Not claimed
 
