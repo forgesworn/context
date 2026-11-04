@@ -106,7 +106,7 @@
   "metrics": {
     "readsAfterPacket": "Direct reads (shell cat, sed, rg on a path) of lines already returned by a packet in the same session, divided by packet-covered files.",
     "toolErrorRate": "Error tool results divided by all tool results.",
-    "missedOrIncorrectDependencies": "Against the hidden dependency set, by checker and scope check.",
+    "missedOrIncorrectDependencies": "Counted after acceptance against the hidden dependency set, by checker and scope check; independent of acceptance (an accepted outcome can still miss a dependency) and never shown to executor or reviewer.",
     "firstPassAccepted": "Code-change checker passes on the executor's first self-check.",
     "totalTokens": "Executor plus reviewer input and output, including cached input, setup, repairs and failed attempts.",
     "reviewerSeconds": "Reviewer wall seconds."

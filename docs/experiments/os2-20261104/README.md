@@ -22,10 +22,17 @@ Lower tokens alone cannot pass.
 
 ## What earlier runs showed, and what this plan does about it
 
-No comparison has run since the 0.4.0 screen on 23 September. Since then, 22
-releases have shipped explore, graph, coverage, scope notices and wider
-language support. The earlier record names four causes that this plan
-addresses before anything is paid for.
+No comparison has run since the 0.4.0 screen on 23 September, which already
+included explore and coverage. The 29 release tags since then added, among
+other things:
+
+- the encrypted shared workspace cache (from 0.7.0);
+- the repository graph (from 0.11.0);
+- the policy scope notice (0.24.0);
+- web, Svelte and shell sources (0.25.0 and 0.26.0).
+
+None of these has been measured against a baseline. The earlier record names
+four causes that this plan addresses before anything is paid for.
 
 | Observed | Source | Response here |
 | --- | --- | --- |
@@ -119,7 +126,7 @@ The OS2 row needs only the pair (plain against Context). The acceptance
 contract also wants a Graphify comparison. With Graphify the run is
 8 × 3 × 3 = 72 executor cells; without it, 8 × 2 × 3 = 48. Either way every
 cell gets a reviewer session. Repetition r of task i uses arm order
-(i + r − 1) mod n, as in the September repeated design. Results are never
+(i + r - 1) mod n, as in the September repeated design. Results are never
 pooled with v1, v2, S5, v3, the repeated Pro run or the 0.4.0 screen.
 
 ## Phases
@@ -173,6 +180,12 @@ the checker and the scope check, not by a reviewer reading prose.
 
 The alternative is **first-pass accepted changes**: the code-change checker
 passes on the executor's first self-check.
+
+The dependency count is independent of acceptance. An outcome can pass its
+checker and review and still miss a dependency in the hidden set, for example
+a caller left unchanged that no test exercises. The count is taken after
+acceptance, from the hidden set, which is never shown to the executor or the
+reviewer.
 
 Context passes on quality if:
 
