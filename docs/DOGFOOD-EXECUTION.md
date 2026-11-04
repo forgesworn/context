@@ -1841,4 +1841,9 @@ without naming the policy, which is how this went unnoticed. Results now carry
 `policyScope` and a note line under the header whenever a root
 `.z1p-navigation.json` has an include list or exclude rules. Default exclusions
 and `.gitignore` alone do not trigger it; the tracked exclude-only policies in v4v, forgesworn.dev and vitark do, by design. Nested policy files are not summarised. Packets already refuse excluded paths
-by name. HTML, CSS, shell and JSON files are still not packet sources (OS4).
+by name.
+
+Correction, same day: packets already accepted JSON, TOML and YAML. HTML, CSS,
+SCSS, Svelte and shell (`.sh`, `.bash`, `.zsh`) were not accepted, and now are as
+exact `build` sources (OS4). None of these formats is indexed for search or
+explore, and extensionless scripts and Dockerfiles remain outside both lists.
