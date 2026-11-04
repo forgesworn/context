@@ -38,7 +38,7 @@ Include entries cannot override `.gitignore`, hidden-file or symlink exclusions.
 When a root policy has an include list or exclude rules, search and explore
 results carry `policyScope` (include mode and rule counts) plus a note line under
 the text header, so an absent match is not mistaken for absence from the
-repository. Default exclusions and `.gitignore` alone do not add it. Review an
+repository. Default exclusions and `.gitignore` alone do not add it, and nested policy files are not summarised. Review an
 untracked local policy file periodically: a narrow allowlist left in place
 hides the rest of the checkout from every agent.
 

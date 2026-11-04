@@ -1840,5 +1840,5 @@ Search and explore previously reported such a narrowed scope as `complete`
 without naming the policy, which is how this went unnoticed. Results now carry
 `policyScope` and a note line under the header whenever a root
 `.z1p-navigation.json` has an include list or exclude rules. Default exclusions
-and `.gitignore` alone do not trigger it. Packets already refuse excluded paths
+and `.gitignore` alone do not trigger it; the tracked exclude-only policies in v4v, forgesworn.dev and vitark do, by design. Nested policy files are not summarised. Packets already refuse excluded paths
 by name. HTML, CSS, shell and JSON files are still not packet sources (OS4).
