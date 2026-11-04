@@ -2,8 +2,8 @@
 // OS2 phase 0: how many merged changes could become impact or code-change tasks? Model-free.
 //
 // Writes the candidate list to --out for the blind task author and prints counts
-// only. The tool-side session that runs it never sees which changes qualified,
-// so it cannot learn a hidden dependency set from them.
+// only. The pool can be rebuilt from public history; what stays hidden from the
+// tool side is which candidates the blind author picks and their acceptance files.
 //
 // A candidate is one first-parent change (a squash commit, or a merge diffed
 // against its first parent) that:
