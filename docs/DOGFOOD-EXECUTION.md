@@ -1770,3 +1770,55 @@ owner Girnel card, adoption by four models, automatic stopping, or savings. Fixt
 host labels do not show how models poll the inbox. The npm registry still carries
 0.3.3; no registry release was authorised. These releases do not close OS0, OS1e,
 OS2 or OS6.
+
+## 4 November: OS0 evidence from ordinary use
+
+Context reached daily use through the managed skills and startup guidance: 341
+task checkpoints were saved across about 30 checkouts between 1 and 4 November,
+250 of them outside Context. OS0 asks for three accepted real tasks with their
+records, so three merged tasks in different repositories were selected
+retrospectively from those checkpoints. No new task or model inference was run.
+Selection rule: a merged change, a checkpoint whose checks all passed, and a host
+session whose task boundaries fall between requests. One candidate (a fold-kit
+release) was rejected because it sat inside a single 13-hour multi-repository
+Codex turn, so its usage could not be attributed without guessing.
+
+| Task | Host, model/effort | Merged | Context packets | Checks and failures recorded |
+| --- | --- | --- | --- | --- |
+| kithmoot #667, Coming Soon site (public) | Codex, `gpt-6.1-sol`/high, one session | `1df4c67b`, deployed and verified live | 1 source (README); site/test/deploy paths excluded by policy and HTML/CSS unsupported, so the host used direct bounded reads and file hashes | 4 passed. First commit broke the publication verifier, repaired in `1fd04ee1`; WebKit rendering unverified |
+| v4v #518, adaptive quality recovery (private) | Codex, `gpt-6.1-sol`/high, two turns | `575f1ef6`, guarded release | 5 JS sources, then 3 for the release | 4 passed, CI initially pending then green; physical and venue acceptance kept separate |
+| vennel #348, invitation review fixes (private) | Claude Code running `kimi-k3`; review by five Codex `gpt-6.1-sol`/high sessions | merged 4 November | Rust sources across `vmls-core` and `vmls-mls` | Two M4 test runs failed on implementation errors (module paths, borrow shapes), fixed and rerun; four Codex review rounds, five findings fixed, one design item deferred and recorded in the PR |
+
+Each packet was built against the current index generation (the tool refuses a
+stale one) and records git HEAD plus per-source SHA-256.
+
+Usage was imported offline with `daily-usage.mjs import` from copies of the
+session files, using each task's window between user turns and checkpoint saves:
+
+| Task and phase | Input (cached) | Output (reasoning) | Requests | Complete |
+| --- | --- | --- | --- | --- |
+| kithmoot host | 8,171,344 (8,050,432) | 27,932 (7,056) | 77 | yes |
+| v4v host | 26,035,271 (25,867,264) | 85,962 (49,477) | 98 | yes |
+| vennel host | ≥51,531,342 (≥50,880,772) | 116,679 | 347 | no: 84 unknown records, 82 of them conflicting streamed copies |
+| vennel review, five sessions | 11,877,879 (11,245,440) | 58,772 (24,782) | 115 | yes |
+
+Every receipt carries the `coverage-is-operator-asserted` and
+`billing-not-collected` warnings. Preparation and any subagent use are not
+captured, so every whole-task total stays null. About 98% of Codex input was
+cached. The summary lists three tasks, all accepted, all with Context used.
+Here, accepted means merged under the owner's standing ship instruction. No
+separate review time was recorded.
+
+Findings for later goals:
+
+- **Packet sufficiency (OS4):** for the website task the packet held only the
+  README. Website, test and deploy paths sit outside the default policy, and
+  HTML/CSS are not packet sources, so the host fell back to direct reads.
+- **Accounting (FS2):** a Claude Code transcript running a non-Anthropic model
+  produced conflicting streamed usage copies, leaving the host total incomplete.
+  Long autonomous multi-repository turns cannot be split per task.
+- **Usability, not savings:** these are retrospective ordinary-use records with no
+  baseline, so they show nothing about token or cash savings (OS2).
+
+Receipts, specifications, capture hashes and the summary are kept in a private
+dated record. Session copies were deleted after import.
