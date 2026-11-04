@@ -40,7 +40,7 @@
     "hiddenAcceptance": "Required evidence, dependency set, checker and scope rules per task. Mined tasks take them from the merged change; the blind Claude session writes the rest and vets all. Hashes recorded here at lock; unread by the tool side, including the owner, until results are recorded.",
     "hiddenAcceptanceSha256": {},
     "source": {
-      "impactAndCodeChange": "Merged first-parent changes selected by history-candidates.mjs; the selecting session sees counts only.",
+      "impactAndCodeChange": "Merged first-parent changes selected by history-candidates.mjs, which prints counts only. The pool is rebuildable from public history; the blind author's picks and the private acceptance files are what stay hidden.",
       "candidateCounts": {
         "since": "2025-01-01",
         "bray": {
@@ -90,7 +90,8 @@
       "description": "As plain, plus a graph prebuilt with `graphify update <workspace>` (no model).",
       "package": "graphifyy",
       "packageVersion": "0.9.65",
-      "status": "later round, not in this run"
+      "status": "later round, not in this run",
+      "note": "harness.py schedule() requires plain and context in every arm set; a Graphify round needs all three arms or a schedule change at its lock"
     }
   },
   "retrievalInstructionRule": "Each arm's prompt begins with one retrieval instruction of similar length and force.",
@@ -153,7 +154,8 @@
     "usageAssumptions": [
       "cached_input_tokens within input_tokens",
       "reasoning_output_tokens within output_tokens",
-      "per-turn, not cumulative, usage in turn.completed"
+      "per-turn, not cumulative, usage in turn.completed",
+      "the write probe records which optional usage fields (cached_input_tokens, reasoning_output_tokens) are present; absent ones are summed as 0"
     ]
   },
   "qualityGate": {

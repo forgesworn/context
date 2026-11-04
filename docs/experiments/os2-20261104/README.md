@@ -88,8 +88,10 @@ Where the tasks come from:
   redoes a real merged change from its parent commit. That change's diff gives
   the dependency set, and the tests it added give the checker. This keeps the
   hidden sets objective. [`history-candidates.mjs`](history-candidates.mjs)
-  lists eligible changes into a private file and prints counts only, so this
-  session has not seen which changes qualified. Since 2025-01-01:
+  lists eligible changes into a private file and prints counts only. The pool
+  itself is not secret: the script and history are public, so anyone can
+  rebuild it. What stays hidden from the tool side is which candidates the
+  blind author picks, and their private acceptance files. Since 2025-01-01:
 
   | Repository | Head checked | First-parent changes | Eligible | Since 2026-07-01 |
   | --- | --- | --- | --- | --- |
