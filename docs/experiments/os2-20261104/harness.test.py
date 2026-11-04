@@ -210,10 +210,130 @@ class PlanDryRun(unittest.TestCase):
                 self.assertEqual('mcp_servers' in cfg, cell['arm'] == 'context')
                 if cell['arm'] == 'context':
                     self.assertIn(json.dumps(str(cd / 'workspace')), cfg)
-                self.assertTrue((cd / 'executor-prompt.txt').read_text().endswith(f"Do {cell['task']}.\n"))
+                self.assertIn(f"Do {cell['task']}.", (cd / 'executor-prompt.txt').read_text())
+                self.assertRegex(cell['directory'], r'^cell-\d{3}$')
             with self.assertRaises(SystemExit):
                 h.main(['plan', '--tasks', str(tasks), '--codex', str(fake), '--node', '/bin/node',
                         '--navigation-cli', '/c/cli.mjs', '--out', str(out)])
+
+
+FAKE_CODEX = r'''#!/usr/bin/env python3
+import sys, json, pathlib
+a = sys.argv
+cwd = pathlib.Path(a[a.index('-C') + 1]); out = pathlib.Path(a[a.index('-o') + 1])
+U = {"input_tokens": 100, "cached_input_tokens": 40, "output_tokens": 10, "reasoning_output_tokens": 2, "cache_write_input_tokens": 0}
+if a[a.index('--sandbox') + 1] == 'workspace-write':
+    sys.stdin.read()
+    (cwd / 'src.ts').write_text('export const v = "fixed"\n')
+    (cwd.parent / 'escape.txt').write_text('outside the workspace\n')
+    (cwd / 'answer.json').write_text(json.dumps({"filesChanged": ["src.ts"], "summary": "s", "testsRun": [],
+        "evidence": [{"path": "src.ts", "startLine": 1, "endLine": 1, "claim": "c"}, {"path": "../escape.txt", "startLine": 1, "endLine": 1, "claim": "x"}]}))
+    print(json.dumps({"type": "item.completed", "item": {"type": "command_execution", "command": "/bin/zsh -lc 'cat /etc/hosts && cat src.ts'", "exit_code": 0, "status": "completed"}}))
+else:
+    rubric = json.loads((cwd / 'rubric.json').read_text())
+    assert (cwd / 'source' / 'src.ts').is_file() and not (cwd / 'escape.txt').exists()
+    out.write_text(json.dumps({"accepted": True, "findings": [{"id": r["id"], "passed": True, "reason": "ok"} for r in rubric["rubric"]], "materialIssues": []}))
+print(json.dumps({"type": "turn.completed", "usage": U}))
+'''
+
+
+class ExecutionPath(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        d = self.d = pathlib.Path(self.tmp.name).resolve()
+        self.codex = d / 'codex'; self.codex.write_text(FAKE_CODEX); self.codex.chmod(0o755)
+        self.auth = d / 'auth.json'; self.auth.write_text('{}')
+        repo = self.repo = d / 'repos' / 'r'; repo.mkdir(parents=True)
+        g = lambda *a: h.git(repo, *a).stdout.strip()
+        g('init', '-q')
+        (repo / 'src.ts').write_text('export const v = "buggy"\n'); (repo / '.gitignore').write_text('node_modules/\n')
+        g('add', '-A'); g('commit', '-qm', 'base'); base = g('rev-parse', 'HEAD')
+        (repo / 'src.ts').write_text('export const v = "fixed"\n'); (repo / 'check.test.ts').write_text('// expects fixed\n')
+        g('add', '-A'); g('commit', '-qm', 'fix'); change = g('rev-parse', 'HEAD')
+        self.archive_dir = d / 'archives'; self.archive_dir.mkdir()
+        h.git(repo, 'archive', '--format=tar', '-o', str(self.archive_dir / 'r-code-change.tar'), base)
+        self.tasks = d / 'tasks'; self.tasks.mkdir()
+        self.task = {'id': 'r-code-change', 'repository': 'r', 'class': 'code-change', 'baseCommit': base,
+                     'statement': 'Make v fixed.', 'answerFormat': '{"filesChanged": [...]}'}
+        (self.tasks / 'r-code-change.json').write_text(json.dumps(self.task))
+        self.acc = d / 'acceptance'; self.acc.mkdir()
+        (self.acc / 'r-code-change.json').write_text(json.dumps({'id': 'r-code-change', 'sourceChange': change,
+            'requiredEvidence': [{'path': 'src.ts', 'startLine': 1, 'endLine': 1}], 'dependencySet': [{'path': 'src.ts', 'symbol': 'v'}],
+            'checker': {'setup': 'true', 'command': 'grep -q fixed src.ts && test -f check.test.ts', 'testFiles': ['check.test.ts']},
+            'rubric': [{'id': 'R1', 'requirement': 'v is fixed'}], 'scope': 'src.ts', 'notes': ''}))
+        self.archives = d / 'archives.json'
+        self.archives.write_text(json.dumps({'r-code-change': h.sha256_file(self.archive_dir / 'r-code-change.tar')}))
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def run_all(self, forbid=()):
+        d = self.d
+        h.INSTALL['r'] = 'true'
+        self.assertEqual(h.main(['prepare', '--tasks', str(self.tasks), '--archives', str(self.archives),
+                                 '--archive-dir', str(self.archive_dir), '--templates', str(d / 'templates')]), 0)
+        self.assertEqual(h.main(['plan', '--tasks', str(self.tasks), '--repetitions', '1', '--codex', str(self.codex),
+                                 '--node', '/bin/node', '--navigation-cli', '/c/cli.mjs', '--out', str(d / 'plan')]), 0)
+        common = ['--plan', str(d / 'plan'), '--tasks', str(self.tasks), '--codex', str(self.codex), '--auth-file', str(self.auth)]
+        node = os.environ.get('OS2_NODE', '/usr/local/bin/node')
+        return h.main(['execute', *common, '--templates', str(d / 'templates'), '--node', node,
+                       '--navigation-cli', '/c/cli.mjs', '--forbid', *forbid]), common
+
+    def test_prepare_rejects_a_changed_archive(self):
+        self.archives.write_text(json.dumps({'r-code-change': '0' * 64}))
+        with self.assertRaises(ValueError):
+            h.main(['prepare', '--tasks', str(self.tasks), '--archives', str(self.archives),
+                    '--archive-dir', str(self.archive_dir), '--templates', str(self.d / 'templates')])
+
+    def test_execute_refuses_while_acceptance_files_are_on_the_machine(self):
+        with self.assertRaises(SystemExit):
+            self.run_all(forbid=[str(self.acc)])
+
+    def test_execute_then_assess_end_to_end(self):
+        code, common = self.run_all(forbid=[str(self.d / 'not-here')])
+        self.assertEqual(code, 0)
+        cells = sorted((self.d / 'plan').glob('cell-*'))
+        self.assertEqual(len(cells), 2)
+        for cell in cells:
+            ex = json.loads((cell / 'executor.json').read_text())
+            self.assertEqual(ex['changedFiles'], ['src.ts'])
+            self.assertTrue(ex['answerPresent'])
+            self.assertEqual(ex['usage']['total'], 110)
+            self.assertEqual(ex['outsideReferences'], ['/etc/hosts'])
+            self.assertIn('fixed', (cell / 'executor.diff').read_text())
+        self.assertEqual(h.main(['assess', *common, '--acceptance', str(self.acc), '--repos', str(self.d / 'repos')]), 0)
+        for cell in cells:
+            a = json.loads((cell / 'assessment.json').read_text())
+            self.assertTrue(a['checker']['passed'])
+            self.assertEqual(a['dependencies'], {'missed': 0, 'incorrect': 0, 'total': 0})
+            self.assertTrue(a['reviewer']['valid'])
+            self.assertTrue(a['accepted'])
+            self.assertEqual(a['totalTokens'], 220)
+            self.assertFalse((cell / 'check').exists())
+
+    def test_a_failed_checker_is_never_accepted(self):
+        code, common = self.run_all()
+        acc = json.loads((self.acc / 'r-code-change.json').read_text())
+        acc['checker']['command'] = 'exit 1'
+        (self.acc / 'r-code-change.json').write_text(json.dumps(acc))
+        h.main(['assess', *common, '--acceptance', str(self.acc), '--repos', str(self.d / 'repos')])
+        for cell in sorted((self.d / 'plan').glob('cell-*')):
+            a = json.loads((cell / 'assessment.json').read_text())
+            self.assertFalse(a['checker']['passed'])
+            self.assertTrue(a['reviewer']['accepted'])
+            self.assertFalse(a['accepted'])
+
+    def test_dependency_count_and_review_validation(self):
+        task = {'class': 'impact'}
+        acc = {'dependencySet': [{'path': 'a.ts'}, {'path': 'b.ts'}]}
+        answer = {'mustChange': [{'path': 'a.ts'}, {'path': 'invented.ts'}]}
+        self.assertEqual(h.dependency_count(task, acc, answer, [], {'a.ts', 'b.ts'}), {'missed': 1, 'incorrect': 1, 'total': 2})
+        self.assertIsNone(h.dependency_count({'class': 'orientation'}, acc, answer, [], set()))
+        good = {'accepted': True, 'findings': [{'id': 'R1', 'passed': True, 'reason': 'ok'}], 'materialIssues': []}
+        self.assertEqual(h.review_outcome(good, ['R1']), {'valid': True, 'accepted': True})
+        self.assertEqual(h.review_outcome({**good, 'materialIssues': ['x']}, ['R1']), {'valid': True, 'accepted': False})
+        self.assertEqual(h.review_outcome({**good, 'findings': []}, ['R1'])['valid'], False)
+        self.assertEqual(h.review_outcome(None, ['R1'])['valid'], False)
 
 
 if __name__ == '__main__':

@@ -1,0 +1,195 @@
+{
+  "ranAt": "2026-11-04",
+  "script": "blind-check.mjs",
+  "note": "Counts and pass/fail only; details stay private.",
+  "freeze": {
+    "host": "M4, clean install at each base commit, tests with outbound network denied",
+    "tasks": [
+      {
+        "id": "bray-code-change",
+        "class": "code-change",
+        "schemaErrors": 0,
+        "archiveSha256": "0c2eb4074f06485279c459c6d3e251d0d7f842cbbb909ef1e532c3598ad9609a",
+        "evidenceValidAtBase": "4/4",
+        "dependencyPathsAtBase": "3/3",
+        "authorSetupExit": 0,
+        "failsAtBase": true,
+        "reinstalled": false,
+        "passesWithChange": true,
+        "checkerDiscriminates": true
+      },
+      {
+        "id": "bray-diagnosis",
+        "class": "diagnosis",
+        "schemaErrors": 0,
+        "archiveSha256": "d96a5b347dfdf7ad3d39d9c5c08089c02663077b9021d642b1b2d97b2f9977a4",
+        "evidenceValidAtBase": "1/1",
+        "dependencyPathsAtBase": "1/1",
+        "authorSetupExit": 0,
+        "failsAtBase": true,
+        "reinstalled": false,
+        "passesWithChange": true,
+        "checkerDiscriminates": true
+      },
+      {
+        "id": "bray-impact",
+        "class": "impact",
+        "schemaErrors": 0,
+        "archiveSha256": "f857a195c2f5d5916ff440f333861c7e43ef5ee04e6550466ce8e9633e6fb0bf",
+        "evidenceValidAtBase": "9/9",
+        "dependencyPathsAtBase": "10/10"
+      },
+      {
+        "id": "bray-orientation",
+        "class": "orientation",
+        "schemaErrors": 0,
+        "archiveSha256": "c58c5388d935ce1811fe594381762db312d82927a68b12eebac54137b9d57f81",
+        "evidenceValidAtBase": "10/10",
+        "dependencyPathsAtBase": "5/5"
+      },
+      {
+        "id": "h3-code-change",
+        "class": "code-change",
+        "schemaErrors": 0,
+        "archiveSha256": "39421ead7b38ed1f9019ce2316c0d3fd024cd9ccdd95065b2dd2d8ef2f0c58d4",
+        "evidenceValidAtBase": "4/4",
+        "dependencyPathsAtBase": "3/3",
+        "authorSetupExit": 0,
+        "failsAtBase": true,
+        "reinstalled": false,
+        "passesWithChange": true,
+        "checkerDiscriminates": true
+      },
+      {
+        "id": "h3-diagnosis",
+        "class": "diagnosis",
+        "schemaErrors": 0,
+        "archiveSha256": "55d7e37f2a1b8388cc6bc32753b20a306ab4427d861097fce7e9aa8c9d5161e7",
+        "evidenceValidAtBase": "3/3",
+        "dependencyPathsAtBase": "1/1",
+        "authorSetupExit": 0,
+        "failsAtBase": true,
+        "reinstalled": false,
+        "passesWithChange": true,
+        "checkerDiscriminates": true
+      },
+      {
+        "id": "h3-impact",
+        "class": "impact",
+        "schemaErrors": 0,
+        "archiveSha256": "d272041ed3db5c73507c67707e208d3d0a9c24952857a99f5f7ac0abec5a2440",
+        "evidenceValidAtBase": "6/6",
+        "dependencyPathsAtBase": "5/5"
+      },
+      {
+        "id": "h3-orientation",
+        "class": "orientation",
+        "schemaErrors": 0,
+        "archiveSha256": "273a52bba9990ffae6da92327340b94a40cf20b50038c8d4e9c2e39efc5351be",
+        "evidenceValidAtBase": "13/13",
+        "dependencyPathsAtBase": "6/6"
+      }
+    ]
+  },
+  "packets": {
+    "host": "owner Mac, Context 0.26.0 connect, one build packet per task, maxBytes 65536, JSON format",
+    "tasks": [
+      {
+        "id": "bray-code-change",
+        "class": "code-change",
+        "schemaErrors": 0,
+        "ranges": 4,
+        "covered": 4,
+        "pastEnd": 0,
+        "packetBytes": 9228,
+        "failure": null,
+        "singles": null,
+        "sufficient": true
+      },
+      {
+        "id": "bray-diagnosis",
+        "class": "diagnosis",
+        "schemaErrors": 0,
+        "ranges": 1,
+        "covered": 1,
+        "pastEnd": 0,
+        "packetBytes": 4211,
+        "failure": null,
+        "singles": null,
+        "sufficient": true
+      },
+      {
+        "id": "bray-impact",
+        "class": "impact",
+        "schemaErrors": 0,
+        "ranges": 9,
+        "covered": 9,
+        "pastEnd": 0,
+        "packetBytes": 28370,
+        "failure": null,
+        "singles": null,
+        "sufficient": true
+      },
+      {
+        "id": "bray-orientation",
+        "class": "orientation",
+        "schemaErrors": 0,
+        "ranges": 10,
+        "covered": 10,
+        "pastEnd": 0,
+        "packetBytes": 27192,
+        "failure": null,
+        "singles": null,
+        "sufficient": true
+      },
+      {
+        "id": "h3-code-change",
+        "class": "code-change",
+        "schemaErrors": 0,
+        "ranges": 4,
+        "covered": 4,
+        "pastEnd": 0,
+        "packetBytes": 5332,
+        "failure": null,
+        "singles": null,
+        "sufficient": true
+      },
+      {
+        "id": "h3-diagnosis",
+        "class": "diagnosis",
+        "schemaErrors": 0,
+        "ranges": 3,
+        "covered": 3,
+        "pastEnd": 0,
+        "packetBytes": 7160,
+        "failure": null,
+        "singles": null,
+        "sufficient": true
+      },
+      {
+        "id": "h3-impact",
+        "class": "impact",
+        "schemaErrors": 0,
+        "ranges": 6,
+        "covered": 6,
+        "pastEnd": 0,
+        "packetBytes": 7556,
+        "failure": null,
+        "singles": null,
+        "sufficient": true
+      },
+      {
+        "id": "h3-orientation",
+        "class": "orientation",
+        "schemaErrors": 0,
+        "ranges": 13,
+        "covered": 13,
+        "pastEnd": 0,
+        "packetBytes": 36131,
+        "failure": null,
+        "singles": null,
+        "sufficient": true
+      }
+    ]
+  }
+}

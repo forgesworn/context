@@ -232,10 +232,22 @@ Results are never pooled with v1, v2, S5, v3, the repeated Pro run or the
 
 ### Phase 0: zero model (free)
 
-1. **Packet sufficiency.** For each new task, a deterministic script checks
-   whether a bounded Context packet built from the task's required evidence
-   contains it all, and records the bytes. A task that Context cannot cover
-   within budget is recorded as a known gap. It is not removed from the pack.
+1. **Packet sufficiency and freeze (done, blind).**
+   [`blind-check.mjs`](blind-check.mjs) reads the private acceptance files
+   and prints only counts and pass/fail. It has 4 tests, including that its
+   output never contains paths, symbols or commands. Results are in
+   [`phase0-blind-checks.json`](phase0-blind-checks.json):
+   - *Packets* (Context 0.26.0 `connect`, one build packet per task,
+     64 KiB budget): all 8 tasks' required evidence fits in one packet:
+     1 to 13 ranges, 4,211 to 36,131 bytes in JSON form. No task is a
+     known gap.
+   - *Freeze* (M4, clean install at each base commit, tests with outbound
+     network denied):
+     - all 8 base archives are hashed into the protocol;
+     - for all 4 code-change and diagnosis tasks, the checker fails at base
+       with the change's tests applied and passes with the change, and no
+       reinstall was needed;
+     - every required evidence range is valid at its base commit.
 2. **Transcript metrics.** Built in [`metrics.mjs`](metrics.mjs), with
    fixture tests in [`metrics.test.mjs`](metrics.test.mjs) (run with
    `node --test`; the repository's CI does not run experiment tests). It reads
@@ -267,7 +279,23 @@ Results are never pooled with v1, v2, S5, v3, the repeated Pro run or the
    can be added to test against them. Otherwise the phase 1 pair is the first
    real measurement, and the 0.25 threshold stays proposed until then.
 3. **Harness tests.** Built in [`harness.test.py`](harness.test.py) (run
-   with `python3 harness.test.py`), 20 tests:
+   with `python3 harness.test.py`), 25 tests. The execution path has four
+   stages:
+   - `prepare`: templates from the hashed archives;
+   - `plan`: opaque `cell-NNN` names, so the reviewer cannot read the arm
+     from its path;
+   - `execute`: every executor cell. It refuses to start while any
+     `--forbid` path exists, because Codex's sandbox limits writes, not
+     reads. So the acceptance files, the author's transcript and the blind
+     workspace must be off the executing machine. Commands that reference
+     paths outside the workspace are recorded for review.
+   - `assess`, after all executors: the checker with the change's tests
+     applied, the path-level dependency count, and the blind reviewer.
+
+   The fake-Codex end-to-end tests cover the hidden-file refusal, the answer
+   kept out of the recorded change, reviewer sources that escape the
+   workspace, and a failed checker never being accepted. Six deliberate
+   bugs in these safeguards were each caught. The earlier tests:
    - rotation for 48 and 72 cells, checked against the formula;
    - arm setup, including that only the Context arm gets the server, bound to
      its own workspace;
@@ -425,12 +453,15 @@ Phase 2 is of that order. Phase 1 is one pair. No prices were looked up.
 3. Phase 1.
 4. The protocol review and phase 2, only if phase 1 passes.
 
-Free work left before phase 1:
+Phase 0 is complete. Choices for phase 1:
 
-- freezing each task's archive and preparer;
-- a blind checker run from clean installs (reporting pass or fail only);
-- packet sufficiency, also run blind, since required evidence is private;
-- the execution path in the harness.
+- **The task:** one impact or code-change task. h3-code-change or
+  bray-code-change is suggested, because their checkers are verified and the
+  author's leak did not concern them.
+- **The host.** Either:
+  - this Mac, with the blind workspace moved off it while executors run;
+  - or the M4, which first needs Codex 0.166.0 and Context 0.26.0 installed,
+    and the private acceptance copy removed during execute.
 
 ## Not claimed
 

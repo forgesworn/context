@@ -16,7 +16,7 @@
     "repinRule": "A phase 0 or phase 1 fix ships as its own release; this block is repinned before lock."
   },
   "taskPack": {
-    "status": "authored 2026-11-04; archives, preparer and checker runs to freeze",
+    "status": "authored and frozen 2026-11-04 (archives hashed; checkers verified from clean installs)",
     "shape": "Eight tasks: four on bray and four on h3; per repository one orientation, impact, diagnosis and code-change task.",
     "repositories": {
       "forgesworn": {
@@ -93,6 +93,16 @@
         "Checkers were verified against HEAD node_modules, not clean installs at each base commit",
         "Orientation rubric line ranges were read by hand; reviewers allow small offsets"
       ]
+    },
+    "archives": {
+      "bray-code-change": "0c2eb4074f06485279c459c6d3e251d0d7f842cbbb909ef1e532c3598ad9609a",
+      "bray-diagnosis": "d96a5b347dfdf7ad3d39d9c5c08089c02663077b9021d642b1b2d97b2f9977a4",
+      "bray-impact": "f857a195c2f5d5916ff440f333861c7e43ef5ee04e6550466ce8e9633e6fb0bf",
+      "bray-orientation": "c58c5388d935ce1811fe594381762db312d82927a68b12eebac54137b9d57f81",
+      "h3-code-change": "39421ead7b38ed1f9019ce2316c0d3fd024cd9ccdd95065b2dd2d8ef2f0c58d4",
+      "h3-diagnosis": "55d7e37f2a1b8388cc6bc32753b20a306ab4427d861097fce7e9aa8c9d5161e7",
+      "h3-impact": "d272041ed3db5c73507c67707e208d3d0a9c24952857a99f5f7ac0abec5a2440",
+      "h3-orientation": "273a52bba9990ffae6da92327340b94a40cf20b50038c8d4e9c2e39efc5351be"
     }
   },
   "executor": {
@@ -132,11 +142,12 @@
     "phase0": {
       "paid": false,
       "steps": [
-        "Packet sufficiency: deterministic check that a bounded packet holds each task's required evidence; record bytes; uncovered tasks are recorded gaps, not removed. Waits for the task pack.",
-        "Transcript metrics on Codex exec --json streams: metrics.mjs with fixture tests (done). September streams not found at the recorded path, so the metric is unvalidated on the known bad case; the write probe checks field names and phase 1 gives the first real measurement.",
-        "Harness: harness.py with 19 fixture tests (done): rotation, arm setup, no-alias rule, incomplete usage, cost gate and a dry-run plan. Five seeded bugs caught. Execution path waits for the task pack.",
-        "Offline tests for both repositories (done at the heads checked).",
-        "History candidates: history-candidates.mjs with tests (done; counts only)."
+        "Packet sufficiency (done, blind): all 8 tasks covered by one bounded build packet each, 4,211 to 36,131 bytes in JSON form; see phase0-blind-checks.json.",
+        "Transcript metrics: metrics.mjs (done); checked on the write-probe stream.",
+        "Harness: harness.py plan, prepare, execute and assess with 25 fixture tests (done). Execute refuses while forbidden paths exist; outside-workspace references are flagged.",
+        "Offline tests for both repositories (done).",
+        "History candidates (done; counts only).",
+        "Freeze (done, blind): 8 archives hashed; the 4 checker tasks fail at base and pass with the change from clean installs; all required evidence ranges valid at base."
       ]
     },
     "writeProbe": {
@@ -263,7 +274,7 @@
     "screen-pro-040-20260923"
   ],
   "openDecisions": [
-    "Phase 1 approval (one impact or code-change task, plain and context, one reviewer each)",
+    "Phase 1 approval and host",
     "Protocol review and phase 2 only if phase 1 passes",
     "Whether the protocol review replaces the tasks touched by the author's leak"
   ],
@@ -276,5 +287,11 @@
     "billing": "Codex reports \"Logged in using ChatGPT\": plan allowance, not metered; report tokens and headroom, no cash claim",
     "qualityMeasure": "missedOrIncorrectDependencies"
   },
-  "repetitionsCells": "8 tasks x 2 arms x 3 repetitions = 48 executor cells, each with a reviewer"
+  "repetitionsCells": "8 tasks x 2 arms x 3 repetitions = 48 executor cells, each with a reviewer",
+  "execution": {
+    "stages": "prepare (templates from frozen archives), execute (all executor cells, no acceptance files on the machine), assess (checker, dependency count, reviewer)",
+    "readExposure": "Codex workspace-write limits writes, not reads. Acceptance files, the author transcript and other cells' outputs must be off the executing machine or are flagged by outsideReferences.",
+    "cellNames": "opaque cell-NNN so the reviewer cannot read the arm from its path",
+    "host": "owner choice: this Mac (move the blind workspace off it during execute) or the M4 (needs Codex 0.166.0 and Context 0.26.0 installed)"
+  }
 }
