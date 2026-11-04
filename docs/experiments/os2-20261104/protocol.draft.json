@@ -1,0 +1,146 @@
+{
+  "version": 0,
+  "status": "draft-unlocked",
+  "experimentId": "os2-codex-sol-high-context-0.26.0",
+  "draftedAt": "2026-11-04",
+  "lockedAt": null,
+  "lockRule": "Set lockedAt and the hashes below only after owner approval, a passed phase 1 and an accepted independent protocol review, and before any phase 2 cell. Any change after lock is a new version; earlier versions and their results are retained.",
+  "purpose": "OS2: whether Context gives better accepted outcomes at lower complete model token cost than a competent ordinary workflow (and optionally Graphify) with the same frontier model in every arm.",
+  "buildUnderTest": {
+    "version": "0.26.0",
+    "commit": "8cbb6163f3903c248899442278a673e8aacf20de",
+    "artifacts": {
+      "forgesworn-context-0.26.0.tgz": "b03731611e5e07155efa4f176207e8737452cb3c841a5d86d95d54112181acbd",
+      "forgesworn-context-tools-0.26.0.tgz": "234e5470950755bc11550ed789dde3eb4b6b4eb68d3629ad109b188592b6197e"
+    },
+    "repinRule": "A phase 0 or phase 1 fix ships as its own release; this block is repinned before lock."
+  },
+  "taskPack": {
+    "status": "to-write",
+    "shape": "Eight tasks: four on one ForgeSworn repository and four on one repository outside ForgeSworn; per repository one orientation, impact, diagnosis and code-change task.",
+    "repositories": {
+      "forgesworn": {
+        "name": null,
+        "commit": null,
+        "archiveSha256": null
+      },
+      "external": {
+        "name": null,
+        "commit": null,
+        "archiveSha256": null,
+        "licence": null
+      }
+    },
+    "excluded": "The eight d5-20260921 tasks are not reused: both repositories are ForgeSworn and the 0.4.0 fixes were found on that set.",
+    "hiddenAcceptance": "Required evidence, dependency set, checker and scope rules per task, written and hashed by a session that has not designed Context tools, instructions or prompts. Hashes recorded here at lock; contents unread by the tool side until results are recorded.",
+    "hiddenAcceptanceSha256": {}
+  },
+  "executor": {
+    "client": "codex-cli",
+    "clientVersion": "pin at lock (0.166.0 on 2026-11-04)",
+    "model": "gpt-5.6-sol",
+    "effort": "high",
+    "sandbox": "workspace-write",
+    "session": "fresh, --ephemeral, per-arm CODEX_HOME",
+    "invocation": "absolute binary path with explicit flags, no shell, no inherited aliases",
+    "maxTurns": null
+  },
+  "reviewer": {
+    "client": "codex-cli",
+    "model": "gpt-5.6-sol",
+    "effort": "high",
+    "sandbox": "read-only",
+    "blind": "does not see arm name or other arms' output",
+    "receives": "answer or diff, checker result, private rubric, bounded excerpts of cited frozen source"
+  },
+  "arms": {
+    "plain": "Built-in shell, read and edit; no MCP server.",
+    "context": "As plain, plus the pinned 0.26.0 repository MCP server bound to the arm's prepared root; fresh server per arm.",
+    "graphify": {
+      "optional": true,
+      "description": "As plain, plus a graph prebuilt with `graphify update <workspace>` (no model).",
+      "package": "graphifyy",
+      "packageVersion": "0.9.65"
+    }
+  },
+  "retrievalInstructionRule": "Each arm's prompt begins with one retrieval instruction of similar length and force.",
+  "repetitions": 3,
+  "armOrderRule": "Repetition r (1 to 3) of task i (1 to 8) uses the arm order rotated by (i + r - 1) mod n, where n is the number of arms.",
+  "phases": {
+    "phase0": {
+      "paid": false,
+      "steps": [
+        "Packet sufficiency: deterministic check that a bounded packet holds each task's required evidence; record bytes; uncovered tasks are recorded gaps, not removed.",
+        "Transcript metrics on Codex --json streams: readsAfterPacket and toolErrorRate, tested on recorded streams.",
+        "Harness tests for rotation, third arm, incomplete usage and the no-alias rule."
+      ]
+    },
+    "writeProbe": {
+      "paid": true,
+      "approval": "required",
+      "purpose": "Recheck the v2 read-only sandbox defect on the pinned Codex version."
+    },
+    "phase1": {
+      "paid": true,
+      "approval": "required",
+      "cells": "one impact or code-change task, plain and context, one repetition, one reviewer each",
+      "passIf": {
+        "contextAccepted": true,
+        "readsAfterPacketMax": 0.25,
+        "contextToolErrorRateMax": 0.05
+      },
+      "onFailure": "Record; fix the observed cause as its own release; rerun phase 1 under a new draft revision. Phase 2 is not run."
+    },
+    "protocolReview": {
+      "paid": true,
+      "approval": "required",
+      "reviewer": "fresh gpt-5.6-sol/high",
+      "countedAs": "setup"
+    },
+    "phase2": {
+      "paid": true,
+      "approval": "required, separate",
+      "cells": "8 tasks x 3 repetitions x 2 or 3 arms, plus one reviewer per cell"
+    }
+  },
+  "metrics": {
+    "readsAfterPacket": "Direct reads (shell cat, sed, rg on a path) of lines already returned by a packet in the same session, divided by packet-covered files.",
+    "toolErrorRate": "Error tool results divided by all tool results.",
+    "missedOrIncorrectDependencies": "Against the hidden dependency set, by checker and scope check.",
+    "firstPassAccepted": "Code-change checker passes on the executor's first self-check.",
+    "totalTokens": "Executor plus reviewer input and output, including cached input, setup, repairs and failed attempts.",
+    "reviewerSeconds": "Reviewer wall seconds."
+  },
+  "qualityGate": {
+    "primary": "missedOrIncorrectDependencies (alternative: firstPassAccepted; choose before lock)",
+    "rule": "Per-task median lower than the comparator on at least two tasks and higher on none, with no Context outcome rejected.",
+    "perfectBaseline": "No claim; a prospectively written harder task class replaces that class.",
+    "structuredAcceptance": "Checker passed and blind reviewer accepted."
+  },
+  "costGate": {
+    "statistic": "Sum over tasks of per-task median totalTokens",
+    "rule": "Context at least 20% below each comparator, and sum of per-task median reviewerSeconds no higher.",
+    "reportedOnly": "Geometric mean of per-task ratios with a 90% bootstrap interval (10,000 draws, seed fixed at lock).",
+    "accounting": "Codex --json event stream usage; cached, uncached, output and reasoning subset reported separately, never added twice.",
+    "incomplete": "Missing usage marks a cell incomplete, never zero; an incomplete cell fails the cost gate for its task.",
+    "money": "Billing route unknown; cash savings remain unproven."
+  },
+  "notPooledWith": [
+    "d5-20260921",
+    "d5-20260921-v2",
+    "d5-20260921-v3",
+    "graphify-20260922",
+    "graphify-20260922-v2",
+    "graphify-20260922-v3-coverage",
+    "graphify-20260922-s5-deepseek",
+    "repeated-pro-20260923",
+    "screen-pro-040-20260923"
+  ],
+  "openDecisions": [
+    "External repository and commit",
+    "Two or three arms",
+    "Author of hidden rubrics and dependency sets",
+    "Sol billing route",
+    "Separate approvals for write probe, phase 1, protocol review and phase 2"
+  ]
+}

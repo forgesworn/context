@@ -156,6 +156,10 @@ checks. Model routing stays client-owned; no new paid trial is started by this p
 | **OS5 — Practical local scale and refresh. Active local slice; wider qualification open** | Deliver the owner-authorised encrypted workspace cache, catalogue, file-preparation reuse and advisory multi-agent coordination; qualify measured performance/refresh against actual workloads. Private source is persisted only as authenticated encrypted payloads in an explicitly initialised local cache | Context lead: `docs/ENTERPRISE-SCALE-REVIEW.md`, `docs/BOUNDED-SEARCH-DESIGN.md`, `benchmarks/scale`, Node tools adapter; protocol changes only if justified | Sol/high for storage/generation design; Terra/medium for integration; Flash/off for scoped fixtures | Independent Sol/high | Predeclared corpus, latency/memory/work budgets, recall and update targets pass; cancellation, deletion, crash/recovery and concurrent readers tested; no silent plaintext private index. All local capabilities remain MIT |
 | **OS6 — Dependable open-source release. Open** | Consolidate intended changes, finish applicable G0–G4 checks, document supported capability set and publish through the release process when authorised | Context lead + the product owner: Context packages, CI, `RELEASE_EVIDENCE.md`, README/changelog and registry acceptance | Deterministic build/install/checks; Flash/off for release docs; Terra/medium for packaging repairs | Terra/medium release review; Sol/high signs off unresolved consequential boundaries and savings evidence | Named commit, matching CI, clean independent install, exact published registry smoke and real external usage; honest scope/gaps, measured benefits and licence/notices inventory |
 
+The unlocked OS2 draft protocol is in
+[`experiments/os2-20261104`](experiments/os2-20261104/README.md); nothing has
+run under it and each paid step needs separate approval.
+
 The OS2 token threshold is a proposed decision rule for a **new** prospective
 protocol, to be fixed before running arms. Existing D5 v1/v2/v3 protocols and
 results remain immutable. Also retain the separate D5 monetary target where
