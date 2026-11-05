@@ -7,11 +7,11 @@
   "lockRule": "Set lockedAt and the hashes below only after owner approval, a passed phase 1 and an accepted independent protocol review, and before any phase 2 cell. Any change after lock is a new version; earlier versions and their results are retained.",
   "purpose": "OS2: whether Context gives better accepted outcomes at lower complete model token cost than a competent ordinary workflow (and optionally Graphify) with the same frontier model in every arm.",
   "buildUnderTest": {
-    "version": "0.28.0",
-    "commit": "05bc5013ab80db418151d9b7247a80aa3992c5cd",
+    "version": "0.29.0",
+    "commit": "6cd0ce2c2cf7649eaca67b439b25059e83d943cf",
     "artifacts": {
-      "forgesworn-context-0.28.0.tgz": "57705f7ca1b423fdcfe35d7c44d2de7ee2df34126ff6744dca2f53aed7436d3a",
-      "forgesworn-context-tools-0.28.0.tgz": "76018522d3d9be43054a69c59d80ede2412d29d12db5024ec87c241c39fe140c"
+      "forgesworn-context-0.29.0.tgz": "5fa7a7aaba06fa34d7d69526277a6ea1820b8fae3869b4261bc4891c19580337",
+      "forgesworn-context-tools-0.29.0.tgz": "8392fd461e59378bb54b8f419a42266d540d6d94be056d75da2dfaaad94b6f9d"
     },
     "repinRule": "A fix found later ships as its own release; this block is repinned and the protocol requalified before lock."
   },
@@ -127,7 +127,7 @@
   },
   "arms": {
     "plain": "Built-in shell, read and edit; no MCP server.",
-    "context": "As plain, plus the pinned 0.28.0 repository MCP server bound to the arm's staged root; fresh server per arm. Instruction: search or explore, then read exact implementation and tests with repository_packet (no forced status or refresh).",
+    "context": "As plain, plus the pinned 0.29.0 repository MCP server bound to the arm's staged root; fresh server per arm. Instruction: search or explore, then read exact implementation and tests with repository_packet (no forced status or refresh).",
     "graphify": {
       "description": "As plain, plus a graph prebuilt with `graphify update <workspace>` (no model).",
       "package": "graphifyy",
@@ -626,7 +626,9 @@
       "version": 2,
       "revisedAt": "2026-11-05",
       "basis": "protocol-review.md ranked changes 1-5, 9, 13 and 14 (free); paid items 6-8, 10 and 12 remain open",
-      "build": "0.28.0 (05bc501)"
+      "build": "0.29.0 (6cd0ce2)",
+      "repinnedAt": "2026-11-05",
+      "repinNote": "repinned from 0.28.0 (05bc501) after repository_search accepted expectedGeneration; not yet run on a model"
     }
   ]
 }
