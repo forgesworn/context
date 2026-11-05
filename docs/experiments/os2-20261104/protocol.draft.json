@@ -333,7 +333,30 @@
               "outsideReferences": 0
             }
           },
-          "observation": "One pair is not a gate test. On this pair the Context cell used 1.31x the plain cell total and its reviewer took longer; the cost gate needs at most 0.80x and no higher reviewer seconds. Attempt 1 (invalid environment) showed the same direction at 2.3x."
+          "observation": "One pair is not a gate test. On this pair the Context cell used 1.31x the plain cell total and its reviewer took longer; the cost gate needs at most 0.80x and no higher reviewer seconds. Attempt 1 (invalid environment) showed the same direction at 2.3x.",
+          "codex": "0.166.0",
+          "context": "0.26.0",
+          "settings": "gpt-5.6-sol/high",
+          "executorGap": {
+            "total": 284034,
+            "cachedInput": 271232,
+            "uncachedInput": 11780,
+            "output": 1022,
+            "note": "95% of the executor gap is cached input"
+          },
+          "reviewerInputs": {
+            "context": {
+              "evidenceFiles": 5,
+              "sourceBytes": 38960,
+              "diffBytes": 6651
+            },
+            "plain": {
+              "evidenceFiles": 5,
+              "sourceBytes": 38889,
+              "diffBytes": 6534
+            },
+            "note": "reviewers received near-identical material, so evidence volume does not explain the reviewer-seconds difference"
+          }
         }
       ],
       "status": "passed"
@@ -419,5 +442,12 @@
     "readExposure": "Codex workspace-write limits writes, not reads. Acceptance files, the author transcript and other cells' outputs must be off the executing machine or are flagged by outsideReferences.",
     "cellNames": "opaque cell-NNN so the reviewer cannot read the arm from its path",
     "host": "owner choice: this Mac (move the blind workspace off it during execute) or the M4 (needs Codex 0.166.0 and Context 0.26.0 installed)"
-  }
+  },
+  "protocolReviewBrief": [
+    "Whether cached input should count fully toward the token gate: it is 95% of the phase 1 executor gap",
+    "outsideReferences exempts /tmp, which is shared by cells",
+    "the reviewer runs where the parent directory names the arm",
+    "whether to replace the tasks touched by the author's leak",
+    "whether reviewer seconds at n=1 per task is a usable gate input"
+  ]
 }

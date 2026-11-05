@@ -434,7 +434,10 @@ in any of the four sessions.
 One pair is not a gate test, but on this pair the Context cell used 1.31 times
 the plain cell's tokens and its reviewer took longer. The cost gate needs at
 most 0.80 times and no higher reviewer seconds. Attempt 1, in a broken
-environment, pointed the same way (2.3 times).
+environment, pointed the same way (2.3 times). Of the 284,034-token executor
+gap, 271,232 (95%) is cached input; uncached input differs by 11,780 and output
+by 1,022. Both reviewers received near-identical material (5 cited files,
+about 39 KB each), so that does not explain their time difference.
 
 ### Independent protocol review (paid, needs approval)
 
