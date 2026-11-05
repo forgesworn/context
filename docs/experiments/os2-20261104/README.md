@@ -1,10 +1,57 @@
-# OS2 protocol draft: Codex Sol/high, Context 0.26.0
+# OS2 protocol draft v2: Codex Sol/high, Context 0.28.0
 
-Status: **draft for owner review, not locked, nothing run.** The draft protocol
-is in [`protocol.draft.json`](protocol.draft.json). It has no `lockedAt` and no
-hashes. It is locked only after the owner approves it and an independent
-reviewer accepts it, and before any arm runs. Each paid step below needs its
-own approval; approving this draft approves none of them.
+Status: **draft v2 for owner review, not locked.** Version 1 qualified in phase
+1 and was then reviewed; the review said revise before phase 2. Version 2
+(2026-11-05) applies the review's free changes. The protocol is in
+[`protocol.draft.json`](protocol.draft.json). It has no `lockedAt`. It is
+locked only after the owner approves it, the paid items under
+[Still needs separate approval](#still-needs-separate-approval-in-this-order)
+are done, and before any phase 2 cell. Each paid step needs its own approval;
+approving this draft approves none of them. Sections below that record runs
+(phase 0, phase 1, the review and the diagnostic pairs) describe version 1 as
+it was run and are kept unchanged.
+
+## Version 2 changes (2026-11-05)
+
+What the [protocol review](protocol-review.md) asked for, and what changed:
+
+| Review item | Version 2 |
+| --- | --- |
+| Executors and reviewers can read sibling cells, plans, hidden files and shared temp | Codex 0.166 permission profiles deny reads of the home directory, `/private/tmp` and per-user temp. Each session runs in a fresh root under `/Users/Shared` with its own temp and `HOME`, and a copied toolchain. Before any model starts, a probe under the same profile must fail to read a canary in the cell directory. The legacy `--sandbox` flag is never passed, because it overrides the profile. |
+| Reviewer blinding defeated by its parent directory | The reviewer runs in its own staged root holding only its bundle, under a read-only profile with the same denies. |
+| Usage assumptions A1-A4 unvalidated | Checked on every stream: cached within input, reasoning within output, one usage event per exec whose totals equal the per-call session log, zero cache writes, exit 0. Any failure makes the cell incomplete. |
+| Harness gaps: manifest, setup, locked inputs, repetition counts, scope, frozen evidence, assess order | `plan` skips the manifest and records hashes of Codex, Node, the Context CLI, the toolchain, every task file, the harness and the metrics script; `execute` refuses on any change. Failed setup removes the template. Templates are rechecked against their record. The cost statistic requires exactly the planned repetitions. Scope is enforced from the acceptance file. The reviewer sees bounded excerpts of cited lines, resolved inside the workspace. `assess` waits for every executor. |
+| Declared analysis not implemented | `analyse` computes the cost gate, a task-level bootstrap interval, the geometric mean and the quality guard into `analysis.json`. |
+| Point estimate at 0.80 is not inferential | The cost gate needs the point ratio at most 0.80 **and** the upper end of its 90% task-bootstrap interval below 1.0. |
+| Reviewer seconds too noisy to gate | Reported, not gated. |
+| "Plan headroom" not measured | The primary outcome is renamed **reported processed tokens** (input plus output, cached input included). Uncached input, cached input and output are reported, with a frozen sensitivity set: uncached + output + w x cached for w = 0, 0.1 and 1. No plan-headroom claim. |
+| Quality rule has a floor effect; "no Context rejection" is brittle | Quality guard: Context has no fewer accepted outcomes than the comparator, and on no impact or code-change task a higher median dependency count. "Better" (lower on two or more tasks) is reported. All-zero counts are inconclusive. Code changes are scored on files actually changed, not claimed; impact answers also report precision. |
+| Arm order confounded with time | Blocks of (task, repetition) run in a seeded random order (seed 20261105). |
+| Metrics fail open | `metrics.mjs` reports malformed lines, separates MCP and shell error rates, parses pipelines, `tail` and interpreter one-liners more strictly, and makes reads-after-packet invalid on malformed lines, packets without ranges, or an unclassified command that names a packet-covered file or could reach one indirectly (globs, variables, substitutions, loops, `xargs`). On the eight recorded cells the measure is valid in all eight. |
+| Forced status and refresh calls | The Context instruction no longer asks for `repository_status` or a refresh. From 0.28.0, packet, explore, coverage and graph calls without a generation refresh a stale index themselves. |
+
+Still open, and not decided by this version:
+
+- **Task replacement (paid).** bray-impact, bray-diagnosis, h3-diagnosis and
+  h3-code-change are exposed. They need replacing by an isolated custodian,
+  with a separate qualification task that phase 2 never uses. Replacement
+  acceptance files must give scope as `{"allowedPaths": [glob, ...]}`;
+  `assess` stops on any other shape.
+- **Quality measure (paid pilot).** Symbol and call-site recall and precision,
+  and rules for alternative valid implementations, need a pilot on tasks
+  outside phase 2.
+- **Reviewer independence (paid).** A different model family or several
+  blinded reviewers, with an agreement sample.
+- **Live isolation check (paid, small).** `codex sandbox` honours the profile
+  (tested); one short `codex exec` session must show the same before lock.
+- **Loopback.** h3's socket-backed tests fail under the Codex sandbox with or
+  without the new profile (local ports are blocked). Whether to allow loopback
+  in the profile is an owner decision.
+- **Power.** Eight tasks give roughly 25% power for a true 0.80 ratio. More
+  independent tasks, or a claim limited to this pack, is an owner decision.
+- **Excluded costs.** Indexing, CPU, storage and tool development are outside
+  the measured model cost; executor wall time and local preparation are
+  reported separately.
 
 ## What this decides
 
@@ -12,11 +59,13 @@ OS2 asks whether Context gives better developer results at lower complete
 model cost than a competent ordinary workflow, with the same frontier model on
 both sides ([OS2 row](../../OPEN-SOURCE-EXECUTION.md),
 [acceptance contract](../../DETERMINISTIC-CODE-INTELLIGENCE.md#acceptance-better-outcomes-and-lower-complete-cost)).
-It passes only if Context:
+In version 2 it passes only if Context:
 
-1. has every outcome accepted,
-2. improves one prospectively named quality measure, and
-3. uses at least 20% fewer total model tokens, with no more total review time.
+1. passes the quality guard against each comparator (no fewer accepted
+   outcomes, and no impact or code-change task with more missed or incorrect
+   dependencies), and
+2. uses at least 20% fewer reported processed tokens, with the upper end of
+   the 90% task-bootstrap interval below parity.
 
 Lower tokens alone cannot pass.
 
@@ -47,160 +96,39 @@ repairs and failed attempts.
 
 ## Build under test
 
-Context 0.26.0, commit `8cbb6163f3903c248899442278a673e8aacf20de`, installed
+Context 0.28.0, commit `05bc5013ab80db418151d9b7247a80aa3992c5cd`, installed
 from the public release assets:
 
-- `forgesworn-context-0.26.0.tgz`
-  sha256 `b03731611e5e07155efa4f176207e8737452cb3c841a5d86d95d54112181acbd`
-- `forgesworn-context-tools-0.26.0.tgz`
-  sha256 `234e5470950755bc11550ed789dde3eb4b6b4eb68d3629ad109b188592b6197e`
+- `forgesworn-context-0.28.0.tgz`
+  sha256 `57705f7ca1b423fdcfe35d7c44d2de7ee2df34126ff6744dca2f53aed7436d3a`
+- `forgesworn-context-tools-0.28.0.tgz`
+  sha256 `76018522d3d9be43054a69c59d80ede2412d29d12db5024ec87c241c39fe140c`
 
-If phase 0 exposes a tool defect, the fix ships as its own release and PR. The
-draft is then repinned before lock. Fixes are never made inside the experiment.
-
-## Task pack: same shape, new tasks
-
-The acceptance contract says to "retain OS2's proposed eight tasks across two
-repositories, one external". The shape is retained but not the files. The
-eight locked tasks in [`d5-20260921/tasks`](../d5-20260921/tasks) cannot be
-used, for two reasons:
-
-- They are all on context and kithmoot, both ForgeSworn repositories.
-- The 0.4.0 fixes were found on that set.
-
-The new pack:
-
-- Eight tasks: four on [forgesworn/bray](https://github.com/forgesworn/bray)
-  and four on [h3js/h3](https://github.com/h3js/h3), outside ForgeSworn. Each
-  task is pinned at its own commit and frozen as an archive.
-- Per repository: one orientation, one impact, one diagnosis and one code
-  change. Impact and code-change tasks carry the quality measure.
-- Each task has a public statement and a private acceptance file. The private
-  file holds required evidence, the dependency set a correct answer or diff
-  must touch, and the checker and scope rules.
-- Nobody on the tool side reads the private files before results are
-  recorded. The owner designed Context, so the owner does not write them
-  either.
-
-Where the tasks come from:
-
-- **Impact and code-change tasks are taken from merged history.** Each one
-  redoes a real merged change from its parent commit. That change's diff gives
-  the dependency set, and the tests it added give the checker. This keeps the
-  hidden sets objective. [`history-candidates.mjs`](history-candidates.mjs)
-  lists eligible changes into a private file and prints counts only. The pool
-  itself is not secret: the script and history are public, so anyone can
-  rebuild it. What stays hidden from the tool side is which candidates the
-  blind author picks, and their private acceptance files. Since 2025-01-01:
-
-  | Repository | Head checked | First-parent changes | Eligible | Since 2026-07-01 |
-  | --- | --- | --- | --- | --- |
-  | bray | `8d6713d8` (2026-11-02) | 512 | 79 | 14 |
-  | h3 | `f0e17808` (2026-10-22) | 732 | 99 | 43 |
-
-  The most recent eligible changes are preferred, because the model is less
-  likely to have seen them.
-- **Orientation and diagnosis tasks, and the vetting of mined tasks,** are
-  done by a fresh Claude session that has not seen the Context docs, tools or
-  these prompts. Using a different model family from the Sol executor avoids
-  shared blind spots. On this machine every Claude session loads the Context
-  skill from the global instructions at startup, so that session must be
-  started where those instructions are not loaded. It uses model tokens and
-  needs its own approval.
-
-Why these repositories:
-
-- bray: about 70,000 lines of TypeScript and 119 test files, the largest
-  ForgeSworn TypeScript repository checked. context (the tool's own
-  repository) and kithmoot (where the 0.4.0 fixes were found) are excluded.
-- h3: MIT, almost entirely TypeScript, vitest, about 5,500 stars. Version 2
-  is a recent rewrite, so the model is less likely to answer from memory than
-  with a more famous repository.
-- Both are MIT and use vitest. Their tests pass with outbound network denied
-  on the M4 (macOS `sandbox-exec`; the profile was first checked to block an
-  outbound HTTPS request and allow loopback):
-
-  | Repository | Install | Test command | Result |
-  | --- | --- | --- | --- |
-  | bray `8d6713d8` | `npm ci && npm run build` | `vitest run` | 119 files, 1,852 tests passed |
-  | h3 `f0e17808` | `pnpm install --frozen-lockfile` (pnpm 12.3.4, pinned by `packageManager`) | `vitest --run` | 72 files passed, 1 skipped; 3,112 tests passed, 69 skipped |
-
-  bray's test files mention relay URLs and WebSocket (63 and 8 files), so the
-  passing run, not the absence of references, is the evidence. h3's own
-  `test` script also runs lint and a typecheck; the checker runs vitest only.
-  This shows no network references are needed at those commits. Each task's
-  own commit is checked again when it is frozen.
-
-## Task pack as authored (2026-11-04)
-
-The public statements are in [`tasks/`](tasks), with hashes in
-[`tasks/manifest.json`](tasks/manifest.json). The acceptance files are kept
-private and are unread by the tool side; their hashes are in the protocol.
-
-| Task | Class | Base commit | Base date |
-| --- | --- | --- | --- |
-| bray-orientation | orientation | `8d6713d8` | 2026-11-02 |
-| bray-impact | impact | `f49cada6` | 2026-09-03 |
-| bray-diagnosis | diagnosis | `264acc6f` | 2026-10-29 |
-| bray-code-change | code-change | `0cac309e` | 2026-07-28 |
-| h3-orientation | orientation | `f0e17808` | 2026-10-22 |
-| h3-impact | impact | `2a164f36` | 2026-07-02 |
-| h3-diagnosis | diagnosis | `ae4d6ee0` | 2026-07-22 |
-| h3-code-change | code-change | `3eb3a57f` | 2026-07-09 |
-
-The author examined and rejected eight other candidates.
-
-How the author session ran:
-
-- Claude Code headless, Opus 5.5, on the owner's plan. 70 turns, 626 seconds;
-  about 8.1M cached input read, 0.2M cache writes and 50,000 output tokens
-  (about $4.26 at API rates; not billed as cash).
-- Isolation:
-  - `CLAUDE_CODE_DISABLE_CLAUDE_MDS=1`, auto-memory off, project settings
-    only, skills off, no MCP servers, and web and agent tools disallowed;
-  - the shell sandboxed through `--settings` to deny every outbound domain
-    and any write outside its folder;
-  - git remotes removed from its repository copies.
-- Checks:
-  - a test session reported no user or project instructions;
-  - the brief's first step confirmed that outbound HTTPS was refused and a
-    write outside the folder was refused.
-- Before that:
-  - two Opus attempts stopped at that first step because the network was
-    still open: Claude Code ignores a project settings file in an untrusted
-    folder;
-  - three one-turn Haiku probes found the network setting that works.
-
-Known issues, for the protocol review:
-
-- **Partial leak.** Despite the brief, the author's final reply gave partial
-  hints about the hidden answers for bray-impact and bray-diagnosis, and said
-  the two h3 code tasks touch one shared source file. The tool side has seen
-  those hints. The protocol review decides whether to replace those tasks.
-- **Checkers not yet verified on clean installs.** The checkers were verified
-  against each repository's current `node_modules`, not a clean install at
-  each base commit. Freezing each task repeats the check from a clean
-  install, run by a script that reports only pass or fail.
-- **Orientation line ranges** were read by hand, so reviewers allow small
-  offsets.
+Version 1 ran 0.26.0 (`8cbb616`); the diagnostic pairs ran 0.27.0 and 0.28.0.
+If a later phase exposes a tool defect, the fix ships as its own release and
+PR, and the draft is repinned and requalified before lock. Fixes are never
+made inside the experiment.
 
 ## Executor, reviewer and harness
 
 - Executor: Codex CLI, `gpt-5.6-sol`, reasoning effort `high`. Both arms run in
   separate fresh sessions, each with its own `CODEX_HOME` (session logs kept for per-call accounting). This is the Codex cohort; a Claude cohort
   is separate work with its own fixed model and effort.
-- Reviewer: a fresh `gpt-5.6-sol`/high session with a read-only sandbox. It is
-  blind to the arm and sees only the answer or diff, the checker result, the
-  private rubric and the cited frozen source.
+- Reviewer: a fresh `gpt-5.6-sol`/high session under a read-only permission
+  profile, in its own staged root. It sees only the answer or diff, the checker
+  result, the private rubric and bounded excerpts of the cited lines.
+  Same-model review remains a known limit (see Version 2 changes).
 - Harness: [`harness.py`](harness.py), derived from
   [`d5-20260921-v3/run-pair.py`](../d5-20260921-v3/run-pair.py), which stays
-  locked and unchanged. It keeps `codex exec --json`, per-arm `CODEX_HOME`,
-  `--sandbox workspace-write` for executors and `read-only` for reviewers, and
-  adds rotation, arms as data, one source for model and effort, and the seven
-  0.26.0 retrieval tools for the Context arm. (v3 enabled only status, refresh
-  and search, which would leave `repository_packet` unavailable and the
-  reads-after-packet measure undefined.) It currently only plans cells; running
-  them waits for the task pack.
+  locked and unchanged. It keeps `codex exec --json` and per-arm `CODEX_HOME`.
+  From version 2 it isolates every session with a permission profile instead
+  of `--sandbox` (`:workspace` for executors, `:read-only` for reviewers, both
+  denying the home directory and shared temp), and adds rotation, arms as data,
+  one source for model and effort, and the seven retrieval tools for the
+  Context arm. (v3 enabled only status, refresh and search, which would leave
+  `repository_packet` unavailable and the reads-after-packet measure
+  undefined.) Stages: `toolchain`, `plan`, `prepare`, `execute`, `assess`,
+  `analyse`.
 - No recorded cell can be reused as a comparator. Every earlier cell used
   Luna/medium or DeepSeek V4 Pro, so all arms run fresh.
 - The harness calls the Codex binary by absolute path with explicit flags. It
@@ -215,7 +143,7 @@ Known issues, for the protocol review:
 | Arm | Tools | Notes |
 | --- | --- | --- |
 | plain | Codex built-in shell, read and edit; no MCP | Retrieval instruction of similar length and force to the other arms |
-| context | Same, plus the pinned 0.26.0 repository MCP server bound to the arm's prepared root | Fresh server per arm; refresh before the first packet |
+| context | Same, plus the pinned 0.28.0 repository MCP server bound to the arm's staged root | Fresh server per arm; the first call builds the index, and later calls without a generation refresh it when stale |
 | graphify (later round) | Same as plain, plus a graph prebuilt with `graphify update` (no model) from `graphifyy` 0.9.65 | Not in this run; see below |
 
 This run uses two arms: 8 × 2 × 3 = 48 executor cells, each with a reviewer
@@ -224,7 +152,8 @@ Graphify comparison, and in the September repeated run Context used 1.31 times
 Graphify's input tokens, so it is a serious comparator. It runs as a separate
 later round, with its own approval, only if the pair passes. The harness
 already supports a third arm. Repetition r of task i uses the arm list
-rotated left by (i + r - 1) mod n, as in the September repeated design.
+rotated left by (i + r - 1) mod n, as in the September repeated design; from
+version 2 the (task, repetition) blocks then run in a seeded random order.
 Results are never pooled with v1, v2, S5, v3, the repeated Pro run or the
 0.4.0 screen.
 
@@ -359,6 +288,16 @@ plus a reviewer for each. It passes if:
 A failed qualification is recorded. Its observed cause is fixed and released
 as its own change, and phase 1 runs again under a new draft revision.
 Phase 2 is not run after a failure.
+
+Version 2 requalification uses a separate qualification task that phase 2
+never uses, and also needs: reads after packet valid (no malformed lines and
+no unclassified command that could reach a packet-covered file), the Context
+MCP error rate (`mcpErrorRate`, MCP calls only) at most 5%, every isolation
+probe passed and complete usage in both cells. For scale, the Context MCP
+error rate was 4.3% in the 0.27.0 diagnostic pair and 15.4% in the 0.28.0
+pair (4 of 26 calls: two searches rejected for passing `expectedGeneration`,
+which search does not accept; one packet over 64 KiB; one packet naming a
+missing file).
 
 #### Attempt 1 (2026-11-04): invalid, runner defect
 
@@ -605,55 +544,64 @@ Eight tasks, three repetitions, two arms (48 executor and 48 reviewer sessions),
 
 ## Quality gate
 
-The primary measure is **missed or incorrect dependencies** on impact and
-code-change tasks (owner decision, 2026-11-04). These are counted against the
-hidden dependency set by the checker and the scope check, not by a reviewer
-reading prose. Tasks taken from merged history give that set directly. First-pass
-accepted changes is reported, but does not decide, because Context has no
-clear reason to improve it.
+The measure is **missed or incorrect dependencies** on impact and code-change
+tasks (owner decision, 2026-11-04), counted against the hidden dependency set
+without a reviewer. For code changes, covered paths are the files actually
+changed; claims in `answer.json` do not count. For impact answers, named paths
+that do not exist at base are incorrect, and paths outside the set are
+reported as precision. Diagnosis and orientation tasks are not counted. The
+count is taken for every outcome, accepted or not, and is never shown to the
+executor or the reviewer.
 
-The dependency count is independent of acceptance. An outcome can pass its
-checker and review and still miss a dependency in the hidden set, for example
-a caller left unchanged that no test exercises. The count is taken after
-acceptance, from the hidden set, which is never shown to the executor or the
-reviewer.
+An outcome is accepted only if its checker passes (code-change and diagnosis),
+every changed file is inside the task's scope, and the blind reviewer accepts.
 
-Context passes on quality if:
+Version 2 quality guard, per comparator:
 
-- its per-task median count of missed or incorrect dependencies is lower than
-  the comparator's on at least two tasks and higher on none; and
-- no Context outcome is rejected.
+- Context has no fewer accepted outcomes in total; and
+- on no impact or code-change task is Context's median dependency count higher.
 
-If the baseline makes no misses on the pack, the claim is not made. A harder
-task class, chosen and written before rerunning, replaces that class.
+Lower on at least two such tasks is reported as "better" but not required.
+If both arms score zero on every counted task, the quality comparison is
+inconclusive; replacing a task class after seeing the baseline would be a new
+protocol. First-pass acceptance is not measured in version 2.
 
-Structured answers still need blind reviewer acceptance to count as accepted.
+Version 1 required "lower on at least two tasks and higher on none, with no
+Context outcome rejected"; the review found that rule had a floor effect and
+failed on one stochastic rejection.
 
 ## Cost gate
 
-The proposal uses one statistic: the **sum over tasks of per-task median total
-tokens**. Total means executor plus reviewer input and output, including:
+The primary outcome is **reported processed tokens**: executor plus reviewer
+input and output from the Codex `--json` stream, cached input included. The
+statistic is the **sum over tasks of per-task median** processed tokens. Every
+task needs exactly the planned repetitions per arm, all complete.
 
-- cached input;
-- host setup;
-- repairs;
-- failed attempts.
+Context passes against a comparator only if:
 
-Context must be at least 20% below each comparator, with no higher sum of
-per-task median reviewer seconds. The geometric-mean ratio with a 90%
-bootstrap interval, as used in the 0.4.0 screen, is reported but does not
-decide.
+- its sum is at most 0.80 of the comparator's; and
+- the upper end of the 90% bootstrap interval of that ratio (tasks resampled
+  with replacement, 10,000 draws, seed 20261105) is below 1.0.
 
-Cached input, uncached input, output and the reasoning subset are reported
-separately and never added twice. Usage comes from the Codex `--json` event
-stream, as in v3. A cell with missing usage is marked incomplete, never zero.
-An incomplete cell in either compared arm fails the cost gate, since the
-statistic cannot then be computed.
+Reported, not gated:
+
+- the geometric mean of per-task ratios with its interval;
+- uncached input, cached input, output and the reasoning subset, never added
+  twice;
+- uncached + output + w x cached for w = 0, 0.1 and 1, fixed before any new
+  cell;
+- reviewer seconds;
+- executor wall time and local preparation.
+
+Usage must pass the A1-A4 checks (see Version 2 changes) or the cell is
+incomplete, never zero, and an incomplete cell in a compared arm fails the
+gate. Setup, repairs, invalid attempts and reruns are listed per run in this
+README; `analyse` totals the recorded executor and reviewer sessions only.
 
 Codex on this machine reports "Logged in using ChatGPT", so Sol usage comes
-from the plan allowance, not metered API billing. The result is reported as
-token reduction and plan headroom, never as cash saved. A full Sol/high run
-may meet the plan's rate limits.
+from the plan allowance, not metered API billing. Nothing here measures plan
+headroom or cash; the result is reported as processed tokens. A full Sol/high
+run may meet the plan's rate limits.
 
 ## Scale (not a price)
 
@@ -685,8 +633,17 @@ Phase 2 is of that order. Phase 1 is one pair. No prices were looked up.
    authored).
 3. ~~Phase 1~~ (attempt 1 invalid on a runner defect; attempt 2 passed
    2026-11-05).
-4. ~~The protocol review~~ (run 2026-11-05: revise then run). Phase 2 needs a
-   revised protocol and separate approval.
+4. ~~The protocol review~~ (run 2026-11-05: revise then run).
+5. Owner review of version 2, including the open decisions listed under
+   Version 2 changes (loopback, task count, reviewer design).
+6. One short live isolation session: `isolation-probe.py`, one Sol/low
+   `codex exec` session under the executor profile, which must fail to read a
+   canary in the home and still read and write its staged workspace.
+7. Replacement tasks from an isolated custodian, plus a separate
+   qualification task.
+8. The quality-measure pilot and the reviewer-independence design.
+9. Requalification (phase 1) on version 2 with the qualification task.
+10. Phase 2.
 
 ## Not claimed
 

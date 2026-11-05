@@ -55,6 +55,19 @@ class Schedule(unittest.TestCase):
                 h.schedule(TASKS, bad, 3)
 
 
+class SeededOrder(unittest.TestCase):
+    def test_a_seed_shuffles_blocks_but_keeps_each_block_and_its_arm_rotation(self):
+        plain = h.schedule(TASKS, ('plain', 'context'), 3)
+        seeded = h.schedule(TASKS, ('plain', 'context'), 3, seed=7)
+        self.assertEqual(seeded, h.schedule(TASKS, ('plain', 'context'), 3, seed=7))
+        self.assertNotEqual([(c['task'], c['repetition']) for c in seeded], [(c['task'], c['repetition']) for c in plain])
+        key = lambda c: (c['task'], c['repetition'], c['position'])
+        self.assertEqual(sorted(map(json.dumps, plain)), sorted(map(json.dumps, seeded)))
+        for i in range(0, len(seeded), 2):
+            self.assertEqual((seeded[i]['task'], seeded[i]['repetition']), (seeded[i + 1]['task'], seeded[i + 1]['repetition']))
+            self.assertEqual([seeded[i]['position'], seeded[i + 1]['position']], [1, 2])
+
+
 class ArmSetup(unittest.TestCase):
     def test_only_context_gets_the_server_with_all_seven_tools_bound_to_its_workspace(self):
         ctx = h.codex_config('context', h.SETTINGS, '/w/ws', '/bin/node', '/c/cli.mjs')
@@ -66,6 +79,24 @@ class ArmSetup(unittest.TestCase):
             self.assertNotIn('mcp_servers', h.codex_config(arm, h.SETTINGS))
         with self.assertRaises(ValueError):
             h.codex_config('context', h.SETTINGS, 'relative', '/bin/node', '/c/cli.mjs')
+
+    def test_isolated_config_denies_home_and_temp_and_writes_only_the_root(self):
+        cfg = h.codex_config('plain', h.SETTINGS, root='/Users/Shared/os2-x-cell-001-cell', toolchain='/Users/Shared/os2-toolchain-a',
+                             home='/Users/someone')
+        self.assertIn('default_permissions = "os2"', cfg)
+        self.assertIn('extends = ":workspace"', cfg)
+        for line in ('"/Users/someone" = "deny"', '"/private/tmp" = "deny"', '"/private/var/folders" = "deny"',
+                     '"/Users/Shared/os2-x-cell-001-cell/workspace" = "write"', '"/Users/Shared/os2-toolchain-a" = "read"'):
+            self.assertIn(line, cfg)
+        self.assertIn('inherit = "none"', cfg)
+        self.assertIn('HOME = "/Users/Shared/os2-x-cell-001-cell/home"', cfg)
+        self.assertNotIn('sandbox_mode', cfg)
+        rv = h.codex_config('reviewer', h.SETTINGS, root='/Users/Shared/r', toolchain='/Users/Shared/os2-toolchain-a', home='/Users/someone')
+        self.assertIn('extends = ":read-only"', rv)
+        self.assertIn('"/Users/Shared/r/review" = "read"', rv)
+        for bad in ('/Users/someone/plan', '/private/tmp/x', 'relative'):
+            with self.assertRaises(ValueError):
+                h.codex_config('plain', h.SETTINGS, root=bad, toolchain='/Users/Shared/t', home='/Users/someone')
 
     def test_config_and_command_agree_on_model_and_effort(self):
         cfg = h.codex_config('plain', h.SETTINGS)
@@ -81,27 +112,37 @@ class ArmSetup(unittest.TestCase):
         bodies = {h.prompt(a, 'TASK').split('\n', 1)[1] for a in h.ARM_NAMES}
         self.assertEqual(len(bodies), 1)
         self.assertIn('No navigation service', h.prompt('plain', 'TASK'))
+        self.assertNotIn('repository_status', h.INSTRUCTIONS['context'])
 
 
 class NoAlias(unittest.TestCase):
-    def test_commands_are_lists_with_one_sandbox_and_no_bypass(self):
+    def test_commands_are_lists_with_no_sandbox_flag_or_bypass(self):
         ex = h.command('/opt/codex', 'executor', h.SETTINGS, '/w', '/w/f')
         rv = h.command('/opt/codex', 'reviewer', h.SETTINGS, '/r', '/r/f', 'review this')
-        self.assertEqual(ex[ex.index('--sandbox') + 1], 'workspace-write')
-        self.assertEqual(rv[rv.index('--sandbox') + 1], 'read-only')
+        for argv in (ex, rv):
+            self.assertNotIn('--sandbox', argv)
+            self.assertNotIn('-s', argv)
         self.assertEqual(ex[-1], '-')
         self.assertIn('--skip-git-repo-check', rv)
         self.assertNotIn('--skip-git-repo-check', ex)
         with self.assertRaises(ValueError):
             h.command('/opt/codex', 'reviewer', h.SETTINGS, '/r', '/r/f')
 
-    def test_bypass_overrides_shells_and_strings_are_rejected(self):
+    def test_bypass_sandbox_mode_profile_overrides_shells_and_strings_are_rejected(self):
         base = h.command('/opt/codex', 'executor', h.SETTINGS, '/w', '/w/f')
-        for bad in (base + ['--dangerously-bypass-approvals-and-sandbox'], base + ['--full-auto'], base + ['-s', 'danger-full-access'],
-                    base[:-1] + ['-c', 'sandbox_mode="danger-full-access"', '-'], ['codex'] + base[1:], ['/bin/zsh', '-lc', 'codex exec'],
-                    [x for x in base if x not in ('--sandbox', 'workspace-write')], ' '.join(base)):
+        for bad in (base + ['--dangerously-bypass-approvals-and-sandbox'], base + ['--full-auto'], base + ['-s', 'read-only'],
+                    base + ['--sandbox', 'workspace-write'], base + ['--sandbox=workspace-write'], base + ['-p', 'other'],
+                    base[:-1] + ['-c', 'sandbox_mode="workspace-write"', '-'], base[:-1] + ['-c', 'default_permissions="x"', '-'],
+                    base[:-1] + ['-c', 'shell_environment_policy.inherit="all"', '-'],
+                    ['codex'] + base[1:], ['/bin/zsh', '-lc', 'codex exec'], ' '.join(base)):
             with self.assertRaises(ValueError, msg=str(bad)[:80]):
                 h.validate_command(bad)
+
+    def test_the_version_1_command_is_unchanged_for_the_scripts_that_ran_with_it(self):
+        ex = h.command_v1('/opt/codex', 'executor', h.SETTINGS, '/w', '/w/f')
+        rv = h.command_v1('/opt/codex', 'reviewer', h.SETTINGS, '/r', '/r/f', 'review this')
+        self.assertEqual(ex[:5], ['/opt/codex', 'exec', '--sandbox', 'workspace-write', '--ignore-rules'])
+        self.assertEqual(rv[:5], ['/opt/codex', 'exec', '--sandbox', 'read-only', '--ignore-rules'])
 
     def test_resolve_codex_needs_an_absolute_executable_that_is_not_a_shell(self):
         with tempfile.TemporaryDirectory() as d:
@@ -116,117 +157,211 @@ class NoAlias(unittest.TestCase):
 
 
 class Usage(unittest.TestCase):
-    U = {'input_tokens': 1000, 'cached_input_tokens': 600, 'output_tokens': 200, 'reasoning_output_tokens': 50}
+    U = {'input_tokens': 1000, 'cached_input_tokens': 600, 'output_tokens': 200, 'reasoning_output_tokens': 50, 'cache_write_input_tokens': 0}
 
     def test_complete_stream_reports_parts_without_double_counting(self):
-        u = h.usage(stream(self.U, self.U))
-        self.assertTrue(u['complete'])
+        u = h.usage(stream(self.U))
+        self.assertTrue(u['complete'], u['incompleteReasons'])
         self.assertEqual((u['input'], u['cached'], u['uncached'], u['output'], u['reasoning'], u['total']),
-                         (2000, 1200, 800, 400, 100, 2400))
-        self.assertEqual(u['turns'], 2)
+                         (1000, 600, 400, 200, 50, 1200))
 
-    def test_missing_usage_or_failure_is_incomplete_never_zero(self):
-        for text in (stream(), stream(None), stream(self.U, {'output_tokens': 3}),
-                     stream(self.U, extra=[{'type': 'turn.failed', 'error': {'message': 'x'}}])):
-            u = h.usage(text)
-            self.assertFalse(u['complete'])
-            self.assertIsNone(u['total'])
+    def test_each_assumption_failure_is_incomplete_never_zero(self):
+        cases = {
+            'no-usage': stream(), 'missing-usage-field': stream({k: v for k, v in self.U.items() if k != 'reasoning_output_tokens'}),
+            'A3-multiple-usage-events': stream(self.U, self.U),
+            'A1-cached-exceeds-input': stream({**self.U, 'cached_input_tokens': 1001}),
+            'A2-reasoning-exceeds-output': stream({**self.U, 'reasoning_output_tokens': 201}),
+            'A4-cache-write-unsettled': stream({**self.U, 'cache_write_input_tokens': 70}),
+            'turn-failed': stream(self.U, extra=[{'type': 'turn.failed', 'error': {'message': 'x'}}]),
+            'malformed-lines': 'junk\n' + stream(self.U),
+        }
+        for reason, text in cases.items():
+            with self.subTest(reason):
+                u = h.usage(text)
+                self.assertFalse(u['complete'])
+                self.assertIn(reason, u['incompleteReasons'])
+                self.assertIsNone(u['total'])
+        self.assertIn('exit-nonzero', h.usage(stream(self.U), exit_code=1)['incompleteReasons'])
 
-    def test_cache_writes_are_reported_and_flagged_but_not_added_to_the_total(self):
-        u = h.usage(stream({**self.U, 'cache_write_input_tokens': 0}))
-        self.assertEqual((u['cacheWrite'], u['cacheWriteSeen'], u['total']), (0, False, 1200))
-        u = h.usage(stream({**self.U, 'cache_write_input_tokens': 70}))
-        self.assertEqual((u['cacheWrite'], u['cacheWriteSeen'], u['total']), (70, True, 1200))
-
-    def test_raw_unwrapped_lines_and_junk_are_handled(self):
-        text = 'junk\n' + json.dumps({'type': 'turn.completed', 'usage': self.U})
-        self.assertEqual(h.usage(text)['total'], 1200)
+    def test_session_log_must_sum_to_the_stream(self):
+        good = {'calls': [{'input': 600, 'output': 120}, {'input': 400, 'output': 80}]}
+        self.assertTrue(h.usage(stream(self.U), session=good)['complete'])
+        bad = {'calls': [{'input': 600, 'output': 120}]}
+        self.assertIn('A3-session-stream-mismatch', h.usage(stream(self.U), session=bad)['incompleteReasons'])
+        self.assertIn('A3-session-stream-mismatch', h.usage(stream(self.U), session={})['incompleteReasons'])
 
     def test_cell_total_is_none_if_any_part_is_incomplete(self):
         good, bad = h.usage(stream(self.U)), h.usage(stream())
         self.assertEqual(h.cell_total([good, good]), 2400)
         self.assertIsNone(h.cell_total([good, bad]))
         self.assertIsNone(h.cell_total([]))
+        self.assertEqual(h.sensitivity([good, good]), {'0.0': 1200, '0.1': 1320.0, '1.0': 2400})
 
 
 class CostGate(unittest.TestCase):
-    def cells(self, ctx, plain, ctx_seconds=10, plain_seconds=10):
+    def cells(self, ctx, plain, tasks=('a', 'b', 'c', 'd'), ctx_seconds=10, plain_seconds=10):
         out = []
-        for t in ('a', 'b'):
-            for r, (c, p) in enumerate(zip(ctx, plain)):
+        for t in tasks:
+            for c, p in zip(ctx, plain):
                 out.append({'task': t, 'arm': 'context', 'totalTokens': c, 'reviewerSeconds': ctx_seconds})
                 out.append({'task': t, 'arm': 'plain', 'totalTokens': p, 'reviewerSeconds': plain_seconds})
         return out
 
-    def test_twenty_percent_lower_passes_and_uses_medians(self):
-        g = h.cost_gate(self.cells([80, 79, 10**9], [100, 100, 100]), ['plain'])
+    def test_twenty_percent_lower_with_a_tight_interval_passes_and_uses_medians(self):
+        g = h.cost_gate(self.cells([80, 79, 10**9], [100, 100, 100]), ['plain'], 3)
         self.assertTrue(g['passed'])
         self.assertAlmostEqual(g['comparisons']['plain']['tokenRatio'], 0.8)
+        self.assertLess(g['comparisons']['plain']['bootstrap']['sumRatioInterval'][1], 1.0)
 
     def test_fifteen_percent_lower_fails(self):
-        self.assertFalse(h.cost_gate(self.cells([85] * 3, [100] * 3), ['plain'])['passed'])
+        self.assertFalse(h.cost_gate(self.cells([85] * 3, [100] * 3), ['plain'], 3)['passed'])
 
-    def test_higher_reviewer_time_fails(self):
-        g = h.cost_gate(self.cells([50] * 3, [100] * 3, ctx_seconds=11), ['plain'])
+    def test_a_point_pass_with_an_interval_reaching_parity_fails(self):
+        cells = []
+        for t, (c, p) in {'a': (10, 100), 'b': (10, 100), 'c': (250, 100), 'd': (10, 100)}.items():
+            cells += [{'task': t, 'arm': 'context', 'totalTokens': c, 'reviewerSeconds': 1}] * 3
+            cells += [{'task': t, 'arm': 'plain', 'totalTokens': p, 'reviewerSeconds': 1}] * 3
+        g = h.cost_gate(cells, ['plain'], 3)
+        self.assertLessEqual(g['comparisons']['plain']['tokenRatio'], 0.8)
+        self.assertGreaterEqual(g['comparisons']['plain']['bootstrap']['sumRatioInterval'][1], 1.0)
         self.assertFalse(g['passed'])
-        self.assertFalse(g['comparisons']['plain']['reviewerSecondsNoHigher'])
 
-    def test_an_incomplete_cell_in_either_arm_fails_the_gate(self):
+    def test_reviewer_time_is_reported_not_gated(self):
+        g = h.cost_gate(self.cells([50] * 3, [100] * 3, ctx_seconds=99), ['plain'], 3)
+        self.assertTrue(g['passed'])
+        self.assertEqual(g['arms']['context']['reviewerSeconds'], 4 * 99)
+
+    def test_an_incomplete_cell_or_a_wrong_repetition_count_fails(self):
         for cells in (self.cells([50, None, 50], [100] * 3), self.cells([50] * 3, [100, 100, None])):
-            g = h.cost_gate(cells, ['plain'])
+            g = h.cost_gate(cells, ['plain'], 3)
             self.assertFalse(g['passed'])
-            self.assertEqual(g['incompleteTasks'], ['a', 'b'])
+            self.assertEqual(g['incompleteTasks'], ['a', 'b', 'c', 'd'])
+        with self.assertRaises(ValueError):
+            h.cost_gate(self.cells([50] * 2, [100] * 2), ['plain'], 3)
 
     def test_each_comparator_must_be_beaten(self):
         cells = self.cells([80] * 3, [100] * 3)
-        cells += [{'task': t, 'arm': 'graphify', 'totalTokens': 90, 'reviewerSeconds': 10} for t in ('a', 'b') for _ in range(3)]
-        g = h.cost_gate(cells, ['plain', 'graphify'])
+        cells += [{'task': t, 'arm': 'graphify', 'totalTokens': 90, 'reviewerSeconds': 10} for t in 'abcd' for _ in range(3)]
+        g = h.cost_gate(cells, ['plain', 'graphify'], 3)
         self.assertTrue(g['comparisons']['plain']['passed'])
         self.assertFalse(g['comparisons']['graphify']['passed'])
         self.assertFalse(g['passed'])
 
 
+class QualityGuard(unittest.TestCase):
+    def row(self, task, arm, accepted, total, cls='code-change'):
+        return {'task': task, 'class': cls, 'arm': arm, 'accepted': accepted, 'dependencies': {'total': total}}
+
+    def test_more_misses_on_any_task_or_fewer_acceptances_fails(self):
+        ok = [self.row('a', 'context', True, 0), self.row('a', 'plain', True, 1), self.row('b', 'context', True, 0), self.row('b', 'plain', True, 2)]
+        q = h.quality_guard(ok, ['plain'])
+        self.assertTrue(q['passed'])
+        self.assertTrue(q['comparisons']['plain']['better'])
+        worse = ok[:-1] + [self.row('b', 'plain', True, 0), self.row('b', 'context', True, 1)]
+        self.assertFalse(h.quality_guard(worse[:2] + worse[3:], ['plain'])['passed'])
+        fewer = [self.row('a', 'context', False, 0), self.row('a', 'plain', True, 0)]
+        self.assertFalse(h.quality_guard(fewer, ['plain'])['passed'])
+
+    def test_all_zero_is_inconclusive_and_orientation_is_not_counted(self):
+        rows = [self.row('a', 'context', True, 0), self.row('a', 'plain', True, 0), self.row('o', 'context', True, 5, 'orientation'),
+                self.row('o', 'plain', True, 0, 'orientation')]
+        q = h.quality_guard(rows, ['plain'])
+        self.assertTrue(q['passed'])
+        self.assertTrue(q['comparisons']['plain']['inconclusive'])
+        self.assertEqual(list(q['comparisons']['plain']['dependencyMedians']), ['a'])
+
+
+def fake_toolchain(base):
+    """A toolchain directory with a valid manifest, built by the real subcommand."""
+    prefix = base / 'node-prefix'
+    (prefix / 'bin').mkdir(parents=True)
+    (prefix / 'bin' / 'node').write_text('#!/bin/sh\necho v0\n'); (prefix / 'bin' / 'node').chmod(0o755)
+    corepack = base / 'corepack-home' / 'v1' / 'pnpm' / '11.9.0'
+    corepack.mkdir(parents=True); (corepack / 'pnpm.mjs').write_text('')
+    rg = base / 'rg'; rg.write_text(''); rg.chmod(0o755)
+    out = base / 'shared' / 'os2-toolchain-test'
+    assert h.main(['toolchain', '--node-prefix', str(prefix), '--corepack-home', str(base / 'corepack-home'),
+                   '--pnpm-version', '11.9.0', '--rg', str(rg), '--out', str(out)]) == 0
+    return out
+
+
+class FakeHome:
+    """Point the home directory and denied trees at a test sandbox."""
+    def __init__(self, d):
+        self.home = d / 'home'; self.home.mkdir()
+        self.saved = os.environ.get('HOME'), h.DENY_READ
+
+    def __enter__(self):
+        os.environ['HOME'] = str(self.home); h.DENY_READ = ()
+        return self.home
+
+    def __exit__(self, *exc):
+        if self.saved[0] is None:
+            os.environ.pop('HOME', None)
+        else:
+            os.environ['HOME'] = self.saved[0]
+        h.DENY_READ = self.saved[1]
+
+
 class PlanDryRun(unittest.TestCase):
-    def test_plan_writes_every_cell_and_never_starts_codex(self):
+    def test_plan_writes_every_cell_skips_the_manifest_and_never_starts_codex(self):
         with tempfile.TemporaryDirectory() as d:
-            d = pathlib.Path(d)
-            marker = d / 'codex-was-run'
-            fake = d / 'codex'
-            fake.write_text(f'#!/bin/sh\ntouch {marker}\n'); fake.chmod(0o755)
-            tasks = d / 'tasks'; tasks.mkdir()
-            for t in TASKS:
-                (tasks / f'{t}.json').write_text(json.dumps({'id': t, 'statement': f'Do {t}.'}))
-            out = d / 'plan'
-            self.assertEqual(h.main(['plan', '--tasks', str(tasks), '--codex', str(fake), '--node', '/bin/node',
-                                     '--navigation-cli', '/c/cli.mjs', '--out', str(out)]), 0)
-            self.assertFalse(marker.exists())
-            plan = json.loads((out / 'schedule.json').read_text())
-            self.assertEqual(len(plan['cells']), 48)
-            for cell in plan['cells']:
-                cd = out / cell['directory']
-                argv = json.loads((cd / 'executor-command.json').read_text())
-                h.validate_command(argv)
-                self.assertEqual(argv[0], str(fake.resolve()))
-                cfg = (cd / 'executor-config.toml').read_text()
-                self.assertEqual('mcp_servers' in cfg, cell['arm'] == 'context')
-                if cell['arm'] == 'context':
-                    self.assertIn(json.dumps(str(cd / 'workspace')), cfg)
-                self.assertIn(f"Do {cell['task']}.", (cd / 'executor-prompt.txt').read_text())
-                self.assertRegex(cell['directory'], r'^cell-\d{3}$')
-            with self.assertRaises(SystemExit):
-                h.main(['plan', '--tasks', str(tasks), '--codex', str(fake), '--node', '/bin/node',
-                        '--navigation-cli', '/c/cli.mjs', '--out', str(out)])
+            d = pathlib.Path(d).resolve()
+            with FakeHome(d) as home:
+                toolchain = fake_toolchain(d)
+                marker = d / 'codex-was-run'
+                fake = d / 'codex'
+                fake.write_text(f'#!/bin/sh\ntouch {marker}\n'); fake.chmod(0o755)
+                tasks = d / 'tasks'; tasks.mkdir()
+                for t in TASKS:
+                    (tasks / f'{t}.json').write_text(json.dumps({'id': t, 'statement': f'Do {t}.'}))
+                (tasks / 'manifest.json').write_text(json.dumps({'tasks': TASKS}))
+                out = home / 'plan'
+                args = ['plan', '--tasks', str(tasks), '--codex', str(fake), '--node', '/bin/node', '--navigation-cli', '/c/cli.mjs',
+                        '--toolchain', str(toolchain), '--active-base', str(d / 'shared'), '--out', str(out)]
+                self.assertEqual(h.main(args), 0)
+                self.assertFalse(marker.exists())
+                plan = json.loads((out / 'schedule.json').read_text())
+                self.assertEqual(len(plan['cells']), 48)
+                self.assertEqual(sorted(plan['lock']['taskSha256']), TASKS)
+                self.assertEqual(plan['seed'], h.SEED)
+                for cell in plan['cells']:
+                    cd = out / cell['directory']
+                    argv = json.loads((cd / 'executor-command.json').read_text())
+                    h.validate_command(argv)
+                    self.assertEqual(argv[0], str(fake.resolve()))
+                    cfg = (cd / 'executor-config.toml').read_text()
+                    self.assertEqual('mcp_servers' in cfg, cell['arm'] == 'context')
+                    self.assertIn(f'{json.dumps(str(home))} = "deny"', cfg)
+                    root = h.active_root(plan, cell['directory'])
+                    self.assertIn(f'{json.dumps(str(root / "workspace"))} = "write"', cfg)
+                    if cell['arm'] == 'context':
+                        self.assertIn(json.dumps(str(root / 'workspace')), cfg.split('[mcp_servers')[1])
+                    self.assertIn(f"Do {cell['task']}.", (cd / 'executor-prompt.txt').read_text())
+                    self.assertRegex(cell['directory'], r'^cell-\d{3}$')
+                with self.assertRaises(SystemExit):
+                    h.main(args)
+                with self.assertRaises(SystemExit):
+                    h.main(args[:-4] + ['--active-base', str(home / 'x'), '--out', str(home / 'plan2')])
 
 
-FAKE_CODEX = r'''#!/usr/bin/env python3
-import sys, json, pathlib, subprocess
+# A fake Codex. `sandbox` enforces the config's "deny" paths with a real seatbelt
+# profile (unless OS2_FAKE_NO_DENY is set, to simulate a broken profile); `exec`
+# plays executor or reviewer and writes a session log that sums to its stream.
+FAKE_CODEX = r"""#!/usr/bin/env python3
+import sys, json, pathlib, subprocess, os, re
 a = sys.argv
+home = pathlib.Path(os.environ['CODEX_HOME'])
 if a[1] == 'sandbox':
-    sys.exit(subprocess.run(a[a.index('-c') + 2:]).returncode)
+    cfg = (home / 'config.toml').read_text()
+    deny = re.findall(r'^"([^"]+)" = "deny"$', cfg, re.M)
+    if os.environ.get('OS2_FAKE_NO_DENY') or not deny:
+        sys.exit(subprocess.run(a[2:]).returncode)
+    profile = '(version 1)(allow default)' + ''.join(f'(deny file-read* (subpath "{p}"))' for p in deny)
+    sys.exit(subprocess.run(['sandbox-exec', '-p', profile] + a[2:]).returncode)
 cwd = pathlib.Path(a[a.index('-C') + 1]); out = pathlib.Path(a[a.index('-o') + 1])
 U = {"input_tokens": 100, "cached_input_tokens": 40, "output_tokens": 10, "reasoning_output_tokens": 2, "cache_write_input_tokens": 0}
-import os
-log = pathlib.Path(os.environ['CODEX_HOME']) / 'sessions' / '2026' / 'rollout-x.jsonl'
+log = home / 'sessions' / '2026' / 'rollout-x.jsonl'
 log.parent.mkdir(parents=True, exist_ok=True)
 log.write_text('\n'.join(json.dumps(x) for x in [
     {"type": "response_item", "payload": {"type": "custom_tool_call", "name": "exec", "input": "text(1)"}},
@@ -234,25 +369,31 @@ log.write_text('\n'.join(json.dumps(x) for x in [
     {"type": "event_msg", "payload": {"type": "token_count", "info": {"last_token_usage": {"input_tokens": 60, "cached_input_tokens": 20, "output_tokens": 4, "reasoning_output_tokens": 1}}}},
     {"type": "event_msg", "payload": {"type": "token_count", "info": None}},
     {"type": "event_msg", "payload": {"type": "token_count", "info": {"last_token_usage": {"input_tokens": 40, "cached_input_tokens": 20, "output_tokens": 6, "reasoning_output_tokens": 1}}}}]) + '\n')
-if a[a.index('--sandbox') + 1] == 'workspace-write':
+if '--skip-git-repo-check' not in a:
     sys.stdin.read()
     (cwd / 'src.ts').write_text('export const v = "fixed"\n')
+    if os.environ.get('OS2_FAKE_EXTRA'):
+        (cwd / 'other.ts').write_text('x\n')
     (cwd.parent / 'escape.txt').write_text('outside the workspace\n')
     (cwd / 'answer.json').write_text(json.dumps({"filesChanged": ["src.ts"], "summary": "s", "testsRun": [],
         "evidence": [{"path": "src.ts", "startLine": 1, "endLine": 1, "claim": "c"}, {"path": "../escape.txt", "startLine": 1, "endLine": 1, "claim": "x"}]}))
     print(json.dumps({"type": "item.completed", "item": {"type": "command_execution", "command": "/bin/zsh -lc 'cat /etc/hosts && cat src.ts'", "exit_code": 0, "status": "completed"}}))
 else:
     rubric = json.loads((cwd / 'rubric.json').read_text())
-    assert (cwd / 'source' / 'src.ts').is_file() and not (cwd / 'escape.txt').exists()
+    excerpt = (cwd / 'source' / 'src.ts').read_text()
+    assert excerpt.startswith('1: export const v'), excerpt
+    assert not (cwd / 'escape.txt').exists() and not (cwd / 'source' / 'escape.txt').exists()
     out.write_text(json.dumps({"accepted": True, "findings": [{"id": r["id"], "passed": True, "reason": "ok"} for r in rubric["rubric"]], "materialIssues": []}))
 print(json.dumps({"type": "turn.completed", "usage": U}))
-'''
+"""
 
 
 class ExecutionPath(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
         d = self.d = pathlib.Path(self.tmp.name).resolve()
+        self.fake_home = FakeHome(d); self.home = self.fake_home.__enter__()
+        self.toolchain = fake_toolchain(d)
         self.codex = d / 'codex'; self.codex.write_text(FAKE_CODEX); self.codex.chmod(0o755)
         self.auth = d / 'auth.json'; self.auth.write_text('{}')
         repo = self.repo = d / 'repos' / 'r'; repo.mkdir(parents=True)
@@ -268,110 +409,195 @@ class ExecutionPath(unittest.TestCase):
         self.task = {'id': 'r-code-change', 'repository': 'r', 'class': 'code-change', 'baseCommit': base,
                      'statement': 'Make v fixed.', 'answerFormat': '{"filesChanged": [...]}'}
         (self.tasks / 'r-code-change.json').write_text(json.dumps(self.task))
+        (self.tasks / 'manifest.json').write_text('{}')
         self.acc = d / 'acceptance'; self.acc.mkdir()
         (self.acc / 'r-code-change.json').write_text(json.dumps({'id': 'r-code-change', 'sourceChange': change,
             'requiredEvidence': [{'path': 'src.ts', 'startLine': 1, 'endLine': 1}], 'dependencySet': [{'path': 'src.ts', 'symbol': 'v'}],
             'checker': {'setup': 'true', 'command': 'grep -q fixed src.ts && test -f check.test.ts', 'testFiles': ['check.test.ts']},
-            'rubric': [{'id': 'R1', 'requirement': 'v is fixed'}], 'scope': 'src.ts', 'notes': ''}))
+            'rubric': [{'id': 'R1', 'requirement': 'v is fixed'}], 'scope': {'allowedPaths': ['src.ts', 'test/*']}, 'notes': ''}))
         self.archives = d / 'archives.json'
         self.archives.write_text(json.dumps({'r-code-change': h.sha256_file(self.archive_dir / 'r-code-change.tar')}))
-
-        self.saved = dict(h.RELINK), dict(h.READY)
+        self.saved = dict(h.RELINK), dict(h.READY), dict(h.INSTALL)
         h.RELINK['r'] = 'mkdir -p node_modules && touch node_modules/relinked'
         h.READY['r'] = 'test -f node_modules/relinked'
+        h.INSTALL['r'] = 'true'
 
     def tearDown(self):
-        h.RELINK.clear(); h.RELINK.update(self.saved[0]); h.READY.clear(); h.READY.update(self.saved[1])
+        for live, saved in zip((h.RELINK, h.READY, h.INSTALL), self.saved):
+            live.clear(); live.update(saved)
+        for k in ('OS2_FAKE_NO_DENY', 'OS2_FAKE_EXTRA'):
+            os.environ.pop(k, None)
+        self.fake_home.__exit__()
         self.tmp.cleanup()
 
-    def run_all(self, forbid=()):
+    def plan(self):
         d = self.d
-        h.INSTALL['r'] = 'true'
-        self.assertEqual(h.main(['prepare', '--tasks', str(self.tasks), '--archives', str(self.archives),
-                                 '--archive-dir', str(self.archive_dir), '--templates', str(d / 'templates')]), 0)
-        self.assertEqual(h.main(['plan', '--tasks', str(self.tasks), '--repetitions', '1', '--codex', str(self.codex),
-                                 '--node', '/bin/node', '--navigation-cli', '/c/cli.mjs', '--out', str(d / 'plan')]), 0)
-        common = ['--plan', str(d / 'plan'), '--tasks', str(self.tasks), '--codex', str(self.codex), '--auth-file', str(self.auth)]
         node = os.environ.get('OS2_NODE', '/usr/local/bin/node')
-        return h.main(['execute', *common, '--templates', str(d / 'templates'), '--node', node,
-                       '--navigation-cli', '/c/cli.mjs', '--forbid', *forbid]), common
+        self.assertEqual(h.main(['prepare', '--tasks', str(self.tasks), '--archives', str(self.archives),
+                                 '--archive-dir', str(self.archive_dir), '--templates', str(self.home / 'templates')]), 0)
+        self.assertEqual(h.main(['plan', '--tasks', str(self.tasks), '--repetitions', '1', '--codex', str(self.codex),
+                                 '--node', node, '--navigation-cli', '/c/cli.mjs', '--toolchain', str(self.toolchain),
+                                 '--active-base', str(d / 'shared'), '--out', str(self.home / 'plan')]), 0)
+        self.common = ['--plan', str(self.home / 'plan'), '--tasks', str(self.tasks), '--codex', str(self.codex),
+                       '--auth-file', str(self.auth), '--toolchain', str(self.toolchain)]
+        self.node = node
 
-    def test_prepare_rejects_a_changed_archive(self):
+    def execute(self, forbid=()):
+        return h.main(['execute', *self.common, '--templates', str(self.home / 'templates'), '--node', self.node,
+                       '--navigation-cli', '/c/cli.mjs', '--forbid', *forbid])
+
+    def run_all(self, forbid=()):
+        self.plan()
+        return self.execute(forbid), self.common
+
+    def assess(self, *extra):
+        return h.main(['assess', *self.common, '--acceptance', str(self.acc), '--repos', str(self.d / 'repos'), *extra])
+
+    def test_prepare_rejects_a_changed_archive_and_a_failed_install(self):
         self.archives.write_text(json.dumps({'r-code-change': '0' * 64}))
         with self.assertRaises(ValueError):
             h.main(['prepare', '--tasks', str(self.tasks), '--archives', str(self.archives),
-                    '--archive-dir', str(self.archive_dir), '--templates', str(self.d / 'templates')])
+                    '--archive-dir', str(self.archive_dir), '--templates', str(self.home / 'templates')])
+        self.archives.write_text(json.dumps({'r-code-change': h.sha256_file(self.archive_dir / 'r-code-change.tar')}))
+        h.INSTALL['r'] = 'exit 4'
+        with self.assertRaises(SystemExit):
+            h.main(['prepare', '--tasks', str(self.tasks), '--archives', str(self.archives),
+                    '--archive-dir', str(self.archive_dir), '--templates', str(self.home / 'templates')])
+        self.assertFalse((self.home / 'templates' / 'r-code-change').exists())
 
-    def test_execute_refuses_while_acceptance_files_are_on_the_machine(self):
+    def test_execute_refuses_while_forbidden_paths_exist(self):
         with self.assertRaises(SystemExit):
             self.run_all(forbid=[str(self.acc)])
 
-    def test_execute_then_assess_end_to_end(self):
+    def test_execute_refuses_when_a_planned_input_changed(self):
+        self.plan()
+        (self.tasks / 'r-code-change.json').write_text(json.dumps({**self.task, 'statement': 'Something else.'}))
+        with self.assertRaises(SystemExit):
+            self.execute()
+        self.assertFalse((self.home / 'plan' / 'cell-001' / 'executor.json').exists())
+
+    def test_execute_refuses_a_template_changed_after_prepare(self):
+        self.plan()
+        (self.home / 'templates' / 'r-code-change' / 'src.ts').write_text('tampered\n')
+        with self.assertRaises(SystemExit):
+            self.execute()
+
+    def test_no_model_starts_if_the_canary_is_readable(self):
+        self.plan()
+        os.environ['OS2_FAKE_NO_DENY'] = '1'
+        with self.assertRaises(SystemExit):
+            self.execute()
+        cell = self.home / 'plan' / 'cell-001'
+        env = json.loads((cell / 'environment.json').read_text())
+        self.assertEqual(env['isolation']['exitCode'], 97)
+        self.assertFalse((cell / 'executor-events.jsonl').exists())
+        self.assertEqual(list((self.d / 'shared').glob('os2-*-cell')), [])
+
+    def test_execute_then_assess_then_analyse_end_to_end(self):
         code, common = self.run_all(forbid=[str(self.d / 'not-here')])
         self.assertEqual(code, 0)
-        cells = sorted((self.d / 'plan').glob('cell-*'))
+        cells = sorted((self.home / 'plan').glob('cell-*'))
         self.assertEqual(len(cells), 2)
+        self.assertEqual(sorted(p.name for p in (self.d / 'shared').iterdir()), ['os2-toolchain-test'])
         for cell in cells:
             ex = json.loads((cell / 'executor.json').read_text())
             self.assertEqual(ex['changedFiles'], ['src.ts'])
             self.assertTrue(ex['answerPresent'])
+            self.assertTrue(ex['usage']['complete'], ex['usage']['incompleteReasons'])
             self.assertEqual(ex['usage']['total'], 110)
             self.assertEqual(ex['outsideReferences'], ['/etc/hosts'])
             self.assertIn('fixed', (cell / 'executor.diff').read_text())
-            self.assertEqual(ex['environment']['relink']['exitCode'], 0)
-            self.assertEqual(ex['environment']['ready']['exitCode'], 0)
+            for step in ('relink', 'isolation', 'ready'):
+                self.assertEqual(ex['environment'][step]['exitCode'], 0, step)
             self.assertTrue(ex['environment']['intactAfterRun'])
+            self.assertTrue(ex['activeRoot'].startswith(str(self.d / 'shared')))
+            self.assertTrue((cell / 'workspace' / 'src.ts').is_file())
             self.assertEqual([c['input'] for c in ex['session']['calls']], [60, 40])
-            self.assertEqual((ex['session']['scripts'], ex['session']['scriptBytes'], ex['session']['shownBytes']), (1, 7, 3))
-            self.assertNotIn('--ephemeral', ex['command'])
-        self.assertEqual(h.main(['assess', *common, '--acceptance', str(self.acc), '--repos', str(self.d / 'repos')]), 0)
+            self.assertNotIn('--sandbox', ex['command'])
+        with self.assertRaises(SystemExit):
+            h.main(['analyse', '--plan', str(self.home / 'plan'), '--tasks', str(self.tasks)])
+        self.assertEqual(self.assess(), 0)
         for cell in cells:
             a = json.loads((cell / 'assessment.json').read_text())
             self.assertTrue(a['checker']['passed'])
-            self.assertEqual(a['dependencies'], {'missed': 0, 'incorrect': 0, 'total': 0})
+            self.assertEqual(a['scope'], {'passed': True, 'outside': []})
+            self.assertEqual(a['dependencies']['total'], 0)
             self.assertTrue(a['reviewer']['valid'])
+            self.assertTrue(a['reviewer']['isolation'])
             self.assertTrue(a['accepted'])
-            self.assertEqual(a['checker']['relinkExit'], 0)
-            self.assertEqual(len(a['reviewer']['session']['calls']), 2)
+            self.assertEqual(a['excerpts'], ['src.ts'])
             self.assertEqual(a['totalTokens'], 220)
             self.assertFalse((cell / 'check').exists())
+            self.assertTrue((cell / 'review' / 'rubric.json').is_file())
+        self.assertEqual(sorted(p.name for p in (self.d / 'shared').iterdir()), ['os2-toolchain-test'])
+        self.assertEqual(h.main(['analyse', '--plan', str(self.home / 'plan'), '--tasks', str(self.tasks)]), 0)
+        report = json.loads((self.home / 'plan' / 'analysis.json').read_text())
+        self.assertEqual(report['cost']['comparisons']['plain']['tokenRatio'], 1.0)
+        self.assertFalse(report['passed'])
+
+    def test_a_change_outside_scope_is_never_accepted(self):
+        os.environ['OS2_FAKE_EXTRA'] = '1'
+        self.run_all()
+        self.assess()
+        for cell in sorted((self.home / 'plan').glob('cell-*')):
+            a = json.loads((cell / 'assessment.json').read_text())
+            self.assertEqual(a['scope'], {'passed': False, 'outside': ['other.ts']})
+            self.assertTrue(a['reviewer']['accepted'])
+            self.assertFalse(a['accepted'])
+
+    def test_an_unreadable_scope_stops_assessment(self):
+        self.run_all()
+        acc = json.loads((self.acc / 'r-code-change.json').read_text()); acc['scope'] = 'src.ts'
+        (self.acc / 'r-code-change.json').write_text(json.dumps(acc))
+        with self.assertRaises(SystemExit):
+            self.assess()
+        self.assertEqual(self.assess('--checker-only'), 0)
+        rec = json.loads((self.home / 'plan' / 'cell-001' / 'checker-only.json').read_text())
+        self.assertIsNone(rec['scope'])
+
+    def test_assess_waits_for_every_executor(self):
+        self.plan()
+        h.main(['execute', *self.common, '--templates', str(self.home / 'templates'), '--node', self.node,
+                '--navigation-cli', '/c/cli.mjs', '--only', 'cell-001'])
+        with self.assertRaises(SystemExit):
+            self.assess()
 
     def test_no_model_starts_unless_the_copy_is_relinked_and_ready(self):
         for relink, ready in (('exit 3', 'true'), ('true', 'test -f node_modules/relinked')):
             with self.subTest(relink=relink, ready=ready):
                 for x in ('plan', 'templates'):
-                    shutil.rmtree(self.d / x, ignore_errors=True)
+                    shutil.rmtree(self.home / x, ignore_errors=True)
                 h.RELINK['r'], h.READY['r'] = relink, ready
                 with self.assertRaises(SystemExit):
                     self.run_all()
-                cell = self.d / 'plan' / 'cell-001'
+                cell = self.home / 'plan' / 'cell-001'
                 self.assertFalse((cell / 'executor.json').exists())
                 self.assertFalse((cell / 'executor-events.jsonl').exists())
-                self.assertFalse((cell / 'escape.txt').exists())
                 self.assertFalse((cell / 'workspace').exists())
                 self.assertTrue((cell / 'environment.json').is_file())
+                self.assertEqual(list((self.d / 'shared').glob('os2-*-cell')), [])
 
     def test_checker_only_runs_no_reviewer(self):
-        code, common = self.run_all()
-        self.assertEqual(h.main(['assess', *common, '--acceptance', str(self.acc), '--repos', str(self.d / 'repos'), '--checker-only']), 0)
-        for cell in sorted((self.d / 'plan').glob('cell-*')):
+        self.run_all()
+        self.assertEqual(self.assess('--checker-only'), 0)
+        for cell in sorted((self.home / 'plan').glob('cell-*')):
             rec = json.loads((cell / 'checker-only.json').read_text())
             self.assertTrue(rec['checkerPassed'])
             self.assertFalse((cell / 'review').exists())
             self.assertFalse((cell / 'assessment.json').exists())
 
-    def test_glob_patterns_are_not_outside_references(self):
+    def test_outside_references_ignore_globs_and_catch_parent_paths(self):
         line = json.dumps({'type': 'item.completed', 'item': {'type': 'command_execution',
-                           'command': "/bin/zsh -lc \"rg -g 'test/**/*.ts' x; find node_modules -path '*/vitest.mjs'; cat /etc/passwd\""}})
-        self.assertEqual(h.outside_references(line, pathlib.Path('/w')), ['/etc/passwd'])
+                           'command': "/bin/zsh -lc \"rg -g 'test/**/*.ts' x; find node_modules -path '*/vitest.mjs'; cat /etc/passwd; cat ../cell-002/x\""}})
+        self.assertEqual(h.outside_references(line, pathlib.Path('/w')), ['../cell-002/x', '/etc/passwd'])
 
     def test_a_failed_checker_is_never_accepted(self):
-        code, common = self.run_all()
+        self.run_all()
         acc = json.loads((self.acc / 'r-code-change.json').read_text())
         acc['checker']['command'] = 'exit 1'
         (self.acc / 'r-code-change.json').write_text(json.dumps(acc))
-        h.main(['assess', *common, '--acceptance', str(self.acc), '--repos', str(self.d / 'repos')])
-        for cell in sorted((self.d / 'plan').glob('cell-*')):
+        self.assess()
+        for cell in sorted((self.home / 'plan').glob('cell-*')):
             a = json.loads((cell / 'assessment.json').read_text())
             self.assertFalse(a['checker']['passed'])
             self.assertTrue(a['reviewer']['accepted'])
@@ -380,14 +606,29 @@ class ExecutionPath(unittest.TestCase):
     def test_dependency_count_and_review_validation(self):
         task = {'class': 'impact'}
         acc = {'dependencySet': [{'path': 'a.ts'}, {'path': 'b.ts'}]}
-        answer = {'mustChange': [{'path': 'a.ts'}, {'path': 'invented.ts'}]}
-        self.assertEqual(h.dependency_count(task, acc, answer, [], {'a.ts', 'b.ts'}), {'missed': 1, 'incorrect': 1, 'total': 2})
+        answer = {'mustChange': [{'path': 'a.ts'}, {'path': 'invented.ts'}, {'path': 'a.ts'}]}
+        d = h.dependency_count(task, acc, answer, [], {'a.ts', 'b.ts'})
+        self.assertEqual((d['missed'], d['incorrect'], d['extra'], d['total'], d['recall'], d['precision']), (1, 1, 1, 2, 0.5, 0.5))
         self.assertIsNone(h.dependency_count({'class': 'orientation'}, acc, answer, [], set()))
+        self.assertIsNone(h.dependency_count({'class': 'diagnosis'}, acc, answer, [], set()))
+        claims = {'filesChanged': ['a.ts', 'b.ts']}
+        self.assertEqual(h.dependency_count({'class': 'code-change'}, acc, claims, ['a.ts'], set())['missed'], 1)
         good = {'accepted': True, 'findings': [{'id': 'R1', 'passed': True, 'reason': 'ok'}], 'materialIssues': []}
         self.assertEqual(h.review_outcome(good, ['R1']), {'valid': True, 'accepted': True})
         self.assertEqual(h.review_outcome({**good, 'materialIssues': ['x']}, ['R1']), {'valid': True, 'accepted': False})
         self.assertEqual(h.review_outcome({**good, 'findings': []}, ['R1'])['valid'], False)
         self.assertEqual(h.review_outcome(None, ['R1'])['valid'], False)
+
+    def test_evidence_excerpts_are_bounded_and_stay_inside_the_workspace(self):
+        ws = self.d / 'ws'; ws.mkdir(); dest = self.d / 'dest'; dest.mkdir()
+        (ws / 'big.ts').write_text(''.join(f'line {n}\n' for n in range(1, 1001)))
+        (self.d / 'outside.ts').write_text('secret\n')
+        (ws / 'link').symlink_to(self.d)
+        answer = {'evidence': [{'path': 'big.ts', 'startLine': 500, 'endLine': 502}, {'path': 'link/outside.ts', 'startLine': 1},
+                               {'path': '../outside.ts', 'startLine': 1}, {'path': '/etc/hosts', 'startLine': 1}]}
+        self.assertEqual(h.evidence_excerpts(ws, answer, dest), ['big.ts'])
+        lines = (dest / 'source' / 'big.ts').read_text().splitlines()
+        self.assertEqual((lines[0], lines[-1], len(lines)), ('480: line 480', '522: line 522', 43))
 
 
 if __name__ == '__main__':

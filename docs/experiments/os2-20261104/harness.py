@@ -5,29 +5,36 @@
 directory and never starts Codex. `prepare` and `assess --checker-only` start no
 model either; `execute` and `assess` do, and each run needs its own approval.
 
-Derived from ../d5-20260921-v3/run-pair.py, which stays locked and unchanged.
-Differences: the arm order rotates; arms are data (plain, context, graphify);
-model and effort have one source; the Context arm exposes all seven 0.26.0
-retrieval tools, including repository_packet; and usage is incomplete rather
-than zero when a stream does not report it.
+Protocol v2 (2026-11-05), after the independent review:
+  - Read isolation is enforced by Codex 0.166 permission profiles, not by
+    prompts: model tool calls cannot read the user's home (plans, sibling
+    cells, hidden acceptance, transcripts), /private/tmp or per-user temp. Deny
+    rules beat allow rules, so each session runs in a fresh root outside the
+    home with its own temp and HOME, and a copied toolchain. A readiness probe
+    proves a canary in the cell directory is unreadable before any model starts.
+  - The legacy --sandbox flag is never passed: it overrides the profile.
+  - Usage fails closed (A1-A4 below are checked, not assumed).
+  - plan records hashes of every input; execute refuses on any mismatch.
+  - Scope is enforced from the acceptance file; reviewer evidence is bounded
+    excerpts; `analyse` computes the declared gates.
 
-Usage assumptions, to be confirmed by the write probe on a real 0.166.0 stream:
-  A1 cached_input_tokens is a subset of input_tokens;
-  A2 reasoning_output_tokens is a subset of output_tokens;
-  A3 one `codex exec` emits one turn.completed per model turn, each with
-     per-turn (not cumulative) usage.
-  A4 cache_write_input_tokens (seen in the 0.166.0 probe, 0 there) is within
-     input_tokens. Unconfirmed: a cell where it is non-zero is flagged
-     cacheWriteSeen so the accounting can be settled before lock.
-The write probe (2026-11-04) saw one turn.completed per exec, aggregating
-every model call in that turn, with all four usage fields plus cache writes.
+Usage checks on every `codex exec --json` stream; a failure makes the cell
+incomplete, never zero:
+  A1 cached_input_tokens <= input_tokens;
+  A2 reasoning_output_tokens <= output_tokens;
+  A3 exactly one turn.completed per exec (0.166 aggregates the whole exec), and
+     its input/output equal the sums of the per-call session log;
+  A4 cache_write_input_tokens is 0 (non-zero accounting is unsettled).
 """
 import argparse
+import fnmatch
 import json
 import os
 import pathlib
+import random
 import statistics
 import sys
+import uuid
 
 HERE = pathlib.Path(__file__).resolve().parent
 
@@ -36,15 +43,20 @@ ARM_NAMES = ('plain', 'context', 'graphify')
 CONTEXT_TOOLS = ['repository_status', 'repository_refresh', 'repository_search', 'repository_explore',
                  'repository_packet', 'repository_coverage', 'repository_graph']
 SHELLS = {'sh', 'bash', 'zsh', 'fish', 'dash', 'ksh', 'env'}
-FORBIDDEN = ('--dangerously-bypass-approvals-and-sandbox', '--yolo', '--full-auto', 'danger-full-access')
-SANDBOXES = {'executor': 'workspace-write', 'reviewer': 'read-only'}
+FORBIDDEN = ('--dangerously-bypass-approvals-and-sandbox', '--yolo', '--full-auto', 'danger-full-access',
+             '--sandbox', '-s', '--profile', '-p')
+PROFILES = {'executor': ':workspace', 'reviewer': ':read-only'}
+# Trees no model tool call may read. The user's home is added at run time.
+DENY_READ = ('/private/tmp', '/private/var/folders')
+ACTIVE_BASE = pathlib.Path('/Users/Shared')
+SEED = 20261105
 
 # One retrieval instruction per arm, of similar length and force (protocol retrievalInstructionRule).
 INSTRUCTIONS = {
     'plain': ('Discover source with bounded rg searches and exact file reads inside this workspace. '
               'Read the implementation and tests you rely on before answering. No navigation service is available.'),
-    'context': ('Discover source with the z1p-repository tools: check repository_status, refresh if not current, '
-                'then search or explore and read exact implementation and tests with repository_packet.'),
+    'context': ('Discover source with the z1p-repository tools: search or explore, then read the exact '
+                'implementation and tests you rely on with repository_packet before answering.'),
     'graphify': ('Discover source with the prebuilt Graphify graph in graphify-out/ and the graphify CLI, '
                  'then read the exact implementation and tests it points to before answering.'),
 }
@@ -52,32 +64,60 @@ COMMON = ('Do not use network search, memory, sibling directories, another arm, 
           'You may run the compiler and focused tests.\n\n')
 
 
-def schedule(task_ids, arms, repetitions):
+def schedule(task_ids, arms, repetitions, seed=None):
     """Cells in run order. Repetition r (1-based) of task i (1-based) uses `arms`
-    rotated left by (i + r - 1) mod n."""
+    rotated left by (i + r - 1) mod n. With a seed, the (task, repetition) blocks
+    run in a seeded random order, so arm order is not tied to time of day."""
     if len(set(arms)) != len(arms) or not set(arms) <= set(ARM_NAMES) or 'plain' not in arms or 'context' not in arms:
         raise ValueError(f'arms must be distinct, include plain and context, and come from {ARM_NAMES}')
-    n, cells = len(arms), []
+    n, blocks = len(arms), []
     for r in range(1, repetitions + 1):
         for i, task in enumerate(task_ids, 1):
             k = (i + r - 1) % n
-            for position, arm in enumerate(list(arms[k:]) + list(arms[:k]), 1):
-                cells.append({'task': task, 'taskIndex': i, 'repetition': r, 'arm': arm, 'position': position})
-    return cells
+            blocks.append([{'task': task, 'taskIndex': i, 'repetition': r, 'arm': arm, 'position': position}
+                           for position, arm in enumerate(list(arms[k:]) + list(arms[:k]), 1)])
+    if seed is not None:
+        random.Random(seed).shuffle(blocks)
+    return [c for b in blocks for c in b]
 
 
 def toml_string(value):
     return json.dumps(str(value))
 
 
-def codex_config(arm, settings, workspace=None, node=None, navigation_cli=None):
-    """config.toml text for one fresh CODEX_HOME. Only the context arm gets an MCP server."""
+def isolation(role, root, toolchain, home=None):
+    """Permission profile and tool environment for one session rooted at `root`
+    (workspace/ or review/, tmp/, home/). Model tool calls cannot read the user's
+    home or shared temp; they write only inside `root`."""
+    root, toolchain = pathlib.Path(root), pathlib.Path(toolchain)
+    home = pathlib.Path(home or pathlib.Path.home())
+    for p in (root, toolchain):
+        if not p.is_absolute() or p == home or home in p.parents or any(p.is_relative_to(d) for d in DENY_READ):
+            raise ValueError(f'{p} must be absolute and outside every denied tree')
+    rules = [(str(home), 'deny')] + [(d, 'deny') for d in DENY_READ]
+    rules += [(str(root / ('workspace' if role == 'executor' else 'review')), 'write' if role == 'executor' else 'read'),
+              (str(root / 'tmp'), 'write'), (str(root / 'home'), 'write'), (str(toolchain), 'read')]
+    env = {'PATH': f'{toolchain}/bin:/Library/Developer/CommandLineTools/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin',
+           'HOME': str(root / 'home'), 'TMPDIR': str(root / 'tmp'), 'COREPACK_HOME': str(toolchain / 'corepack'),
+           'COREPACK_ENABLE_DOWNLOAD_PROMPT': '0', 'LANG': 'en_GB.UTF-8'}
+    return ('default_permissions = "os2"\n'
+            '[permissions.os2]\nextends = ' + toml_string(PROFILES[role]) + '\n'
+            '[permissions.os2.filesystem]\n' + ''.join(f'{toml_string(p)} = {toml_string(m)}\n' for p, m in rules) +
+            '[shell_environment_policy]\ninherit = "none"\nset = { ' +
+            ', '.join(f'{k} = {toml_string(v)}' for k, v in env.items()) + ' }\n')
+
+
+def codex_config(arm, settings, workspace=None, node=None, navigation_cli=None, root=None, toolchain=None, home=None):
+    """config.toml text for one fresh CODEX_HOME. Only the context arm gets an MCP
+    server. With root and toolchain, the session is read-isolated (see isolation)."""
     if arm not in ARM_NAMES and arm != 'reviewer':
         raise ValueError(f'unknown arm {arm!r}')
     text = ('model = ' + toml_string(settings['model']) + '\n'
             'model_reasoning_effort = ' + toml_string(settings['effort']) + '\n'
-            'project_doc_max_bytes = 0\nweb_search = "disabled"\n'
-            '[features]\napps = false\nmemories = false\nmulti_agent = false\n')
+            'project_doc_max_bytes = 0\nweb_search = "disabled"\n')
+    if root is not None:
+        text += isolation('reviewer' if arm == 'reviewer' else 'executor', root, toolchain, home)
+    text += '[features]\napps = false\nmemories = false\nmulti_agent = false\n'
     if arm == 'context':
         for name, path in (('workspace', workspace), ('node', node), ('navigation_cli', navigation_cli)):
             if path is None or not pathlib.Path(path).is_absolute():
@@ -112,7 +152,8 @@ def command(codex, role, settings, cwd, final, prompt_text=None):
         raise ValueError('reviewer needs its prompt')
     # Not --ephemeral: the session log stays in the per-cell CODEX_HOME and is the only
     # record of per-call usage and of what code-mode scripts showed the model.
-    argv = [str(codex), 'exec', '--sandbox', SANDBOXES[role], '--ignore-rules']
+    # No --sandbox: it would override the config's permission profile (see isolation).
+    argv = [str(codex), 'exec', '--ignore-rules']
     if role == 'reviewer':
         argv.append('--skip-git-repo-check')
     argv += ['--json', '-m', settings['model'], '-c', 'model_reasoning_effort=' + toml_string(settings['effort']),
@@ -121,30 +162,51 @@ def command(codex, role, settings, cwd, final, prompt_text=None):
     return argv
 
 
+V1_SANDBOXES = {'executor': 'workspace-write', 'reviewer': 'read-only'}
+
+
+def command_v1(codex, role, settings, cwd, final, prompt_text=None):
+    """The version 1 argument list (legacy --sandbox, no permission profile), kept
+    so write-probe.py and protocol-review.py rerun exactly as recorded. Never used
+    for version 2 cells."""
+    if role == 'reviewer' and not prompt_text:
+        raise ValueError('reviewer needs its prompt')
+    argv = [str(codex), 'exec', '--sandbox', V1_SANDBOXES[role], '--ignore-rules']
+    if role == 'reviewer':
+        argv.append('--skip-git-repo-check')
+    argv += ['--json', '-m', settings['model'], '-c', 'model_reasoning_effort=' + toml_string(settings['effort']),
+             '-C', str(cwd), '-o', str(final), '-' if role == 'executor' else prompt_text]
+    rest = [a for a in argv if a not in ('--sandbox', V1_SANDBOXES[role])]
+    validate_command(rest)
+    return argv
+
+
 def validate_command(argv):
     if not isinstance(argv, list) or not all(isinstance(a, str) for a in argv):
         raise ValueError('command must be a list of strings, never a shell string')
     if not pathlib.Path(argv[0]).is_absolute() or pathlib.Path(argv[0]).name in SHELLS:
         raise ValueError('command must start with the absolute Codex binary')
-    if any(a == f or a.startswith(f + '=') for a in argv for f in FORBIDDEN) or '-s' in argv:
-        raise ValueError('command contains a sandbox bypass or override flag')
-    if any(argv[j - 1] == '-c' and 'sandbox' in argv[j] for j in range(1, len(argv))):
-        raise ValueError('command overrides the sandbox through -c')
-    i = argv.index('--sandbox') if '--sandbox' in argv else -1
-    if i < 0 or argv[i + 1] not in SANDBOXES.values() or argv.count('--sandbox') != 1:
-        raise ValueError('command must set exactly one workspace-write or read-only sandbox')
+    if any(a == f or a.startswith(f + '=') for a in argv for f in FORBIDDEN):
+        raise ValueError('command contains a sandbox bypass, sandbox mode or profile flag')
+    if any(argv[j - 1] == '-c' and any(k in argv[j] for k in ('sandbox', 'permissions', 'shell_environment'))
+           for j in range(1, len(argv))):
+        raise ValueError('command overrides the sandbox, permissions or tool environment through -c')
     return argv
 
 
-def usage(events):
+def usage(events, exit_code=0, session=None):
     """Token usage from one recorded `codex exec --json` stream (raw or {"event": ...} lines).
-    Returns totals only when every model turn reported usage; otherwise complete=False and
-    totals are None, never zero."""
-    turns, raw, abnormal = 0, [], False
+    Totals only when the stream passes A1-A4 (module docstring), the process exited 0
+    and, when given, the session log's per-call sums agree; otherwise complete=False
+    with reasons, and totals are None, never zero."""
+    turns, raw, abnormal, malformed = 0, [], False, 0
     for line in events.splitlines():
+        if not line.strip():
+            continue
         try:
             value = json.loads(line)
         except ValueError:
+            malformed += 1
             continue
         event = value.get('event', value) if isinstance(value, dict) else None
         if not isinstance(event, dict):
@@ -156,10 +218,34 @@ def usage(events):
             turns += 1
             raw.append(event.get('usage'))
     fields = ('input_tokens', 'cached_input_tokens', 'output_tokens', 'reasoning_output_tokens', 'cache_write_input_tokens')
-    complete = turns > 0 and not abnormal and all(
-        isinstance(u, dict) and isinstance(u.get('input_tokens'), int) and isinstance(u.get('output_tokens'), int) for u in raw)
-    result = {'turns': turns, 'raw': raw, 'abnormal': abnormal, 'complete': complete,
-              'assumptions': ['A1 cached within input', 'A2 reasoning within output', 'A3 per-turn usage', 'A4 cache writes within input'],
+    reasons = []
+    if malformed:
+        reasons.append('malformed-lines')
+    if abnormal:
+        reasons.append('turn-failed')
+    if exit_code != 0:
+        reasons.append('exit-nonzero')
+    if turns == 0:
+        reasons.append('no-usage')
+    elif turns > 1:
+        reasons.append('A3-multiple-usage-events')
+    for u in raw:
+        if not (isinstance(u, dict) and all(isinstance(u.get(f), int) and u[f] >= 0 for f in fields)):
+            reasons.append('missing-usage-field')
+            continue
+        if u['cached_input_tokens'] > u['input_tokens']:
+            reasons.append('A1-cached-exceeds-input')
+        if u['reasoning_output_tokens'] > u['output_tokens']:
+            reasons.append('A2-reasoning-exceeds-output')
+        if u['cache_write_input_tokens'] != 0:
+            reasons.append('A4-cache-write-unsettled')
+        if session is not None:
+            calls = (session or {}).get('calls') or []
+            if (sum(c.get('input') or 0 for c in calls), sum(c.get('output') or 0 for c in calls)) != (u['input_tokens'], u['output_tokens']):
+                reasons.append('A3-session-stream-mismatch')
+    complete = not reasons
+    result = {'turns': turns, 'raw': raw, 'abnormal': abnormal, 'malformedLines': malformed, 'complete': complete,
+              'incompleteReasons': sorted(set(reasons)),
               'cacheWriteSeen': any(isinstance(u, dict) and (u.get('cache_write_input_tokens') or 0) > 0 for u in raw)}
     if not complete:
         result.update({f: None for f in ('input', 'cached', 'uncached', 'cacheWrite', 'output', 'reasoning', 'total')})
@@ -179,38 +265,141 @@ def cell_total(parts):
     return sum(p['total'] for p in parts)
 
 
-def cost_gate(cells, comparators, threshold=0.8):
+def per_task_medians(cells, arm, tasks, repetitions):
+    """Median of each task's cells for one arm; exactly `repetitions` complete rows each."""
+    per = {}
+    for t in tasks:
+        rows = [c for c in cells if c['task'] == t and c['arm'] == arm]
+        if len(rows) != repetitions:
+            raise ValueError(f'task {t} arm {arm}: {len(rows)} cells, expected {repetitions}')
+        per[t] = statistics.median(c['totalTokens'] for c in rows)
+    return per
+
+
+def bootstrap_ratio(ctx, other, draws=10_000, seed=SEED, level=0.90):
+    """Percentile interval of sum(ctx)/sum(other) over tasks resampled with
+    replacement, and of the geometric mean of per-task ratios. Tasks are the unit."""
+    import math
+    tasks = sorted(ctx)
+    rng = random.Random(seed)
+    sums, geos = [], []
+    for _ in range(draws):
+        pick = [rng.choice(tasks) for _ in tasks]
+        sums.append(sum(ctx[t] for t in pick) / sum(other[t] for t in pick))
+        geos.append(math.exp(statistics.fmean(math.log(ctx[t] / other[t]) for t in pick)))
+    lo, hi = (1 - level) / 2, 1 - (1 - level) / 2
+    q = lambda xs: [sorted(xs)[int(lo * (len(xs) - 1))], sorted(xs)[int(hi * (len(xs) - 1))]]
+    return {'sumRatioInterval': q(sums), 'geometricMean': math.exp(statistics.fmean(math.log(ctx[t] / other[t]) for t in tasks)),
+            'geometricMeanInterval': q(geos), 'draws': draws, 'seed': seed, 'level': level}
+
+
+def cost_gate(cells, comparators, repetitions, threshold=0.8, upper=1.0):
     """cells: [{task, arm, totalTokens (None when incomplete), reviewerSeconds}].
     Statistic: sum over tasks of per-task median total tokens, per arm. Context passes
-    only if no task has an incomplete cell in a compared arm, its sum is at most
-    threshold x each comparator's, and its sum of per-task median reviewer seconds is
-    no higher."""
+    a comparator only if no compared cell is incomplete, every task has exactly
+    `repetitions` cells per arm, the point ratio is at most `threshold` and the upper
+    end of its 90% task-bootstrap interval is below `upper`. Reviewer seconds are
+    reported, not gated (protocol v2)."""
     tasks = sorted({c['task'] for c in cells})
     arms = ['context'] + list(comparators)
     incomplete = sorted({c['task'] for c in cells if c['arm'] in arms and c['totalTokens'] is None})
     report = {'incompleteTasks': incomplete, 'arms': {}, 'comparisons': {}, 'passed': False}
     if incomplete:
         return report
+    medians = {arm: per_task_medians(cells, arm, tasks, repetitions) for arm in arms}
     for arm in arms:
-        per = {}
-        for t in tasks:
-            rows = [c for c in cells if c['task'] == t and c['arm'] == arm]
-            if not rows:
-                raise ValueError(f'no cells for task {t} arm {arm}')
-            per[t] = {'tokens': statistics.median(c['totalTokens'] for c in rows),
-                      'reviewerSeconds': statistics.median(c['reviewerSeconds'] for c in rows)}
-        report['arms'][arm] = {'perTask': per, 'tokens': sum(v['tokens'] for v in per.values()),
-                               'reviewerSeconds': sum(v['reviewerSeconds'] for v in per.values())}
-    ctx = report['arms']['context']
+        secs = {t: statistics.median(c['reviewerSeconds'] for c in cells if c['task'] == t and c['arm'] == arm) for t in tasks}
+        report['arms'][arm] = {'perTask': medians[arm], 'tokens': sum(medians[arm].values()), 'reviewerSeconds': sum(secs.values())}
     passed = True
     for arm in comparators:
-        other = report['arms'][arm]
-        ratio = ctx['tokens'] / other['tokens'] if other['tokens'] else None
-        ok = ratio is not None and ratio <= threshold and ctx['reviewerSeconds'] <= other['reviewerSeconds']
-        report['comparisons'][arm] = {'tokenRatio': ratio, 'reviewerSecondsNoHigher': ctx['reviewerSeconds'] <= other['reviewerSeconds'], 'passed': ok}
+        other = report['arms'][arm]['tokens']
+        ratio = report['arms']['context']['tokens'] / other if other else None
+        boot = bootstrap_ratio(medians['context'], medians[arm]) if other and all(medians[arm].values()) else None
+        ok = ratio is not None and boot is not None and ratio <= threshold and boot['sumRatioInterval'][1] < upper
+        report['comparisons'][arm] = {'tokenRatio': ratio, 'bootstrap': boot, 'passed': ok}
         passed = passed and ok
     report['passed'] = passed
     return report
+
+
+QUALITY_CLASSES = ('impact', 'code-change')
+
+
+def quality_guard(cells, comparators):
+    """cells: [{task, class, arm, accepted, dependencies}]. Context passes a comparator
+    if it has no fewer accepted outcomes in total, and on no impact or code-change task
+    is its median dependency total (missed + incorrect) higher. "Better" (lower on at
+    least two such tasks) is reported, not required; all-zero is inconclusive."""
+    report = {'comparisons': {}, 'passed': True}
+    tasks = sorted({c['task'] for c in cells if c.get('class') in QUALITY_CLASSES})
+    med = lambda arm, t: statistics.median((c['dependencies'] or {}).get('total', 0) for c in cells if c['task'] == t and c['arm'] == arm)
+    for arm in comparators:
+        acc = {a: sum(1 for c in cells if c['arm'] == a and c['accepted']) for a in ('context', arm)}
+        per = {t: {'context': med('context', t), arm: med(arm, t)} for t in tasks}
+        worse = [t for t, v in per.items() if v['context'] > v[arm]]
+        better = [t for t, v in per.items() if v['context'] < v[arm]]
+        ok = acc['context'] >= acc[arm] and not worse
+        report['comparisons'][arm] = {'accepted': acc, 'dependencyMedians': per, 'worseTasks': worse, 'betterTasks': better,
+                                      'better': len(better) >= 2 and not worse,
+                                      'inconclusive': all(v['context'] == 0 and v[arm] == 0 for v in per.values()), 'passed': ok}
+        report['passed'] = report['passed'] and ok
+    return report
+
+
+def sensitivity(parts, weights=(0.0, 0.1, 1.0)):
+    """uncached + output + w x cached for frozen weights; w = 1 is the total."""
+    if any(not p.get('complete') for p in parts):
+        return None
+    return {str(w): sum(p['uncached'] + p['output'] + w * p['cached'] for p in parts) for w in weights}
+
+
+def load_tasks(directory):
+    """Public task files; manifest.json is the pack index, not a task."""
+    tasks = []
+    for path in sorted(pathlib.Path(directory).glob('*.json')):
+        if path.name == 'manifest.json':
+            continue
+        value = json.loads(path.read_text(encoding='utf8'))
+        if not isinstance(value.get('id'), str) or not isinstance(value.get('statement'), str):
+            raise SystemExit(f'task {path.name} needs string id and statement')
+        tasks.append((path, value))
+    if not tasks:
+        raise SystemExit('no task files')
+    return tasks
+
+
+def tree_digest(root, exclude=('manifest.json',)):
+    """sha256 over sorted relative paths, link targets and file contents."""
+    root = pathlib.Path(root)
+    h = hashlib.sha256()
+    for path in sorted(root.rglob('*')):
+        rel = str(path.relative_to(root))
+        if rel in exclude:
+            continue
+        if path.is_symlink():
+            h.update(f'L {rel} {os.readlink(path)}\n'.encode())
+        elif path.is_file():
+            h.update(f'F {rel} {sha256_file(path)}\n'.encode())
+    return h.hexdigest()
+
+
+def sha_or_none(path):
+    return sha256_file(path) if pathlib.Path(path).is_file() else None
+
+
+def lock_record(args, codex, tasks):
+    """Hashes execute re-checks before any model starts."""
+    cli = pathlib.Path(args.navigation_cli)
+    return {'codex': str(codex), 'codexSha256': sha256_file(codex), 'node': str(args.node), 'nodeSha256': sha_or_none(args.node),
+            'navigationCli': str(cli), 'navigationPackageSha256': sha_or_none(cli.parent.parent / 'package.json'),
+            'navigationCliSha256': sha_or_none(cli),
+            'toolchain': str(args.toolchain), 'toolchainManifestSha256': sha256_file(pathlib.Path(args.toolchain) / 'manifest.json'),
+            'taskSha256': {t['id']: sha256_file(path) for path, t in tasks},
+            'harnessSha256': sha256_file(HERE / 'harness.py'), 'metricsSha256': sha256_file(HERE / 'metrics.mjs')}
+
+
+def active_root(plan_doc, cell_name, kind='cell'):
+    return pathlib.Path(plan_doc['activeBase']) / f"os2-{plan_doc['planId']}-{cell_name}-{kind}"
 
 
 def plan(args):
@@ -219,42 +408,43 @@ def plan(args):
         raise SystemExit('--out must be a new absolute directory')
     codex = resolve_codex(args.codex)
     arms = tuple(args.arms.split(','))
-    tasks = []
-    for path in sorted(args.tasks.glob('*.json')):
-        value = json.loads(path.read_text(encoding='utf8'))
-        if not isinstance(value.get('id'), str) or not isinstance(value.get('statement'), str):
-            raise SystemExit(f'task {path.name} needs string id and statement')
-        tasks.append(value)
-    if not tasks:
-        raise SystemExit('no task files')
+    tasks = load_tasks(args.tasks)
+    base = pathlib.Path(args.active_base)
+    home = pathlib.Path.home()
+    if not base.is_absolute() or base == home or home in base.parents:
+        raise SystemExit('--active-base must be absolute and outside the home directory')
     out.mkdir(mode=0o700)
-    cells = schedule([t['id'] for t in tasks], arms, args.repetitions)
-    by_id = {t['id']: t for t in tasks}
+    cells = schedule([t['id'] for _, t in tasks], arms, args.repetitions, args.seed)
+    by_id = {t['id']: t for _, t in tasks}
+    plan_doc = {'settings': SETTINGS, 'arms': arms, 'repetitions': args.repetitions, 'seed': args.seed, 'protocol': 2,
+                'planId': uuid.uuid4().hex[:12], 'activeBase': str(base), 'codex': str(codex),
+                'lock': lock_record(args, codex, tasks), 'cells': cells}
     for n, cell in enumerate(cells, 1):
-        # Opaque names: the reviewer runs inside the cell directory and must not see the arm.
+        # Opaque names; the reviewer never runs inside the cell directory (protocol v2).
         name = f"cell-{n:03d}"
         d = out / name
         d.mkdir(mode=0o700)
-        workspace = d / 'workspace'
+        root = active_root(plan_doc, name)
+        workspace = root / 'workspace'
         (d / 'executor-config.toml').write_text(
-            codex_config(cell['arm'], SETTINGS, workspace, args.node, args.navigation_cli), encoding='utf8')
+            codex_config(cell['arm'], SETTINGS, workspace, args.node, args.navigation_cli, root, args.toolchain), encoding='utf8')
         (d / 'executor-prompt.txt').write_text(executor_prompt(cell['arm'], by_id[cell['task']]), encoding='utf8')
-        (d / 'executor-command.json').write_text(json.dumps(command(codex, 'executor', SETTINGS, workspace, d / 'final.txt'), indent=2) + '\n', encoding='utf8')
-        (d / 'reviewer-config.toml').write_text(codex_config('reviewer', SETTINGS), encoding='utf8')
+        (d / 'executor-command.json').write_text(json.dumps(command(codex, 'executor', SETTINGS, workspace, d / 'executor-final.txt'), indent=2) + '\n', encoding='utf8')
         cell['directory'] = name
-    (out / 'schedule.json').write_text(json.dumps({'settings': SETTINGS, 'arms': arms, 'repetitions': args.repetitions,
-                                                   'codex': str(codex), 'cells': cells}, indent=2) + '\n', encoding='utf8')
+    (out / 'schedule.json').write_text(json.dumps(plan_doc, indent=2) + '\n', encoding='utf8')
     print(json.dumps({'cells': len(cells), 'out': str(out)}))
     return 0
 
 
 # ---------------------------------------------------------------------------
-# Execution path. Three stages, run separately:
-#   prepare  per task: extract the frozen base archive, install, commit the tree.
-#   execute  per cell: clone the template, run one executor session. Refuses to
-#            start while any --forbid path exists, because Codex's sandbox limits
-#            writes, not reads: hidden acceptance files must not be on the machine.
-#   assess   per cell, after all executors: checker, dependency count, reviewer.
+# Execution path. Stages, run separately:
+#   toolchain  once: copy node, corepack's pinned pnpm and rg outside the home.
+#   prepare    per task: extract the frozen base archive, install, commit the tree.
+#   execute    per cell: stage the template in a fresh root outside the home,
+#              prove isolation and readiness, run one executor session, bring the
+#              workspace back. --forbid paths must still be absent (defence in depth).
+#   assess     after every executor: checker, scope, dependency count, reviewer.
+#   analyse    model-free: cost gate, bootstrap interval, quality guard.
 # ---------------------------------------------------------------------------
 import hashlib
 import shutil
@@ -267,13 +457,16 @@ INSTALL = {'bray': 'npm ci && npm run build', 'h3': 'pnpm install --frozen-lockf
 # A copied pnpm tree is stale to pnpm 11, which reinstalls before every `pnpm <bin>`.
 # Inside Codex's sandbox that reinstall cannot write the global store, fails offline
 # and purges node_modules (phase 1 attempt 1). So each copy is relinked offline,
-# outside the sandbox, and READY is then run under Codex's own sandbox before any
-# model starts.
+# outside the sandbox, and READY is then run under the session's own profile before
+# any model starts.
 RELINK = {'h3': 'pnpm install --frozen-lockfile --offline'}
 READY = {'h3': 'pnpm vitest --version'}
 OFFLINE = ('(version 1)(allow default)(deny network-outbound)(allow network-outbound (remote ip "localhost:*"))'
            '(allow network-outbound (remote unix-socket))')
-SYSTEM_PREFIXES = ('/bin/', '/usr/', '/opt/homebrew/', '/dev/null', '/dev/stdin', '/dev/stdout', '/dev/stderr', '/tmp/', '/private/tmp/')
+SYSTEM_PREFIXES = ('/bin/', '/usr/', '/opt/homebrew/', '/Library/Developer/CommandLineTools/', '/dev/null', '/dev/stdin',
+                   '/dev/stdout', '/dev/stderr')
+CANARY = 'isolation-canary.txt'
+EXCERPT_CONTEXT, EXCERPT_LINES, EXCERPT_BYTES = 20, 400, 262_144
 
 
 def utc():
@@ -307,9 +500,43 @@ def shell(command, cwd, offline=False, timeout=1200):
     return {'exitCode': code, 'seconds': round(time.monotonic() - started, 1), 'tail': out[-4000:]}
 
 
+def clone_tree(src, dst):
+    """APFS copy-on-write clone where available, so per-cell copies are cheap."""
+    r = subprocess.run(['cp', '-cR', str(src), str(dst)], capture_output=True, text=True)
+    if r.returncode != 0:
+        shutil.copytree(src, dst, symlinks=True)
+
+
+def build_toolchain(args):
+    """Copy the tools model sessions may run to a directory outside the home, which
+    the permission profile makes readable. Writes manifest.json with a tree digest."""
+    out = pathlib.Path(args.out)
+    home = pathlib.Path.home()
+    if not out.is_absolute() or out.exists() or home in out.parents:
+        raise SystemExit('--out must be a new absolute directory outside the home')
+    out.mkdir(mode=0o755, parents=True)
+    clone_tree(args.node_prefix, out / 'node')
+    pnpm = pathlib.Path(args.corepack_home) / 'v1' / 'pnpm' / args.pnpm_version
+    if not pnpm.is_dir():
+        raise SystemExit(f'pnpm {args.pnpm_version} is not in the corepack cache')
+    (out / 'corepack' / 'v1' / 'pnpm').mkdir(parents=True)
+    clone_tree(pnpm, out / 'corepack' / 'v1' / 'pnpm' / args.pnpm_version)
+    (out / 'bin').mkdir()
+    for name in ('node', 'npm', 'npx', 'corepack'):
+        (out / 'bin' / name).symlink_to(f'../node/bin/{name}')
+    (out / 'bin' / 'pnpm').symlink_to('../node/lib/node_modules/corepack/dist/pnpm.js')
+    shutil.copy2(pathlib.Path(args.rg).resolve(), out / 'bin' / 'rg')
+    manifest = {'pnpmVersion': args.pnpm_version, 'nodeVersion': subprocess.run([str(out / 'bin' / 'node'), '--version'],
+                capture_output=True, text=True).stdout.strip(), 'digest': tree_digest(out)}
+    write_json(out / 'manifest.json', manifest)
+    print(json.dumps(manifest))
+    return 0
+
+
 def prepare_template(task, archive, expected_sha, out, install=None):
     """Extract the frozen archive, install dependencies, then commit everything so
-    the executor's later diff shows only its own changes."""
+    the executor's later diff shows only its own changes. A failed install removes
+    the copy and stops."""
     if sha256_file(archive) != expected_sha:
         raise ValueError(f'archive hash mismatch for {task["id"]}')
     ws = out / task['id']
@@ -317,6 +544,9 @@ def prepare_template(task, archive, expected_sha, out, install=None):
     with tarfile.open(archive) as tar:
         tar.extractall(ws, filter='data')
     setup = shell(install or INSTALL[task['repository']], ws)
+    if setup['exitCode'] != 0:
+        shutil.rmtree(ws, ignore_errors=True)
+        raise SystemExit(f'{task["id"]}: setup failed (exit {setup["exitCode"]}); template removed')
     git(ws, 'init', '-q'); git(ws, 'add', '-A'); git(ws, 'commit', '-qm', f'base {task["baseCommit"]}')
     record = {'taskId': task['id'], 'baseCommit': task['baseCommit'], 'archiveSha256': expected_sha, 'setup': setup,
               'tree': git(ws, 'rev-parse', 'HEAD^{tree}').stdout.strip()}
@@ -324,11 +554,17 @@ def prepare_template(task, archive, expected_sha, out, install=None):
     return record
 
 
-def clone_tree(src, dst):
-    """APFS copy-on-write clone where available, so per-cell copies are cheap."""
-    r = subprocess.run(['cp', '-cR', str(src), str(dst)], capture_output=True, text=True)
-    if r.returncode != 0:
-        shutil.copytree(src, dst, symlinks=True)
+def verify_template(task, templates):
+    """An existing template must match its record and have no uncommitted change."""
+    ws, rec = templates / task['id'], templates / f'{task["id"]}.template.json'
+    if not rec.is_file():
+        raise SystemExit(f'{task["id"]}: template has no record')
+    record = json.loads(rec.read_text(encoding='utf8'))
+    tree = git(ws, 'rev-parse', 'HEAD^{tree}', check=False).stdout.strip()
+    dirty = git(ws, 'status', '--porcelain', check=False).stdout.strip()
+    if tree != record['tree'] or dirty or record.get('setup', {}).get('exitCode') != 0:
+        raise SystemExit(f'{task["id"]}: template differs from its record or its setup failed')
+    return record
 
 
 def executor_prompt(arm, task):
@@ -339,11 +575,11 @@ def executor_prompt(arm, task):
     return prompt(arm, body)
 
 
-def outside_references(events_text, workspace):
-    """Absolute or home paths in executed commands that point outside the workspace.
-    Reported for review; a non-empty list flags the cell, it does not reject it."""
+def outside_references(events_text, root):
+    """Absolute, home or parent-relative paths in executed commands outside the
+    session root. An audit list: the permission profile is the boundary."""
     import re
-    ws = str(workspace)
+    root = str(root)
     hits = set()
     for line in events_text.splitlines():
         try:
@@ -357,12 +593,28 @@ def outside_references(events_text, workspace):
         cmd = item.get('command') or ''
         cmd = ' '.join(cmd) if isinstance(cmd, list) else cmd
         for token in re.findall(r"(?<![\w.*}])(~[^\s'\";|&)]*|\$HOME[^\s'\";|&)]*|/[^\s'\";|&)]+)", cmd):
-            if token.startswith(ws) or token.startswith(SYSTEM_PREFIXES) or token in ('/bin/zsh', '/bin/bash', '/bin/sh'):
+            if token.startswith(root) or token.startswith(SYSTEM_PREFIXES) or token in ('/bin/zsh', '/bin/bash', '/bin/sh'):
                 continue
             if token.startswith('/') and token.count('/') == 1 and len(token) < 3:
                 continue
             hits.add(token[:200])
+        hits.update(m[:200] for m in re.findall(r"(?:^|[\s'\"=])((?:\.\./)+[^\s'\";|&)]*)", cmd))
     return sorted(hits)
+
+
+def denied_reads(events_text):
+    """Command outputs reporting a denied access: attempts the profile stopped."""
+    n = 0
+    for line in events_text.splitlines():
+        try:
+            e = json.loads(line)
+        except ValueError:
+            continue
+        e = e.get('event', e) if isinstance(e, dict) else {}
+        item = e.get('item') or {}
+        if item.get('type') == 'command_execution' and 'Operation not permitted' in str(item.get('aggregated_output') or ''):
+            n += 1
+    return n
 
 
 def session_calls(home):
@@ -396,45 +648,79 @@ def session_calls(home):
             'shownBytes': shown_bytes, 'otherItems': other}
 
 
-def sandbox_probe(codex, home, ws, command_text, timeout=300):
-    """Run one command under Codex's own workspace-write sandbox, with no model,
-    to check the tool chain works where the executor will run it."""
+def sandbox_probe(codex, home, cwd, command_text, config_text, timeout=300):
+    """Run one command under the session's own permission profile and tool
+    environment, with no model."""
     home.mkdir(mode=0o700, exist_ok=True)
-    argv = [str(codex), 'sandbox', '-c', 'sandbox_mode="workspace-write"', '/bin/zsh', '-lc', command_text]
+    (home / 'config.toml').write_text(config_text, encoding='utf8')
+    argv = [str(codex), 'sandbox', '/bin/zsh', '-lc', command_text]
     started = time.monotonic()
     try:
-        p = subprocess.run(argv, cwd=ws, env={**os.environ, 'CODEX_HOME': str(home)}, text=True, capture_output=True, timeout=timeout)
+        p = subprocess.run(argv, cwd=cwd, env={**os.environ, 'CODEX_HOME': str(home)}, text=True, capture_output=True, timeout=timeout)
         code, out = p.returncode, p.stdout + p.stderr
     except subprocess.TimeoutExpired as exc:
         code, out = 'timeout', str(exc)
     return {'exitCode': code, 'seconds': round(time.monotonic() - started, 1), 'tail': out[-2000:]}
 
 
-def ready_environment(codex, cell_dir, ws, repository):
-    """Relink the copied tree, then probe it under the sandbox. Raises before any
-    model starts if either fails, removing the copy so the cell can be rerun."""
-    env = {'relink': None, 'ready': None}
+def isolation_probe(codex, home, cwd, config_text, canary, writable):
+    """Exit 0 only if the canary (in the cell directory, inside the home) is
+    unreadable and the session root is writable."""
+    probe = (f'if cat {json.dumps(str(canary))} >/dev/null 2>&1; then echo canary-readable; exit 97; fi; '
+             f'echo ok > {json.dumps(str(writable / ".os2-probe"))} && rm {json.dumps(str(writable / ".os2-probe"))}')
+    return sandbox_probe(codex, home, cwd, probe, config_text)
+
+
+def make_root(root, inner):
+    """A fresh session root. Any other os2-* entry under the base is refused: only
+    one session's material may sit outside the denied trees at a time."""
+    base = root.parent
+    others = [p.name for p in base.glob('os2-*') if p != root and not p.name.startswith('os2-toolchain')]
+    if others or root.exists():
+        raise SystemExit(f'refusing to stage: {base} already holds {others or [root.name]}')
+    for d in (inner, 'tmp', 'home'):
+        (root / d).mkdir(parents=True, mode=0o700)
+    return root
+
+
+def ready_environment(codex, cell_dir, root, ws, repository, config_text):
+    """Relink the copied tree, prove isolation, then probe readiness under the
+    session's profile. Raises before any model starts if any step fails, removing
+    the staged root so the cell can be rerun."""
+    env = {'relink': None, 'isolation': None, 'ready': None}
+    canary = cell_dir / CANARY
+    canary.write_text('not for model sessions\n', encoding='utf8')
     if RELINK.get(repository):
         env['relink'] = shell(RELINK[repository], ws, offline=True)
-    if READY.get(repository) and (env['relink'] is None or env['relink']['exitCode'] == 0):
-        env['ready'] = sandbox_probe(codex, cell_dir / 'probe-home', ws, READY[repository])
+    if env['relink'] is None or env['relink']['exitCode'] == 0:
+        env['isolation'] = isolation_probe(codex, cell_dir / 'probe-home', ws, config_text, canary, root / 'tmp')
+    if READY.get(repository) and env['isolation'] and env['isolation']['exitCode'] == 0:
+        env['ready'] = sandbox_probe(codex, cell_dir / 'probe-home', ws, READY[repository], config_text)
     write_json(cell_dir / 'environment.json', env)
-    if any(v is not None and v['exitCode'] != 0 for v in env.values()):
-        shutil.rmtree(ws, ignore_errors=True)
-        raise SystemExit(f'{cell_dir.name}: environment not ready, no model started (see environment.json)')
+    if any(v is not None and v['exitCode'] != 0 for v in env.values()) or env['isolation'] is None:
+        shutil.rmtree(root, ignore_errors=True)
+        raise SystemExit(f'{cell_dir.name}: environment not isolated or not ready, no model started (see environment.json)')
     return env
 
 
-def run_executor(codex, cell_dir, arm, task, template, auth, node, navigation_cli, timeout):
-    ws = cell_dir / 'workspace'
+def run_executor(codex, plan_doc, cell_dir, arm, task, template, auth, node, navigation_cli, toolchain, timeout):
+    root = make_root(active_root(plan_doc, cell_dir.name), 'workspace')
+    ws = root / 'workspace'
+    shutil.rmtree(ws)
     clone_tree(template, ws)
-    environment = ready_environment(codex, cell_dir, ws, task['repository'])
+    config_text = codex_config(arm, SETTINGS, ws, node, navigation_cli, root, toolchain)
+    if config_text != (cell_dir / 'executor-config.toml').read_text(encoding='utf8'):
+        shutil.rmtree(root, ignore_errors=True)
+        raise SystemExit(f'{cell_dir.name}: executor config differs from the plan')
+    environment = ready_environment(codex, cell_dir, root, ws, task['repository'], config_text)
     home = cell_dir / 'executor-home'
     home.mkdir(mode=0o700)
     (home / 'auth.json').symlink_to(auth)
-    (home / 'config.toml').write_text(codex_config(arm, SETTINGS, ws, node, navigation_cli), encoding='utf8')
+    (home / 'config.toml').write_text(config_text, encoding='utf8')
     text = executor_prompt(arm, task)
-    (cell_dir / 'executor-prompt.txt').write_text(text, encoding='utf8')
+    if text != (cell_dir / 'executor-prompt.txt').read_text(encoding='utf8'):
+        shutil.rmtree(root, ignore_errors=True)
+        raise SystemExit(f'{cell_dir.name}: executor prompt differs from the plan')
     argv = command(codex, 'executor', SETTINGS, ws, cell_dir / 'executor-final.txt')
     env = {**os.environ, 'CODEX_HOME': str(home)}
     started, clock = utc(), time.monotonic()
@@ -455,39 +741,60 @@ def run_executor(codex, cell_dir, arm, task, template, auth, node, navigation_cl
     metrics = subprocess.run([str(node), str(HERE / 'metrics.mjs'), str(cell_dir / 'executor-events.jsonl'), '--root', str(ws)],
                              capture_output=True, text=True)
     # After the diff is taken: does the tool chain still work, or did the run break it?
-    after = sandbox_probe(codex, cell_dir / 'probe-home', ws, READY[task['repository']]) if READY.get(task['repository']) else None
+    after = sandbox_probe(codex, cell_dir / 'probe-home', ws, READY[task['repository']], config_text) if READY.get(task['repository']) else None
     environment['intactAfterRun'] = None if after is None else after['exitCode'] == 0
-    return {'startedAt': started, 'seconds': seconds, 'exitCode': code, 'command': argv, 'environment': environment,
-            'session': session_calls(home),
-            'usage': {k: v for k, v in usage(out).items() if k != 'raw'}, 'changedFiles': changed,
-            'answerPresent': (ws / 'answer.json').is_file(),
-            'metrics': json.loads(metrics.stdout) if metrics.returncode == 0 else {'error': metrics.stderr[-500:]},
-            'outsideReferences': outside_references(out, ws)}
+    session = session_calls(home)
+    result = {'startedAt': started, 'seconds': seconds, 'exitCode': code, 'command': argv, 'environment': environment,
+              'activeRoot': str(root), 'session': session,
+              'usage': {k: v for k, v in usage(out, 0 if code == 0 else 1, session).items() if k != 'raw'}, 'changedFiles': changed,
+              'answerPresent': (ws / 'answer.json').is_file(),
+              'metrics': json.loads(metrics.stdout) if metrics.returncode == 0 else {'error': metrics.stderr[-500:]},
+              'outsideReferences': outside_references(out, root), 'deniedAccesses': denied_reads(out)}
+    shutil.move(str(ws), str(cell_dir / 'workspace'))
+    shutil.rmtree(root, ignore_errors=True)
+    return result
 
 
 def answer_paths(task, answer, changed):
-    """Paths an outcome covers, for the dependency count."""
+    """Paths an outcome covers: what an impact answer names, or what a code
+    change actually changed (claims in answer.json do not count)."""
     if task['class'] == 'impact':
-        return {x.get('path') for x in (answer or {}).get('mustChange', []) if isinstance(x, dict)}
-    if task['class'] in ('code-change', 'diagnosis'):
-        return set(changed) | {p for p in (answer or {}).get('filesChanged', []) if isinstance(p, str)}
+        return {x.get('path') for x in (answer or {}).get('mustChange', []) if isinstance(x, dict) and isinstance(x.get('path'), str)}
+    if task['class'] == 'code-change':
+        return set(changed)
     return set()
 
 
 def dependency_count(task, acc, answer, changed, base_paths):
-    """Missed: dependency-set paths the outcome does not cover. Incorrect: impact
-    paths that do not exist at base. Path level only; symbol-level judgement is
-    the reviewer's. Orientation tasks are not counted."""
-    if task['class'] == 'orientation':
+    """Impact and code-change tasks only. Missed: dependency-set paths not covered.
+    Incorrect: impact paths that do not exist at base. Extra: covered paths outside
+    the dependency set (reported as precision, not counted in total)."""
+    if task['class'] not in QUALITY_CLASSES:
         return None
     covered = answer_paths(task, answer, changed)
-    missed = [d['path'] for d in acc['dependencySet'] if d['path'] not in covered]
-    incorrect = [p for p in covered if task['class'] == 'impact' and p not in base_paths]
-    return {'missed': len(missed), 'incorrect': len(incorrect), 'total': len(missed) + len(incorrect)}
+    deps = {d['path'] for d in acc['dependencySet']}
+    missed = sorted(deps - covered)
+    incorrect = sorted(p for p in covered if task['class'] == 'impact' and p not in base_paths)
+    extra = sorted(covered - deps)
+    return {'missed': len(missed), 'incorrect': len(incorrect), 'extra': len(extra), 'total': len(missed) + len(incorrect),
+            'recall': (len(deps & covered) / len(deps)) if deps else None,
+            'precision': (len(deps & covered) / len(covered)) if covered else None}
+
+
+def scope_check(acc, changed, strict=True):
+    """Every changed file must match one of the acceptance file's allowedPaths globs."""
+    scope = acc.get('scope')
+    if not (isinstance(scope, dict) and isinstance(scope.get('allowedPaths'), list)
+            and all(isinstance(g, str) and g for g in scope['allowedPaths'])):
+        if strict:
+            raise SystemExit(f"{acc.get('id')}: acceptance scope must be {{\"allowedPaths\": [glob, ...]}} (protocol v2)")
+        return None
+    outside = [f for f in changed if not any(fnmatch.fnmatchcase(f, g) for g in scope['allowedPaths'])]
+    return {'passed': not outside, 'outside': outside}
 
 
 REVIEW_PROMPT = ('Independently review one task outcome. Read task.json, answer.json, executor.diff (if present), '
-                 'checker.json, rubric.json and only the supplied source/. Judge each rubric item against the cited '
+                 'checker.json, rubric.json and only the supplied source/ excerpts. Judge each rubric item against the cited '
                  'source and the diff. Return strict JSON only: {"accepted":boolean,"findings":[{"id":string,"passed":boolean,'
                  '"reason":string}],"materialIssues":[string]}. Use every rubric id exactly once. No memory, network, MCP, '
                  'other directories or workers. Do not modify files.')
@@ -508,8 +815,39 @@ def review_outcome(report, rubric_ids):
     return {'valid': valid, 'accepted': accepted}
 
 
-def run_checker(cell_dir, task, acc, repo):
-    """Hidden checker and dependency count for one cell, with no model."""
+def evidence_excerpts(ws, answer, dest):
+    """Bounded excerpts of cited lines (plus context) from the frozen workspace. A
+    path resolving outside the workspace, through any symlinked parent, is skipped."""
+    real = ws.resolve()
+    total, written = 0, []
+    ranges = {}
+    for item in (answer or {}).get('evidence', [])[:64]:
+        rel = item.get('path') if isinstance(item, dict) else None
+        if not isinstance(rel, str) or pathlib.PurePosixPath(rel).is_absolute() or 'node_modules' in pathlib.PurePosixPath(rel).parts:
+            continue
+        src = (ws / rel).resolve()
+        if not src.is_relative_to(real) or not src.is_file():
+            continue
+        try:
+            a, b = int(item.get('startLine') or 1), int(item.get('endLine') or item.get('startLine') or 1)
+        except (TypeError, ValueError):
+            continue
+        ranges.setdefault(str(src.relative_to(real)), []).append((max(1, a - EXCERPT_CONTEXT), max(a, b) + EXCERPT_CONTEXT))
+    for rel, spans in sorted(ranges.items()):
+        lines = (real / rel).read_text(encoding='utf8', errors='replace').splitlines()
+        keep = sorted({n for a, b in spans for n in range(a, min(b, len(lines)) + 1)})[:EXCERPT_LINES]
+        text = ''.join(f'{n}: {lines[n - 1]}\n' for n in keep)
+        if total + len(text) > EXCERPT_BYTES:
+            break
+        target = dest / 'source' / rel
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(text, encoding='utf8')
+        total += len(text); written.append(rel)
+    return written
+
+
+def run_checker(cell_dir, task, acc, repo, strict_scope=True):
+    """Hidden checker, scope and dependency count for one cell, with no model."""
     ws = cell_dir / 'workspace'
     receipt = json.loads((cell_dir / 'executor.json').read_text(encoding='utf8'))
     try:
@@ -534,33 +872,33 @@ def run_checker(cell_dir, task, acc, repo):
         shutil.rmtree(check_ws, ignore_errors=True)
     base_paths = set(git(repo, 'ls-tree', '-r', '--name-only', task['baseCommit']).stdout.splitlines())
     deps = dependency_count(task, acc, answer, receipt.get('changedFiles', []), base_paths)
-    return receipt, answer, checker, deps
+    scope = scope_check(acc, receipt.get('changedFiles', []), strict_scope)
+    return receipt, answer, checker, deps, scope
 
 
-def assess_cell(codex, cell_dir, task, acc, repo, auth, timeout):
-    receipt, answer, checker, deps = run_checker(cell_dir, task, acc, repo)
+def assess_cell(codex, plan_doc, cell_dir, task, acc, repo, auth, toolchain, timeout):
+    receipt, answer, checker, deps, scope = run_checker(cell_dir, task, acc, repo)
     ws = cell_dir / 'workspace'
-    review = cell_dir / 'review'
-    review.mkdir(mode=0o700)
+    root = make_root(active_root(plan_doc, cell_dir.name, 'review'), 'review')
+    review = root / 'review'
     write_json(review / 'task.json', {k: task[k] for k in ('id', 'repository', 'class', 'statement', 'answerFormat')})
     write_json(review / 'answer.json', answer if answer is not None else {'error': 'answer.json missing or invalid'})
     if (cell_dir / 'executor.diff').read_text(encoding='utf8'):
         shutil.copy2(cell_dir / 'executor.diff', review / 'executor.diff')
     write_json(review / 'checker.json', {k: checker.get(k) for k in ('ran', 'passed', 'exitCode', 'tail')})
     write_json(review / 'rubric.json', {k: acc.get(k) for k in ('rubric', 'requiredEvidence', 'scope', 'notes')})
-    for item in (answer or {}).get('evidence', [])[:64]:
-        rel = item.get('path') if isinstance(item, dict) else None
-        src = ws / rel if isinstance(rel, str) else None
-        if (not src or '..' in pathlib.PurePosixPath(rel).parts or pathlib.PurePosixPath(rel).is_absolute()
-                or not src.is_file() or src.is_symlink() or 'node_modules' in rel):
-            continue
-        dest = review / 'source' / rel
-        dest.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copyfile(src, dest)
+    excerpts = evidence_excerpts(ws, answer, review)
+    config_text = codex_config('reviewer', SETTINGS, root=root, toolchain=toolchain)
     home = cell_dir / 'reviewer-home'
     home.mkdir(mode=0o700)
     (home / 'auth.json').symlink_to(auth)
-    (home / 'config.toml').write_text(codex_config('reviewer', SETTINGS), encoding='utf8')
+    (home / 'config.toml').write_text(config_text, encoding='utf8')
+    canary = cell_dir / CANARY
+    canary.write_text('not for model sessions\n', encoding='utf8')
+    probe = isolation_probe(codex, cell_dir / 'review-probe-home', review, config_text, canary, root / 'tmp')
+    if probe['exitCode'] != 0:
+        shutil.rmtree(root, ignore_errors=True)
+        raise SystemExit(f'{cell_dir.name}: reviewer isolation not proven, no model started')
     argv = command(codex, 'reviewer', SETTINGS, review, cell_dir / 'review-final.json', REVIEW_PROMPT)
     clock = time.monotonic()
     try:
@@ -575,44 +913,82 @@ def assess_cell(codex, cell_dir, task, acc, repo, auth, timeout):
     except (OSError, ValueError):
         report = None
     verdict = review_outcome(report, [r['id'] for r in acc.get('rubric', [])])
-    reviewer_usage = {k: v for k, v in usage(out).items() if k != 'raw'}
-    accepted = bool(verdict['accepted'] and answer is not None and code == 0
+    session = session_calls(home)
+    reviewer_usage = {k: v for k, v in usage(out, 0 if code == 0 else 1, session).items() if k != 'raw'}
+    accepted = bool(verdict['accepted'] and answer is not None and code == 0 and scope['passed']
                     and (not checker['ran'] or checker['passed']))
     result = {'checker': {k: checker.get(k) for k in ('ran', 'passed', 'exitCode', 'seconds', 'relinkExit')}, 'dependencies': deps,
-              'reviewer': {'exitCode': code, 'seconds': seconds, 'usage': reviewer_usage, 'session': session_calls(home), **verdict},
+              'scope': scope, 'excerpts': excerpts,
+              'reviewer': {'exitCode': code, 'seconds': seconds, 'usage': reviewer_usage, 'session': session, 'isolation': probe['exitCode'] == 0,
+                           'outsideReferences': outside_references(out, root), 'deniedAccesses': denied_reads(out), **verdict},
               'accepted': accepted,
               'totalTokens': cell_total([receipt['usage'], reviewer_usage]),
+              'sensitivity': sensitivity([receipt['usage'], reviewer_usage]),
               'reviewerSeconds': seconds}
-    result['reviewer']['outsideReferences'] = outside_references(out, review)
+    shutil.move(str(review), str(cell_dir / 'review'))
+    shutil.rmtree(root, ignore_errors=True)
     write_json(cell_dir / 'assessment.json', result)
     return result
+
+
+def check_lock(plan_doc, args, codex):
+    """Every input execute uses must match the hashes plan recorded."""
+    lock = plan_doc.get('lock') or {}
+    now = {'codex': str(codex), 'codexSha256': sha256_file(codex), 'node': str(args.node), 'nodeSha256': sha_or_none(args.node),
+           'navigationCli': str(args.navigation_cli), 'toolchain': str(args.toolchain),
+           'toolchainManifestSha256': sha256_file(pathlib.Path(args.toolchain) / 'manifest.json'),
+           'harnessSha256': sha256_file(HERE / 'harness.py'), 'metricsSha256': sha256_file(HERE / 'metrics.mjs')}
+    cli = pathlib.Path(args.navigation_cli)
+    now['navigationCliSha256'] = sha_or_none(cli)
+    now['navigationPackageSha256'] = sha_or_none(cli.parent.parent / 'package.json')
+    bad = sorted(k for k, v in now.items() if lock.get(k) != v)
+    manifest = json.loads((pathlib.Path(args.toolchain) / 'manifest.json').read_text(encoding='utf8'))
+    if manifest.get('digest') != tree_digest(args.toolchain):
+        bad.append('toolchainTree')
+    if bad:
+        raise SystemExit(f'refusing to execute: {", ".join(bad)} differ from the plan')
+
+
+def checked_tasks(plan_doc, directory):
+    tasks = {t['id']: (path, t) for path, t in load_tasks(directory)}
+    want = (plan_doc.get('lock') or {}).get('taskSha256') or {}
+    bad = sorted(i for i, (path, _) in tasks.items() if want.get(i) != sha256_file(path)) + sorted(set(want) - set(tasks))
+    if bad:
+        raise SystemExit(f'refusing: task files differ from the plan: {bad}')
+    return {i: t for i, (_, t) in tasks.items()}
 
 
 def execute(args):
     for path in args.forbid:
         if pathlib.Path(path).exists():
-            raise SystemExit(f'refusing to execute: {path} exists on this machine (executors can read it)')
+            raise SystemExit(f'refusing to execute: {path} exists on this machine')
     codex = resolve_codex(args.codex)
     plan_doc = json.loads((args.plan / 'schedule.json').read_text(encoding='utf8'))
-    tasks = {t['id']: t for t in (json.loads(p.read_text(encoding='utf8')) for p in args.tasks.glob('*.json') if p.name != 'manifest.json')}
+    check_lock(plan_doc, args, codex)
+    tasks = checked_tasks(plan_doc, args.tasks)
     for cell in plan_doc['cells']:
         if args.only and cell['directory'] not in args.only:
             continue
         cell_dir = args.plan / cell['directory']
         if (cell_dir / 'executor.json').exists():
             continue
-        result = run_executor(codex, cell_dir, cell['arm'], tasks[cell['task']], args.templates / cell['task'],
-                              args.auth_file, args.node, args.navigation_cli, args.timeout)
+        verify_template(tasks[cell['task']], args.templates)
+        result = run_executor(codex, plan_doc, cell_dir, cell['arm'], tasks[cell['task']], args.templates / cell['task'],
+                              args.auth_file, args.node, args.navigation_cli, args.toolchain, args.timeout)
         write_json(cell_dir / 'executor.json', result)
         print(json.dumps({'cell': cell['directory'], 'exit': result['exitCode'], 'seconds': result['seconds'],
-                          'complete': result['usage']['complete'], 'outside': len(result['outsideReferences'])}))
+                          'complete': result['usage']['complete'], 'outside': len(result['outsideReferences']),
+                          'denied': result['deniedAccesses']}))
     return 0
 
 
 def assess(args):
     codex = resolve_codex(args.codex)
     plan_doc = json.loads((args.plan / 'schedule.json').read_text(encoding='utf8'))
-    tasks = {t['id']: t for t in (json.loads(p.read_text(encoding='utf8')) for p in args.tasks.glob('*.json') if p.name != 'manifest.json')}
+    tasks = checked_tasks(plan_doc, args.tasks)
+    missing = [c['directory'] for c in plan_doc['cells'] if not (args.plan / c['directory'] / 'executor.json').exists()]
+    if missing and not args.checker_only:
+        raise SystemExit(f'refusing to assess: executors not finished for {missing}')
     for cell in plan_doc['cells']:
         cell_dir = args.plan / cell['directory']
         done = cell_dir / ('checker-only.json' if args.checker_only else 'assessment.json')
@@ -621,27 +997,49 @@ def assess(args):
         task = tasks[cell['task']]
         acc = json.loads((args.acceptance / f"{task['id']}.json").read_text(encoding='utf8'))
         if args.checker_only:
-            # No reviewer: checker pass/fail and dependency counts only, never the checker output.
-            _, answer, checker, deps = run_checker(cell_dir, task, acc, args.repos / task['repository'])
+            # No reviewer: checker pass/fail, scope and dependency counts only, never the checker output.
+            _, answer, checker, deps, scope = run_checker(cell_dir, task, acc, args.repos / task['repository'], strict_scope=False)
             rec = {'cell': cell['directory'], 'answerPresent': answer is not None, 'checkerRan': checker['ran'],
-                   'checkerPassed': checker.get('passed'), 'relinkExit': checker.get('relinkExit'), 'dependencies': deps}
+                   'checkerPassed': checker.get('passed'), 'relinkExit': checker.get('relinkExit'), 'dependencies': deps,
+                   'scope': scope}
             write_json(cell_dir / 'checker-only.json', rec)
             print(json.dumps(rec))
             continue
-        result = assess_cell(codex, cell_dir, task, acc, args.repos / task['repository'], args.auth_file, args.timeout)
+        result = assess_cell(codex, plan_doc, cell_dir, task, acc, args.repos / task['repository'], args.auth_file,
+                             args.toolchain, args.timeout)
         print(json.dumps({'cell': cell['directory'], 'accepted': result['accepted'], 'totalTokens': result['totalTokens'],
                           'dependencies': result['dependencies']}))
+    return 0
+
+
+def analyse(args):
+    """Model-free gate calculation over a finished plan."""
+    plan_doc = json.loads((args.plan / 'schedule.json').read_text(encoding='utf8'))
+    tasks = checked_tasks(plan_doc, args.tasks)
+    rows = []
+    for cell in plan_doc['cells']:
+        d = args.plan / cell['directory']
+        if not (d / 'assessment.json').exists():
+            raise SystemExit(f'{cell["directory"]}: no assessment')
+        a = json.loads((d / 'assessment.json').read_text(encoding='utf8'))
+        rows.append({'task': cell['task'], 'class': tasks[cell['task']]['class'], 'arm': cell['arm'], 'accepted': a['accepted'],
+                     'dependencies': a['dependencies'], 'totalTokens': a['totalTokens'], 'reviewerSeconds': a['reviewerSeconds']})
+    comparators = [a for a in plan_doc['arms'] if a != 'context']
+    cost = cost_gate(rows, comparators, plan_doc['repetitions'])
+    quality = quality_guard(rows, comparators)
+    report = {'cost': cost, 'quality': quality, 'passed': cost['passed'] and quality['passed'],
+              'firstPassAccepted': 'not measured (protocol v2)'}
+    write_json(args.plan / 'analysis.json', report)
+    print(json.dumps({'passed': report['passed'], 'cost': cost['passed'], 'quality': quality['passed']}))
     return 0
 
 
 def prepare(args):
     archives = json.loads(args.archives.read_text(encoding='utf8'))
     args.templates.mkdir(parents=True, exist_ok=True)
-    for p in sorted(args.tasks.glob('*.json')):
-        if p.name == 'manifest.json':
-            continue
-        task = json.loads(p.read_text(encoding='utf8'))
+    for _, task in load_tasks(args.tasks):
         if (args.templates / task['id']).exists():
+            verify_template(task, args.templates)
             continue
         rec = prepare_template(task, args.archive_dir / f"{task['id']}.tar", archives[task['id']], args.templates)
         print(json.dumps({'task': task['id'], 'setupExit': rec['setup']['exitCode'], 'seconds': rec['setup']['seconds']}))
@@ -649,7 +1047,7 @@ def prepare(args):
 
 
 def main(argv=None):
-    p = argparse.ArgumentParser(description='OS2 runner. plan and prepare start no model; execute and assess do.')
+    p = argparse.ArgumentParser(description='OS2 runner. toolchain, plan, prepare and analyse start no model; execute and assess do.')
     sub = p.add_subparsers(dest='cmd', required=True)
     for name in ('execute', 'assess'):
         q = sub.add_parser(name)
@@ -657,6 +1055,7 @@ def main(argv=None):
         q.add_argument('--tasks', required=True, type=pathlib.Path)
         q.add_argument('--codex', required=True, type=pathlib.Path)
         q.add_argument('--auth-file', required=True, type=pathlib.Path)
+        q.add_argument('--toolchain', required=True, type=pathlib.Path)
         q.add_argument('--timeout', type=int, default=1800)
         q.add_argument('--only', nargs='*', default=None, help='cell directory names to run')
         if name == 'execute':
@@ -667,22 +1066,35 @@ def main(argv=None):
         else:
             q.add_argument('--acceptance', required=True, type=pathlib.Path)
             q.add_argument('--repos', required=True, type=pathlib.Path)
-            q.add_argument('--checker-only', action='store_true', help='run the hidden checker and dependency count only; no reviewer, no model')
+            q.add_argument('--checker-only', action='store_true', help='run the hidden checker, scope and dependency count only; no reviewer, no model')
     q = sub.add_parser('prepare')
     q.add_argument('--tasks', required=True, type=pathlib.Path)
     q.add_argument('--archives', required=True, type=pathlib.Path, help='JSON map task id -> archive sha256')
     q.add_argument('--archive-dir', required=True, type=pathlib.Path)
     q.add_argument('--templates', required=True, type=pathlib.Path)
+    q = sub.add_parser('toolchain')
+    q.add_argument('--node-prefix', required=True, type=pathlib.Path)
+    q.add_argument('--corepack-home', required=True, type=pathlib.Path)
+    q.add_argument('--pnpm-version', required=True)
+    q.add_argument('--rg', required=True, type=pathlib.Path)
+    q.add_argument('--out', required=True, type=pathlib.Path)
+    q = sub.add_parser('analyse')
+    q.add_argument('--plan', required=True, type=pathlib.Path)
+    q.add_argument('--tasks', required=True, type=pathlib.Path)
     q = sub.add_parser('plan')
     q.add_argument('--tasks', required=True, type=pathlib.Path, help='directory of public task JSON files')
     q.add_argument('--arms', default='plain,context')
     q.add_argument('--repetitions', type=int, default=3)
+    q.add_argument('--seed', type=int, default=SEED)
     q.add_argument('--codex', required=True, type=pathlib.Path)
     q.add_argument('--node', required=True, type=pathlib.Path)
     q.add_argument('--navigation-cli', required=True, type=pathlib.Path)
+    q.add_argument('--toolchain', required=True, type=pathlib.Path)
+    q.add_argument('--active-base', default=str(ACTIVE_BASE), type=pathlib.Path)
     q.add_argument('--out', required=True, type=pathlib.Path)
     args = p.parse_args(argv)
-    return {'plan': plan, 'prepare': prepare, 'execute': execute, 'assess': assess}[args.cmd](args)
+    return {'plan': plan, 'prepare': prepare, 'execute': execute, 'assess': assess, 'analyse': analyse,
+            'toolchain': build_toolchain}[args.cmd](args)
 
 
 if __name__ == '__main__':

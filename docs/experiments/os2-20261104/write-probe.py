@@ -98,14 +98,14 @@ def main():
     (ws / 'src' / 'a.ts').write_text(SOURCE, encoding='utf8')
     git(ws, 'init', '-q'); git(ws, 'add', '.'); git(ws, 'commit', '-qm', 'probe')
     home(a.out / 'executor-home', a.auth_file, h.codex_config('context', h.SETTINGS, ws, a.node, a.navigation_cli))
-    argv = h.command(codex, 'executor', h.SETTINGS, ws, a.out / 'executor-final.txt')
+    argv = h.command_v1(codex, 'executor', h.SETTINGS, ws, a.out / 'executor-final.txt')
     receipt['executorCommand'] = argv
     receipt['executor'] = run(argv, ws, a.out / 'executor-home', h.prompt('context', EXECUTOR_TASK), a.out / 'executor-events.jsonl')
 
     rv = a.out / 'review'
     rv.mkdir(mode=0o700)
     home(a.out / 'reviewer-home', a.auth_file, h.codex_config('reviewer', h.SETTINGS))
-    argv = h.command(codex, 'reviewer', h.SETTINGS, rv, a.out / 'reviewer-final.txt', REVIEWER_TASK)
+    argv = h.command_v1(codex, 'reviewer', h.SETTINGS, rv, a.out / 'reviewer-final.txt', REVIEWER_TASK)
     receipt['reviewerCommand'] = argv
     receipt['reviewer'] = run(argv, rv, a.out / 'reviewer-home', None, a.out / 'reviewer-events.jsonl')
 

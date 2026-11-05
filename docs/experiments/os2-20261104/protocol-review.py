@@ -129,7 +129,7 @@ def run(args):
     (home / 'config.toml').write_text(h.codex_config('reviewer', h.SETTINGS), encoding='utf8')
     text = PROMPT.format(repo=args.repo)
     (out / 'prompt.txt').write_text(text, encoding='utf8')
-    argv = h.command(codex, 'reviewer', h.SETTINGS, bundle, out / 'protocol-review.md', text)
+    argv = h.command_v1(codex, 'reviewer', h.SETTINGS, bundle, out / 'protocol-review.md', text)
     started, clock = h.utc(), time.monotonic()
     try:
         p = subprocess.run(argv, cwd=bundle, env={**os.environ, 'CODEX_HOME': str(home)}, capture_output=True, text=True,
