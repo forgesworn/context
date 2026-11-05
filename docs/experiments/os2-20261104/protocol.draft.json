@@ -103,7 +103,8 @@
       "h3-diagnosis": "55d7e37f2a1b8388cc6bc32753b20a306ab4427d861097fce7e9aa8c9d5161e7",
       "h3-impact": "d272041ed3db5c73507c67707e208d3d0a9c24952857a99f5f7ac0abec5a2440",
       "h3-orientation": "273a52bba9990ffae6da92327340b94a40cf20b50038c8d4e9c2e39efc5351be"
-    }
+    },
+    "knownLimit": "same model family as the executor and one review per outcome until the different-family reviewer and agreement sample are built (paid design step); results are limited to this eight-task pack"
   },
   "executor": {
     "client": "codex-cli",
@@ -494,9 +495,7 @@
   ],
   "openDecisions": [
     "Owner review of version 2",
-    "Allow loopback in the executor profile, or keep socket-backed tests out of reach",
-    "Task count: more independent tasks for a general claim, or a claim limited to this pack (eight tasks give about 25% power at a true 0.80)",
-    "Reviewer design: different model family or several blinded reviewers, with an agreement sample (paid)",
+    "Reviewer design detail (paid): model, agreement sample size and threshold",
     "Replacement tasks and a separate qualification task from an isolated custodian (paid); acceptance scope as {\"allowedPaths\": [glob, ...]}",
     "Quality-measure pilot on tasks outside phase 2 (paid)"
   ],
@@ -508,7 +507,12 @@
     "hiddenSets": "impact and code-change tasks taken from merged history (diff gives the dependency set, its tests give the checker); orientation, diagnosis and vetting by a fresh Claude session started without the global instructions that load the Context skill",
     "billing": "Codex reports \"Logged in using ChatGPT\": plan allowance, not metered; report tokens and headroom, no cash claim",
     "qualityMeasure": "missedOrIncorrectDependencies",
-    "protocolReviewResponse": "revise then run (2026-11-05)"
+    "protocolReviewResponse": "revise then run (2026-11-05)",
+    "decidedAt20261105": {
+      "loopback": "allow loopback only for executors (network proxy with no domains, allow_local_binding); reviewers keep no network",
+      "taskCount": "keep eight tasks; any result is limited to this pack",
+      "reviewer": "one reviewer from a different model family from the executor, plus a second blinded review on a sample to measure agreement"
+    }
   },
   "repetitionsCells": "8 tasks x 2 arms x 3 repetitions = 48 executor cells, each with a reviewer",
   "execution": {
@@ -517,7 +521,7 @@
     "liveCheck": "Passed 2026-11-05: one gpt-5.6-sol/low codex exec session under the executor profile; the canary read was denied (Operation not permitted, text never shown), workspace read and write succeeded, 43,886 tokens, 20.8 s. Codex 0.166 omits sandbox-denied commands from the --json stream; denials are counted from the session log.",
     "cellNames": "opaque cell-NNN; the reviewer no longer runs inside the cell directory",
     "host": "this Mac; one staged root under /Users/Shared at a time (execute refuses if another exists)",
-    "loopback": "h3 socket-backed tests fail under the Codex sandbox with or without the profile; open owner decision"
+    "loopback": "Executors: [permissions.os2.network] enabled = true, allow_local_binding = true, no domains, and features.network_proxy = true. codex sandbox check 2026-11-05 (no model): localhost round trip passed; outside HTTPS refused by the proxy (403); direct TCP to 1.1.1.1, the LAN gateway and the M4 failed; home unreadable. Without network_proxy the same section opened the internet. The pre-start probe exits 99 on any reachable outside host and 98 if an executor lacks loopback. Not yet checked: h3 socket tests and a codex exec session under this profile."
   },
   "protocolReviewBrief": [
     "Whether cached input should count fully toward the token gate: it is 95% of the phase 1 executor gap",

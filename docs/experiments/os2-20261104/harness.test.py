@@ -98,6 +98,18 @@ class ArmSetup(unittest.TestCase):
             with self.assertRaises(ValueError):
                 h.codex_config('plain', h.SETTINGS, root=bad, toolchain='/Users/Shared/t', home='/Users/someone')
 
+    def test_only_isolated_executors_get_loopback_through_the_network_proxy(self):
+        net = '[permissions.os2.network]\nenabled = true\nallow_local_binding = true\n'
+        for arm in ('plain', 'context'):
+            extra = ('/w/ws', '/bin/node', '/c/cli.mjs') if arm == 'context' else ()
+            cfg = h.codex_config(arm, h.SETTINGS, *extra, root='/Users/Shared/os2-x', toolchain='/Users/Shared/os2-toolchain-a', home='/Users/someone')
+            self.assertIn(net, cfg)
+            self.assertIn('network_proxy = true', cfg)
+            self.assertNotIn('domains', cfg)
+        rv = h.codex_config('reviewer', h.SETTINGS, root='/Users/Shared/r', toolchain='/Users/Shared/os2-toolchain-a', home='/Users/someone')
+        for cfg in (rv, h.codex_config('plain', h.SETTINGS)):
+            self.assertNotIn('network', cfg)
+
     def test_config_and_command_agree_on_model_and_effort(self):
         cfg = h.codex_config('plain', h.SETTINGS)
         argv = h.command('/opt/codex', 'executor', h.SETTINGS, '/w', '/w/final.txt')
@@ -357,7 +369,9 @@ if a[1] == 'sandbox':
     deny = re.findall(r'^"([^"]+)" = "deny"$', cfg, re.M)
     if os.environ.get('OS2_FAKE_NO_DENY') or not deny:
         sys.exit(subprocess.run(a[2:]).returncode)
-    profile = '(version 1)(allow default)' + ''.join(f'(deny file-read* (subpath "{p}"))' for p in deny)
+    net = '(deny network*)' + ('(allow network-bind (local ip "*:*"))(allow network-inbound (local ip "localhost:*"))'
+                               '(allow network-outbound (remote ip "localhost:*"))' if 'allow_local_binding = true' in cfg else '')
+    profile = '(version 1)(allow default)' + net + ''.join(f'(deny file-read* (subpath "{p}"))' for p in deny)
     sys.exit(subprocess.run(['sandbox-exec', '-p', profile] + a[2:]).returncode)
 cwd = pathlib.Path(a[a.index('-C') + 1]); out = pathlib.Path(a[a.index('-o') + 1])
 U = {"input_tokens": 100, "cached_input_tokens": 40, "output_tokens": 10, "reasoning_output_tokens": 2, "cache_write_input_tokens": 0}
@@ -492,6 +506,23 @@ class ExecutionPath(unittest.TestCase):
         self.assertEqual(env['isolation']['exitCode'], 97)
         self.assertFalse((cell / 'executor-events.jsonl').exists())
         self.assertEqual(list((self.d / 'shared').glob('os2-*-cell')), [])
+
+    def test_the_probe_needs_loopback_for_executors_and_no_outside_network(self):
+        ws = self.d / 'ws'; ws.mkdir()
+        canary = self.home / 'probe' / h.CANARY; canary.parent.mkdir(); canary.write_text('x\n')
+        root = pathlib.Path('/Users/Shared/os2-x'); tc = '/Users/Shared/os2-toolchain-a'
+        executor = h.codex_config('plain', h.SETTINGS, root=root, toolchain=tc, home=self.home)
+        reviewer = h.codex_config('reviewer', h.SETTINGS, root=root, toolchain=tc, home=self.home)
+        run = lambda cfg, name, **k: h.isolation_probe(self.codex, self.d / name, ws, cfg, canary, ws, **k)['exitCode']
+        self.assertEqual(run(executor, 'e', loopback=True), 0)
+        self.assertEqual(run(reviewer, 'r'), 0)
+        self.assertEqual(run(reviewer, 'r2', loopback=True), 98)
+        for k in ('OUTSIDE_PROBE',):
+            saved = getattr(h, k); setattr(h, k, 'true')
+            try:
+                self.assertEqual(run(executor, 'open', loopback=True), 99)
+            finally:
+                setattr(h, k, saved)
 
     def test_execute_then_assess_then_analyse_end_to_end(self):
         code, common = self.run_all(forbid=[str(self.d / 'not-here')])

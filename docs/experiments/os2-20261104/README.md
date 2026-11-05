@@ -64,14 +64,27 @@ Still open, and not decided by this version:
 - **Quality measure (paid pilot).** Symbol and call-site recall and precision,
   and rules for alternative valid implementations, need a pilot on tasks
   outside phase 2.
-- **Reviewer independence (paid).** A different model family or several
-  blinded reviewers, with an agreement sample.
+- **Reviewer independence (paid).** Owner decision 2026-11-05: one reviewer
+  from a different model family from the executor, plus a second blinded
+  review on a sample of outcomes to measure agreement. The model, sample size
+  and agreement threshold are set in the paid design step.
 - ~~Live isolation check~~ (run 2026-11-05, passed; see below).
-- **Loopback.** h3's socket-backed tests fail under the Codex sandbox with or
-  without the new profile (local ports are blocked). Whether to allow loopback
-  in the profile is an owner decision.
-- **Power.** Eight tasks give roughly 25% power for a true 0.80 ratio. More
-  independent tasks, or a claim limited to this pack, is an owner decision.
+- **Loopback.** Owner decision 2026-11-05: allow loopback only. Executor
+  profiles set `[permissions.os2.network] enabled = true, allow_local_binding =
+  true` with no domain list, and `features.network_proxy = true`, so Codex's
+  network proxy refuses every outside host. Checked with `codex sandbox` (no
+  model): a localhost socket round trip worked; `curl https://example.com` got
+  403 from the proxy; direct TCP to 1.1.1.1, the LAN gateway and the M4 failed;
+  the home directory stayed unreadable. Without `network_proxy`, the same
+  network section opened the internet, so the probe now checks both: before
+  any model starts it exits 99 if an outside host is reachable and, for
+  executors, 98 if loopback fails. Reviewers keep no network. Not yet checked:
+  h3's own socket tests under this profile, and a `codex exec` session using it
+  (requalification covers both).
+- **Power.** Eight tasks give roughly 25% power for a true 0.80 ratio. Owner
+  decision 2026-11-05: keep eight tasks and limit any result to this task pack.
+  A failed gate is not evidence that Context gives no saving, and a pass is
+  not a general claim.
 - **Excluded costs.** Indexing, CPU, storage and tool development are outside
   the measured model cost; executor wall time and local preparation are
   reported separately.
@@ -661,8 +674,9 @@ Phase 2 is of that order. Phase 1 is one pair. No prices were looked up.
 3. ~~Phase 1~~ (attempt 1 invalid on a runner defect; attempt 2 passed
    2026-11-05).
 4. ~~The protocol review~~ (run 2026-11-05: revise then run).
-5. Owner review of version 2, including the open decisions listed under
-   Version 2 changes (loopback, task count, reviewer design).
+5. Owner review of version 2. The three open decisions were taken
+   2026-11-05: loopback only, eight tasks with a pack-limited claim, and a
+   different-family reviewer with an agreement sample.
 6. ~~One short live isolation session~~ (`isolation-probe.py`, run and
    passed 2026-11-05).
 7. Replacement tasks from an isolated custodian, plus a separate
@@ -674,4 +688,5 @@ Phase 2 is of that order. Phase 1 is one pair. No prices were looked up.
 ## Not claimed
 
 This draft delivers no measurement, savings or quality result. It changes no
-package code and does not reopen or alter any earlier protocol or result.
+package code and does not reopen or alter any earlier protocol or result. Any
+phase 2 result applies to this eight-task pack only.

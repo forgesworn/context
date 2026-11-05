@@ -94,7 +94,7 @@ def main(argv=None):
         canary_text = 'canary text that must never reach the model'
         canary.write_text(canary_text + '\n', encoding='utf8')
         config = h.codex_config('plain', SETTINGS, root=root, toolchain=a.toolchain)
-        pre = h.isolation_probe(codex, a.out / 'probe-home', ws, config, canary, root / 'tmp')
+        pre = h.isolation_probe(codex, a.out / 'probe-home', ws, config, canary, root / 'tmp', loopback=True)
         if pre['exitCode'] != 0:
             raise SystemExit('profile not in effect under codex sandbox; no model started')
         home = a.out / 'executor-home'

@@ -100,10 +100,13 @@ def isolation(role, root, toolchain, home=None):
     env = {'PATH': f'{toolchain}/bin:/Library/Developer/CommandLineTools/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin',
            'HOME': str(root / 'home'), 'TMPDIR': str(root / 'tmp'), 'COREPACK_HOME': str(toolchain / 'corepack'),
            'COREPACK_ENABLE_DOWNLOAD_PROMPT': '0', 'LANG': 'en_GB.UTF-8'}
+    # Executors get loopback only (h3's socket tests): Codex's network proxy with an
+    # empty domain list refuses every outside host, and local binding opens localhost.
+    network = '[permissions.os2.network]\nenabled = true\nallow_local_binding = true\n' if role == 'executor' else ''
     return ('default_permissions = "os2"\n'
             '[permissions.os2]\nextends = ' + toml_string(PROFILES[role]) + '\n'
             '[permissions.os2.filesystem]\n' + ''.join(f'{toml_string(p)} = {toml_string(m)}\n' for p, m in rules) +
-            '[shell_environment_policy]\ninherit = "none"\nset = { ' +
+            network + '[shell_environment_policy]\ninherit = "none"\nset = { ' +
             ', '.join(f'{k} = {toml_string(v)}' for k, v in env.items()) + ' }\n')
 
 
@@ -118,6 +121,8 @@ def codex_config(arm, settings, workspace=None, node=None, navigation_cli=None, 
     if root is not None:
         text += isolation('reviewer' if arm == 'reviewer' else 'executor', root, toolchain, home)
     text += '[features]\napps = false\nmemories = false\nmulti_agent = false\n'
+    if root is not None and arm != 'reviewer':
+        text += 'network_proxy = true\n'
     if arm == 'context':
         for name, path in (('workspace', workspace), ('node', node), ('navigation_cli', navigation_cli)):
             if path is None or not pathlib.Path(path).is_absolute():
@@ -466,6 +471,12 @@ OFFLINE = ('(version 1)(allow default)(deny network-outbound)(allow network-outb
 SYSTEM_PREFIXES = ('/bin/', '/usr/', '/opt/homebrew/', '/Library/Developer/CommandLineTools/', '/dev/null', '/dev/stdin',
                    '/dev/stdout', '/dev/stderr')
 CANARY = 'isolation-canary.txt'
+# Run inside the session's sandbox before any model starts: no outside host may be
+# reachable (by IP or through the proxy), and an executor must reach localhost.
+OUTSIDE_PROBE = '/usr/bin/nc -z -G 3 1.1.1.1 443 || /usr/bin/curl -sS -m 5 -o /dev/null https://example.com'
+LOOPBACK_PROBE = ("/usr/bin/python3 -c 'import socket; s = socket.socket(); s.bind((\"127.0.0.1\", 0)); s.listen(); "
+                  "c = socket.create_connection(s.getsockname(), 3); a, _ = s.accept(); c.sendall(b\"ok\"); "
+                  "assert a.recv(2) == b\"ok\"'")
 EXCERPT_CONTEXT, EXCERPT_LINES, EXCERPT_BYTES = 20, 400, 262_144
 
 
@@ -667,10 +678,13 @@ def sandbox_probe(codex, home, cwd, command_text, config_text, timeout=300):
     return {'exitCode': code, 'seconds': round(time.monotonic() - started, 1), 'tail': out[-2000:]}
 
 
-def isolation_probe(codex, home, cwd, config_text, canary, writable):
+def isolation_probe(codex, home, cwd, config_text, canary, writable, loopback=False):
     """Exit 0 only if the canary (in the cell directory, inside the home) is
-    unreadable and the session root is writable."""
+    unreadable, no outside host is reachable (99), loopback works when required
+    (98), and the session root is writable."""
     probe = (f'if cat {json.dumps(str(canary))} >/dev/null 2>&1; then echo canary-readable; exit 97; fi; '
+             f'if {{ {OUTSIDE_PROBE}; }} >/dev/null 2>&1; then echo network-open; exit 99; fi; ' +
+             (f'{LOOPBACK_PROBE} >/dev/null 2>&1 || {{ echo loopback-blocked; exit 98; }}; ' if loopback else '') +
              f'echo ok > {json.dumps(str(writable / ".os2-probe"))} && rm {json.dumps(str(writable / ".os2-probe"))}')
     return sandbox_probe(codex, home, cwd, probe, config_text)
 
@@ -697,7 +711,7 @@ def ready_environment(codex, cell_dir, root, ws, repository, config_text):
     if RELINK.get(repository):
         env['relink'] = shell(RELINK[repository], ws, offline=True)
     if env['relink'] is None or env['relink']['exitCode'] == 0:
-        env['isolation'] = isolation_probe(codex, cell_dir / 'probe-home', ws, config_text, canary, root / 'tmp')
+        env['isolation'] = isolation_probe(codex, cell_dir / 'probe-home', ws, config_text, canary, root / 'tmp', loopback=True)
     if READY.get(repository) and env['isolation'] and env['isolation']['exitCode'] == 0:
         env['ready'] = sandbox_probe(codex, cell_dir / 'probe-home', ws, READY[repository], config_text)
     write_json(cell_dir / 'environment.json', env)

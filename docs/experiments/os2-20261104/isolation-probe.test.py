@@ -21,7 +21,10 @@ home = pathlib.Path(os.environ['CODEX_HOME'])
 deny = re.findall(r'^"([^"]+)" = "deny"$', (home / 'config.toml').read_text(), re.M)
 if os.environ.get('FAKE_NO_DENY'):
     deny = []
-profile = '(version 1)(allow default)' + ''.join(f'(deny file-read* (subpath "{p}"))' for p in deny)
+cfg = (home / 'config.toml').read_text()
+net = '(deny network*)' + ('(allow network-bind (local ip "*:*"))(allow network-inbound (local ip "localhost:*"))'
+                           '(allow network-outbound (remote ip "localhost:*"))' if 'allow_local_binding = true' in cfg else '')
+profile = '(version 1)(allow default)' + net + ''.join(f'(deny file-read* (subpath "{p}"))' for p in deny)
 run = lambda cmd, cwd=None: subprocess.run(['sandbox-exec', '-p', profile, '/bin/zsh', '-c', cmd], cwd=cwd, capture_output=True, text=True)
 if a[1] == 'sandbox':
     r = run(a[-1]); sys.stdout.write(r.stdout + r.stderr); sys.exit(r.returncode)
