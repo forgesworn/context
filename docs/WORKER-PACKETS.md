@@ -71,9 +71,10 @@ The configured root must be a Git repository with a committed HEAD. Internal
 The response contains the packet, navigation generation/revision/policy and,
 for planning, coverage metadata. The complete response must fit `maxBytes`
 (default/maximum 65,536 bytes), including metadata. Oversized selections fail
-without truncation. The tool rejects unavailable, stale or unknown navigation
-and a mismatched generation, and checks freshness again before returning. Refresh
-and rebuild after relevant changes. This is bounded freshness checking, not an
+without truncation. `expectedGeneration` is optional from 0.28.0: omitted, a
+stale or unknown index is refreshed first and the packet reports `refreshed`;
+given, unavailable, stale or unknown navigation and a mismatched generation are
+rejected. Freshness is checked again before returning. This is bounded freshness checking, not an
 atomic snapshot against hostile concurrent filesystem changes.
 Only one packet request runs at a time; concurrent requests wait in order (up to
 eight), and a further one fails immediately.

@@ -141,7 +141,7 @@ describe('repository packet MCP adapter', () => {
       expect(packetTool?.inputSchema.type).toBe('object')
       expect(packetTool?.inputSchema.additionalProperties).toBe(false)
       expect(Object.keys(packetTool?.inputSchema.properties ?? {}).sort()).toEqual(['expectedGeneration', 'expectedRoot', 'format', 'maxBytes', 'mode', 'spec'])
-      expect(packetTool?.inputSchema.required).toEqual(['mode', 'spec', 'expectedGeneration'])
+      expect(packetTool?.inputSchema.required).toEqual(['mode', 'spec'])
       const early = await call(connection.client, { mode: 'build', spec: spec([{ path: 'alpha.ts', startLine: 1, endLine: 3 }]), expectedGeneration: 'missing' })
       expect(early.isError).toBe(true)
       const refreshed = await connection.client.callTool({ name: 'repository_refresh', arguments: {} }) as { content: unknown }
@@ -174,6 +174,53 @@ describe('repository packet MCP adapter', () => {
       generation = (JSON.parse(text(recovery)) as { generation: string }).generation
       const excluded = await call(connection.client, { mode: 'build', spec: spec([{ path: 'alpha.ts', startLine: 1, endLine: 3 }]), expectedGeneration: generation })
       expect(excluded.isError).toBe(true)
+    } finally { await connection.close() }
+  })
+
+  it('refreshes a stale index for a packet without a generation and keeps a pinned one strict', async () => {
+    const value = await root(); const connection = await connect(value)
+    try {
+      const first = await call(connection.client, { mode: 'build', spec: spec([{ path: 'alpha.ts', startLine: 2, endLine: 2 }]) })
+      expect(first.isError).not.toBe(true)
+      const firstNavigation = (JSON.parse(text(first)) as { navigation: { generation: string; refreshed?: true } }).navigation
+      expect(firstNavigation.refreshed).toBe(true)
+      const again = await call(connection.client, { mode: 'build', spec: spec([{ path: 'alpha.ts', startLine: 2, endLine: 2 }]) })
+      expect((JSON.parse(text(again)) as { navigation: { generation: string; refreshed?: true } }).navigation).toMatchObject({ generation: firstNavigation.generation })
+      expect((JSON.parse(text(again)) as { navigation: { refreshed?: true } }).navigation.refreshed).toBeUndefined()
+
+      await writeFile(join(value, 'alpha.ts'), 'export function alpha() {\n  return 2\n}\n')
+      const pinned = await call(connection.client, { mode: 'build', spec: spec([{ path: 'alpha.ts', startLine: 2, endLine: 2 }]), expectedGeneration: firstNavigation.generation })
+      expect(pinned.isError).toBe(true)
+      expect(text(pinned)).toMatch(/call repository_refresh or omit expectedGeneration/)
+      const current = await call(connection.client, { mode: 'build', spec: spec([{ path: 'alpha.ts', startLine: 2, endLine: 2 }]) })
+      expect(current.isError).not.toBe(true)
+      const parsed = JSON.parse(text(current)) as { navigation: { generation: string; refreshed?: true }; packet: { sources: Array<{ lines: Array<{ content: string }> }> } }
+      expect(parsed.navigation.refreshed).toBe(true)
+      expect(parsed.navigation.generation).not.toBe(firstNavigation.generation)
+      expect(parsed.packet.sources[0].lines).toEqual([{ line: 2, content: '  return 2' }])
+      const rendered = await connection.client.callTool({ name: 'repository_packet', arguments: { mode: 'build', spec: spec([{ path: 'alpha.ts', startLine: 2, endLine: 2 }]) } }) as { content?: unknown }
+      expect(text(rendered).split('\n')[0]).not.toContain('(refreshed)')
+    } finally { await connection.close() }
+  })
+
+  it('runs a batch issued after an edit on one refreshed generation', async () => {
+    const value = await root(); const connection = await connect(value)
+    try {
+      const refreshed = await connection.client.callTool({ name: 'repository_refresh', arguments: {} }) as { content: unknown }
+      const before = (JSON.parse(text(refreshed)) as { generation: string }).generation
+      await writeFile(join(value, 'alpha.ts'), 'export function alpha() {\n  return 3\n}\n')
+      const [search, explore, packet, coverage] = await Promise.all([
+        connection.client.callTool({ name: 'repository_search', arguments: { term: 'alpha', format: 'json' } }),
+        connection.client.callTool({ name: 'repository_explore', arguments: { symbol: 'alpha', format: 'json' } }),
+        call(connection.client, { mode: 'build', spec: spec([{ path: 'alpha.ts', startLine: 2, endLine: 2 }]) }),
+        connection.client.callTool({ name: 'repository_coverage', arguments: { symbols: ['alpha'], answer: 'alpha.ts', format: 'json' } }),
+      ]) as Array<{ isError?: boolean; content?: unknown }>
+      for (const result of [search, explore, packet, coverage]) expect(result.isError, text(result)).not.toBe(true)
+      const exploreGeneration = (JSON.parse(text(explore)) as { generation: string }).generation
+      expect(exploreGeneration).not.toBe(before)
+      expect((JSON.parse(text(packet)) as { navigation: { generation: string } }).navigation.generation).toBe(exploreGeneration)
+      expect((JSON.parse(text(coverage)) as { generation: string }).generation).toBe(exploreGeneration)
+      expect((JSON.parse(text(packet)) as { packet: { sources: Array<{ lines: Array<{ content: string }> }> } }).packet.sources[0].lines[0].content).toBe('  return 3')
     } finally { await connection.close() }
   })
 
