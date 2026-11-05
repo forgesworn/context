@@ -86,7 +86,6 @@ export interface NavigationResultRecord {
   path: string;
   line: number;
   text: string;
-  sha256: string;
 }
 
 export type NavigationStopReason =
@@ -104,6 +103,9 @@ export interface NavigationResult {
   term: string;
   pathPrefix?: string;
   results: NavigationResultRecord[];
+  /** SHA-256 of each file with a result row, once per file rather than per row:
+   * repeated on every row it was about half of a JSON result's tokens. */
+  fileDigests: Record<string, string>;
   bytesUsed: number;
   maxBytes: number;
   visited: number;
@@ -705,6 +707,9 @@ export class RepositoryNavigation {
     const nextCursorToken = randomUUID().replace(/-/g, '');
     const postings = literal ? literalPostings(gen, literal) : gen.byToken.get(token) ?? [];
     const results: NavigationResultRecord[] = [];
+    // Kept in step with `results` (rows per path), so a trial fit costs no rescan.
+    const fileDigests: Record<string, string> = {};
+    const rowsPerPath = new Map<string, number>();
     const policyScope = policyScopeOf(gen.policySummary);
 
     const buildResult = (
@@ -722,6 +727,7 @@ export class RepositoryNavigation {
       term: token,
       ...(pathPrefix !== undefined ? { pathPrefix } : {}),
       results,
+      fileDigests: { ...fileDigests },
       bytesUsed: 0,
       maxBytes,
       visited: visitedVal,
@@ -783,8 +789,9 @@ export class RepositoryNavigation {
         path: loc.path,
         line: loc.line,
         text: loc.text,
-        sha256: loc.sha256,
       });
+      fileDigests[loc.path] = loc.sha256;
+      rowsPerPath.set(loc.path, (rowsPerPath.get(loc.path) ?? 0) + 1);
 
       // Measure the candidate: complete-sized only if accepting it exhausts
       // the actual postings; otherwise reserve the cursor token and size
@@ -796,7 +803,10 @@ export class RepositoryNavigation {
       settle(trial);
 
       if (trial.bytesUsed > maxBytes) {
-        results.pop();
+        const dropped = results.pop()!;
+        const left = (rowsPerPath.get(dropped.path) ?? 1) - 1;
+        if (left === 0) { rowsPerPath.delete(dropped.path); delete fileDigests[dropped.path]; }
+        else rowsPerPath.set(dropped.path, left);
         // visited already counted the inspected posting; idx stays
         // unconsumed so a continuation retries this posting.
         if (results.length === 0) {

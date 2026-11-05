@@ -102,11 +102,13 @@ closure. The call requires current navigation and re-verifies the hash of every
 file it parses; a changed file or policy is rejected until refresh.
 
 Optional `pathPrefix` limits the result to one repository-relative prefix.
-`maxBytes` (32,768 by default, at most 131,072) bounds the response: references
+`maxBytes` (12,288 by default, at most 131,072) bounds the response: references
 are trimmed first, then tests, then extra declarations, then declaration lines,
 and the response says what was omitted. Long classes and namespaces are shown
-as an outline of member lines; long functions are cut at 200 lines with the
-range to request from `repository_packet`. `expectedGeneration` is optional and
+as an outline of member lines; other declarations are previewed to 40 lines with
+the range to request from `repository_packet`. The default was 32,768 bytes and
+200 lines until 0.27.0: in recorded Codex sessions an explore reply filled its
+budget with references, and every later model call re-read it. `expectedGeneration` is optional and
 rejects a mismatch. `format: "json"` returns the same result as one JSON
 object.
 
@@ -153,7 +155,9 @@ the term, counts, completeness, generation and freshness, then each file once
 with the first sixteen hex digits of its digest, then `line: text` rows, and a
 final `next:` line when a cursor exists. The text is always smaller than the
 JSON it is rendered from, so the byte budget still holds. `format: "json"`
-returns the full `NavigationResult` with the 64-hex digest on every record.
+returns the full `NavigationResult`: records carry `path`, `line` and `text`,
+and `fileDigests` maps each file on the page to its 64-hex digest once. Before
+0.27.0 every record repeated the digest, about half of a JSON page's tokens.
 Optional `pathPrefix` limits a search to one repository-relative prefix; a
 continuation cursor is bound to the same term and prefix and is rejected with
 either changed. Postings outside the prefix are skipped without counting as

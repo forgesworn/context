@@ -7,7 +7,7 @@ import { promisify } from 'node:util'
 import { diagnoseRepository } from './repository-doctor.js'
 
 const fake = vi.hoisted(() => ({
-  root: '', head: '', failure: '', calls: [] as string[],
+  root: '', head: '', failure: '', legacyRows: false, calls: [] as string[],
   transportOptions: {} as Record<string, unknown>, clientClosed: 0, transportClosed: 0,
 }))
 vi.mock('@modelcontextprotocol/sdk/client/stdio.js', () => ({
@@ -42,7 +42,8 @@ vi.mock('@modelcontextprotocol/sdk/client/index.js', () => ({
           : name === 'repository_coverage'
           ? { generation: 'generation', files: [{ path: hit.path, status: fake.failure === 'coverage' ? 'missing' : 'cited' }] }
           : name === 'repository_search'
-          ? { generation: fake.failure === 'generation' ? 'other' : 'generation', freshness: 'current', policy, results: [hit] }
+          ? { generation: fake.failure === 'generation' ? 'other' : 'generation', freshness: 'current', policy,
+              ...(fake.legacyRows ? { results: [hit] } : { results: [{ path: hit.path, line: hit.line, text: hit.text }], fileDigests: { [hit.path]: hit.sha256 } }) }
           : { root: fake.failure === 'root' ? '/wrong/root' : fake.root, generation: 'generation',
             revision: 'revision', freshness: 'current', policy, counts: { files: 1 }, exclusions: { symlinks: 0 } }
       return { content: [{ type: 'text', text: JSON.stringify(value) }] }
@@ -62,7 +63,7 @@ beforeAll(async () => {
 })
 afterAll(async () => { await rm(fake.root, { recursive: true, force: true }) })
 beforeEach(() => {
-  fake.failure = ''; fake.calls = []; fake.clientClosed = 0; fake.transportClosed = 0
+  fake.failure = ''; fake.legacyRows = false; fake.calls = []; fake.clientClosed = 0; fake.transportClosed = 0
 })
 
 describe('doctor rejects incomplete or inconsistent server evidence', () => {
@@ -73,6 +74,11 @@ describe('doctor rejects incomplete or inconsistent server evidence', () => {
     expect(fake.transportOptions.env).toBeUndefined()
     expect(fake.clientClosed).toBe(1)
     expect(fake.transportClosed).toBe(1)
+  })
+  it('reads the hit digest from fileDigests and still accepts servers that put it on each row', async () => {
+    await expect(diagnoseRepository(fake.root, 'fixtureToken')).resolves.toBeTruthy()
+    fake.legacyRows = true
+    await expect(diagnoseRepository(fake.root, 'fixtureToken')).resolves.toBeTruthy()
   })
   it.each([
     ['missing', /required tool/, []],

@@ -117,7 +117,9 @@ export function renderPolicyScope(scope: PolicyScope): string {
 export const EXPLORE_SYMBOL = /^[A-Za-z_$][A-Za-z0-9_$]{0,127}(\.[A-Za-z_$#][A-Za-z0-9_$]{0,127})?$/
 export const EXPLORE_MAX_HITS = 2000
 export const EXPLORE_MAX_PARSED_FILES = 64
-const MAX_DEFINITION_LINES = 200
+// A preview, not the block: the full range is one repository_packet away, and
+// a whole body here was re-read by every later model call.
+const MAX_DEFINITION_LINES = 40
 const OUTLINE_THRESHOLD = 60
 const MAX_DEFINITIONS = 6
 const MAX_TITLE = 80

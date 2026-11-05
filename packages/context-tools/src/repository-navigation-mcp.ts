@@ -18,12 +18,17 @@ import { PacketReferences } from './repository-packet-references.js'
 // One identifier, or a printable ASCII literal containing one (hyphens, dots, spaces).
 const SEARCH_TERM = /^(?=.*[A-Za-z_])[\x20-\x7e]{1,128}$/
 const DEFAULT_PACKET_MAX_BYTES = 65_536
-const DEFAULT_EXPLORE_MAX_BYTES = 32_768
+// Explore replies fill their budget with references, and every later model call
+// re-reads them; 12 KiB holds definitions, tests and a first page of references.
+const DEFAULT_EXPLORE_MAX_BYTES = 12_288
 const MAX_EXPLORE_MAX_BYTES = 131_072
 // Packet builds run one at a time; later calls wait their turn rather than fail.
 const MAX_QUEUED_PACKETS = 8
 
 const formatSchema = z.enum(['text', 'json']).optional()
+// Search JSON cost two to four times the tokens of text in recorded sessions, and
+// every later model call re-reads it; the hint sits where a scripting model chooses.
+const readingFormatSchema = formatSchema.describe('text is compact')
 const pathPrefixSchema = z.string().min(1).max(512).optional()
 
 // Handoff metadata is optional here: an interactive read needs only sources, and
@@ -105,7 +110,7 @@ const searchInputSchema = z.object({
   maxResults: z.number().int().min(1).max(100).optional(),
   maxVisited: z.number().int().min(1).max(10000).optional(),
   cursor: z.string().min(1).max(64).optional(),
-  format: formatSchema,
+  format: readingFormatSchema,
 }).strict()
 
 export interface RepositoryNavigationServer {
@@ -311,7 +316,7 @@ export function createRepositoryNavigationServer(root: string, options: Reposito
     'repository_search',
     {
       description:
-        'Exact literal lines by file, case-insensitive with whole-token ends. For symbols use explore. Paginate with cursor and identical arguments.',
+        'Exact literal lines by file, case-insensitive with whole-token ends. Symbols: use explore. Next page: cursor, same arguments.',
       inputSchema: searchInputSchema,
       annotations: { readOnlyHint: true, openWorldHint: false },
     },
@@ -464,7 +469,7 @@ export function renderSearch(result: NavigationResult): string {
   for (const row of result.results) {
     let file = files.get(row.path)
     if (!file) {
-      file = { sha256: row.sha256, rows: [] }
+      file = { sha256: result.fileDigests[row.path] ?? '', rows: [] }
       files.set(row.path, file)
     }
     file.rows.push(row)

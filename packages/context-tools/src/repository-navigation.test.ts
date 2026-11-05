@@ -850,7 +850,22 @@ describe('RepositoryNavigation', () => {
     const res = await nav.search({ term: 'shared' });
     expect(res.results.length).toBe(1);
     const expected = createHash('sha256').update(buf).digest('hex');
-    expect(res.results[0].sha256).toBe(expected);
+    expect(res.fileDigests).toEqual({ 'a.ts': expected });
+    expect(res.results[0]).not.toHaveProperty('sha256');
+  });
+
+  it('gives each file digest once, only for files with rows on the page', async () => {
+    const root = await mkFixture();
+    await writeFile(root, 'a.ts', 'shared one\nshared two\n');
+    await writeFile(root, 'b.ts', 'shared three\n');
+    const nav = new RepositoryNavigation(root);
+    await nav.refresh();
+    const page = await nav.search({ term: 'shared', maxResults: 2 });
+    expect(page.results.map((row) => row.path)).toEqual(['a.ts', 'a.ts']);
+    expect(Object.keys(page.fileDigests)).toEqual(['a.ts']);
+    const all = await nav.search({ term: 'shared' });
+    expect(Object.keys(all.fileDigests).sort()).toEqual(['a.ts', 'b.ts']);
+    expect(all.bytesUsed).toBe(Buffer.byteLength(JSON.stringify(all), 'utf8'));
   });
 
   it('skips and counts files that are not valid UTF-8 and keeps freshness exact', async () => {
