@@ -140,8 +140,8 @@ describe('explore analysis', () => {
     expect(analysis.definitions[0]).toMatchObject({ kind: 'class', outline: true, startLine: 1, endLine: 72 })
     expect(analysis.definitions[0].lines.map((l) => l.line)).toEqual([1, ...members.map((_, i) => i + 2), 72])
     const fn = analyseExplore(parseExploreSymbol('long'), [{ path: 'big.ts', sha256: 'e'.repeat(64), text, hits: [{ line: 74, text: 'export function long(): number {' }] }])
-    expect(fn.definitions[0].lines).toHaveLength(200)
-    expect(fn.definitions[0].omittedLines).toBe(63)
+    expect(fn.definitions[0].lines).toHaveLength(40)
+    expect(fn.definitions[0].omittedLines).toBe(223)
   })
 })
 

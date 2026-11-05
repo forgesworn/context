@@ -63,6 +63,7 @@ interface SearchPayload {
   freshness: string;
   policy?: { freshness?: string } | undefined;
   results: SearchHit[];
+  fileDigests?: Record<string, unknown>;
 }
 
 interface DoctorReport {
@@ -427,6 +428,9 @@ export async function diagnoseRepository(
       results: Array.isArray(searchRaw.results)
         ? (searchRaw.results as SearchHit[])
         : [],
+      fileDigests: searchRaw.fileDigests && typeof searchRaw.fileDigests === 'object'
+        ? (searchRaw.fileDigests as Record<string, unknown>)
+        : undefined,
     };
     if (search.freshness !== 'current') {
       throw new DoctorError('repository_search did not report current freshness');
@@ -446,11 +450,16 @@ export async function diagnoseRepository(
       );
     }
     const hitRaw = requireObject(search.results[0], 'search.results[0]');
+    const hitPath = requireString(hitRaw.path, 'search.results[0].path');
+    // 0.27.0 and later give each file's digest once in fileDigests; earlier
+    // servers repeated it on every row.
     const hit: SearchHit = {
-      path: requireString(hitRaw.path, 'search.results[0].path'),
+      path: hitPath,
       line: requireNumber(hitRaw.line, 'search.results[0].line'),
       text: requireString(hitRaw.text, 'search.results[0].text'),
-      sha256: requireHex(hitRaw.sha256, 'search.results[0].sha256', [64]),
+      sha256: search.fileDigests
+        ? requireHex(search.fileDigests[hitPath], `search.fileDigests[${hitPath}]`, [64])
+        : requireHex(hitRaw.sha256, 'search.results[0].sha256', [64]),
     };
 
     const spec = {

@@ -63,9 +63,9 @@ describe('repository packet MCP adapter', () => {
     try {
       let generation = await refresh()
       const digest = createHash('sha256').update(content).digest('hex')
-      expect((await search('EvidenceMarker')).results).toEqual([
-        { path: file, line: 2, text: 'class EvidenceMarker {}', sha256: digest },
-      ])
+      const found = await search('EvidenceMarker')
+      expect(found.results).toEqual([{ path: file, line: 2, text: 'class EvidenceMarker {}' }])
+      expect(found.fileDigests).toEqual({ [file]: digest })
       const built = await build(generation)
       expect(built.isError).not.toBe(true)
       const packet = JSON.parse(text(built)).packet
