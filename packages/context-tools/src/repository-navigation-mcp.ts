@@ -374,7 +374,7 @@ export function createRepositoryNavigationServer(root: string, options: Reposito
         // Pages are bound to one generation, so search never refreshes a stale index
         // itself; it reports freshness and waits for any refresh another call has
         // started. A passed generation is checked like explore's: agents pass the
-        // one they hold, and rejecting the key cost two calls per recorded session.
+        // one they hold, and rejecting the key cost two calls in a recorded session.
         await buildOnFirstUse(extra.signal)
         leave = await enterRead()
         if (expectedGeneration !== undefined && (await navigation.status(extra.signal)).generation !== expectedGeneration) {
