@@ -445,6 +445,40 @@ A fresh Sol/high session reviews the frozen protocol, harness diff and phase 1
 receipts before phase 2 is locked. That review is itself a model session and
 is counted as setup.
 
+#### Review run (2026-11-05): revise then run
+
+One Sol/high session in a read-only sandbox (602 s, 1,543,816 tokens, of which
+1,400,576 cached) reviewed the protocol folder, both phase 1 attempts' executor
+receipts, the earlier results and the Context source. Hidden material, the
+author transcript and the attempt folders were on the M4 throughout. The full
+report is [protocol-review.md](protocol-review.md); `protocol-review.py`
+builds its bundle from an allowlist and refuses to run while hidden material
+is present.
+
+Verdict: not ready to lock; revise, then run only as a falsification attempt.
+Main points:
+
+- **Token gap.** Both arms made 23 observable model calls, and Context
+  returned fewer raw tool bytes than plain, yet carried about 12,300 more input
+  tokens per call. The cost is context carried on every call (the seven-tool
+  surface and early navigation results), not payload size. No cached-token
+  weight from 0 to 1 turns phase 1 into a saving (ratios 1.03 to 1.31).
+- **Power.** With eight tasks, the reviewer puts power to detect a true 20%
+  saving at about 25%, the plausible phase 2 ratio at 0.8 to 1.8 (most likely
+  1.1 to 1.4) and the chance of passing the token gate as written in single
+  digits to low teens.
+- **Blocking defects.** Executors and reviewers can read sibling cells,
+  `/tmp` and, during assessment, hidden material; the reviewer's parent folder
+  names the arm; the quality and scope gates, bootstrap and complete-cost
+  analysis are not implemented as declared; A1 to A4 do not fail closed; the
+  primary metric does not measure plan headroom; four tasks (bray-impact,
+  bray-diagnosis, h3-diagnosis and the twice-used h3-code-change) should be
+  replaced through an isolated custodian.
+
+One finding is mistaken: pnpm 12.3.4 is the pin at h3 `f0e17808` (offline
+check) and 11.9.0 the pin at h3-code-change's base `3eb3a57`, so they do not
+conflict.
+
 ### Phase 2: full comparison (paid, needs separate approval)
 
 Eight tasks, three repetitions, two arms (48 executor and 48 reviewer sessions), run as locked.
@@ -531,7 +565,8 @@ Phase 2 is of that order. Phase 1 is one pair. No prices were looked up.
    authored).
 3. ~~Phase 1~~ (attempt 1 invalid on a runner defect; attempt 2 passed
    2026-11-05).
-4. The protocol review and phase 2, only if phase 1 passes.
+4. ~~The protocol review~~ (run 2026-11-05: revise then run). Phase 2 needs a
+   revised protocol and separate approval.
 
 ## Not claimed
 

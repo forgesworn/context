@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "status": "draft-unlocked",
+  "status": "draft-unlocked-review-says-revise",
   "experimentId": "os2-codex-sol-high-context-0.26.0",
   "draftedAt": "2026-11-04",
   "lockedAt": null,
@@ -365,7 +365,51 @@
       "paid": true,
       "approval": "required",
       "reviewer": "fresh gpt-5.6-sol/high",
-      "countedAs": "setup"
+      "countedAs": "setup",
+      "status": "run",
+      "ranAt": "2026-11-05",
+      "script": "protocol-review.py",
+      "report": "protocol-review.md",
+      "session": {
+        "model": "gpt-5.6-sol",
+        "effort": "high",
+        "sandbox": "read-only",
+        "seconds": 602.2,
+        "exitCode": 0,
+        "usage": {
+          "input": 1515275,
+          "cached": 1400576,
+          "uncached": 114699,
+          "output": 28541,
+          "reasoning": 15369,
+          "cacheWrite": 0,
+          "total": 1543816
+        },
+        "outsideReferences": "all 10 were arithmetic in analysis commands, not paths"
+      },
+      "readExposure": "hidden material, author transcript and both phase 1 attempt folders on the M4 during the session (hashes matched both ways); bundle built from an allowlist that excludes reviewer rubric copies, verdict reasons and reviewer streams",
+      "verdict": {
+        "readyToLock": false,
+        "blocking": [
+          "read isolation and reviewer blinding are not enforced",
+          "declared quality and scope gates are not implemented correctly",
+          "complete cost and usage assumptions A1-A4 are not validated",
+          "leaked and phase-1-exposed tasks remain in the confirmatory pack",
+          "the primary metric does not measure plan headroom",
+          "the reviewer design and reviewer-seconds gate are not reliable",
+          "the harness lacks the declared final quality, bootstrap, and gate analysis"
+        ],
+        "recommended": [
+          "increase independent task information or narrow the claim",
+          "run a controlled MCP overhead probe",
+          "reduce the always-advertised tool surface and model-call count",
+          "randomize or block execution order",
+          "report nonmodel Context costs and executor time separately"
+        ],
+        "phase2Recommendation": "revise-then-run",
+        "confidence": "high"
+      },
+      "correction": "Finding 8.8 (pnpm 12.3.4 vs 11.9.0) conflates commits: 12.3.4 is pinned at h3 f0e17808 (offline check), 11.9.0 at h3-code-change base 3eb3a57."
     },
     "phase2": {
       "paid": true,
@@ -424,8 +468,8 @@
     "screen-pro-040-20260923"
   ],
   "openDecisions": [
-    "Protocol review (one Sol/high session) and whether to run phase 2 (48 executor and 48 reviewer sessions), given the phase 1 token direction",
-    "Whether the protocol review replaces the tasks touched by the author's leak"
+    "Owner response to the protocol review: revise then run, narrow, or stop",
+    "If revising: which blocking items to fix first (most are free; task replacement, quality-measure redesign and reviewer independence are paid)"
   ],
   "revisedAt": "2026-11-05",
   "ownerDecisions": {
