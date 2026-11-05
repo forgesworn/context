@@ -79,10 +79,20 @@ node packages/context-tools/bin/encrypted-context.mjs navigate /absolute/reposit
 
 There is no identity or encrypted-cache argument. Each process owns its own
 index. Search, explore and coverage build it on first use (concurrent first
-calls share one build); call `repository_refresh` again after source edits.
-`repository_status` reports the generation, revision, exclusion counts and
-freshness without building. Refresh explicitly whenever freshness is `stale` or
-`unknown`: a built index is never replaced without a refresh call.
+calls share one build). `repository_status` reports the generation, revision,
+exclusion counts and freshness without building.
+
+From 0.28.0, packet, explore, coverage and graph called without
+`expectedGeneration` ask for current source: a `stale` or `unknown` index is
+refreshed first, and a packet built that way reports `refreshed` (JSON
+`navigation.refreshed`, text header `(refreshed)`). In recorded Codex sessions
+every edit was followed by a refresh call that re-read the whole conversation.
+A call that passes `expectedGeneration` keeps it: a stale index or mismatch is
+still an error, never a silent change. Search has no generation to pin and its
+cursors are bound to one, so it never refreshes itself; it reports `stale` lines
+after edits until a refresh. One refresh runs at a time; it waits for reads in
+progress, and reads wait for it, so calls batched after an edit see one
+generation. A refresh invalidates cursors and packet references, as before.
 Explore one symbol with `repository_explore`, for example `RepositoryNavigation`
 or `RepositoryNavigation.search`, or search for one identifier with
 `repository_search`.
@@ -98,8 +108,9 @@ scopes and import lines are resolved with the TypeScript parser for TypeScript
 and JavaScript files; every other indexed file is listed lexically without
 scopes. Nothing is type-checked and no module resolution runs, so a name shared
 by unrelated declarations lists all of them, and the result is not a dependency
-closure. The call requires current navigation and re-verifies the hash of every
-file it parses; a changed file or policy is rejected until refresh.
+closure. The call re-verifies the hash of every file it parses. Without
+`expectedGeneration` a stale index is refreshed first; with it, a changed file
+or policy is rejected until refresh.
 
 Optional `pathPrefix` limits the result to one repository-relative prefix.
 `maxBytes` (12,288 by default, at most 131,072) bounds the response: references
@@ -108,8 +119,8 @@ and the response says what was omitted. Long classes and namespaces are shown
 as an outline of member lines; other declarations are previewed to 40 lines with
 the range to request from `repository_packet`. The default was 32,768 bytes and
 200 lines until 0.27.0: in recorded Codex sessions an explore reply filled its
-budget with references, and every later model call re-read it. `expectedGeneration` is optional and
-rejects a mismatch. `format: "json"` returns the same result as one JSON
+budget with references, and every later model call re-read it. `expectedGeneration` is optional;
+given, it rejects a mismatch. `format: "json"` returns the same result as one JSON
 object.
 
 ## Check a draft answer's coverage

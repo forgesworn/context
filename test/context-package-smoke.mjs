@@ -139,7 +139,7 @@ export const view = await vault.create({ title: 'Independent consumer', scope: '
       assert.ok(packetTool)
       assert.equal(packetTool.inputSchema.type, 'object')
       assert.deepEqual(Object.keys(packetTool.inputSchema.properties).sort(), ['expectedGeneration', 'expectedRoot', 'format', 'maxBytes', 'mode', 'spec'])
-      assert.deepEqual([...packetTool.inputSchema.required].sort(), ['expectedGeneration', 'mode', 'spec'])
+      assert.deepEqual([...packetTool.inputSchema.required].sort(), ['mode', 'spec'])
       assert.equal(packetTool.inputSchema.additionalProperties, false)
       const early = await client.callTool({ name: 'repository_packet', arguments: { mode: 'plan', expectedGeneration: 'unrefreshed', spec } })
       assert.equal(early.isError, true)
@@ -200,6 +200,11 @@ export const view = await vault.create({ title: 'Independent consumer', scope: '
       status = JSON.parse(text(await client.callTool({ name: 'repository_refresh', arguments: {} })))
       assert.equal((await get(oldGeneration)).isError, true)
       assert.notEqual((await get(status.generation)).isError, true)
+      await writeFile(root + '/example.ts', 'export function example() {\\n  return 23\\n}\\n')
+      const current = await client.callTool({ name: 'repository_packet', arguments: { mode: 'build', format: 'json', spec: { ...spec, sources: [{ path: 'example.ts', startLine: 2, endLine: 2 }] } } })
+      assert.notEqual(current.isError, true, text(current))
+      assert.equal(JSON.parse(text(current)).navigation.refreshed, true)
+      assert.equal(JSON.parse(text(current)).packet.sources[0].lines[0].content, '  return 23')
     } finally { await client.close() }
     client = await open()
     try {

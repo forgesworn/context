@@ -493,9 +493,12 @@ describe('repository navigation MCP compact rendering and explore', () => {
       expect((invalid as { code?: number }).code === -32602 || (invalid as { isError?: boolean }).isError === true).toBe(true)
 
       await writeFile(join(root, 'beta.ts'), SERVER + '// edited\n')
-      const stale = (await client.callTool({ name: 'repository_explore', arguments: { symbol: 'ownerOptions' } })) as { isError?: boolean; content: Array<{ text: string }> }
+      const stale = (await client.callTool({ name: 'repository_explore', arguments: { symbol: 'ownerOptions', expectedGeneration: refreshed.generation } })) as { isError?: boolean; content: Array<{ text: string }> }
       expect(stale.isError).toBe(true)
       expect(stale.content[0].text).toMatch(/requires current navigation/)
+      const current = (await client.callTool({ name: 'repository_explore', arguments: { symbol: 'ownerOptions' } })) as { isError?: boolean; content: Array<{ text: string }> }
+      expect(current.isError).not.toBe(true)
+      expect(textOf(current).split('\n')[0]).not.toContain(refreshed.generation)
     } finally {
       await serverClose()
     }
@@ -552,9 +555,11 @@ describe('repository navigation MCP compact rendering and explore', () => {
       expect((tooMany as { code?: number }).code === -32602 || (tooMany as { isError?: boolean }).isError === true).toBe(true)
 
       await writeFile(join(root, 'beta.ts'), SERVER + '// edited\n')
-      const stale = (await client.callTool({ name: 'repository_coverage', arguments: { symbols: ['ownerOptions'], answer: draft } })) as { isError?: boolean; content: Array<{ text: string }> }
+      const stale = (await client.callTool({ name: 'repository_coverage', arguments: { symbols: ['ownerOptions'], answer: draft, expectedGeneration: refreshed.generation } })) as { isError?: boolean; content: Array<{ text: string }> }
       expect(stale.isError).toBe(true)
       expect(stale.content[0].text).toMatch(/requires current navigation/)
+      const current = (await client.callTool({ name: 'repository_coverage', arguments: { symbols: ['ownerOptions'], answer: draft } })) as { isError?: boolean; content: Array<{ text: string }> }
+      expect(current.isError).not.toBe(true)
     } finally {
       await serverClose()
     }

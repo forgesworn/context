@@ -76,10 +76,12 @@ When exposed, `repository_graph` can follow static TS bindings, dependency
 neighbours and impact candidates. Rust/Kotlin syntax and name candidates are
 labelled; they do not establish runtime dispatch. Use node IDs when names are
 ambiguous. Graph source locations still need a current source packet.
-Supply the current `expectedGeneration`; read the returned source rather than
-reasoning from pointers alone. Refresh after relevant edits, branch changes,
-pulls or merges. Index freshness covers selected files and policy, not the
-entire world; exclusions and absent matches do not prove absence.
+Omit `expectedGeneration` to read current source: packet, explore, coverage
+and graph refresh a stale index first. Pass it only to pin one generation. Read
+the returned source rather than reasoning from pointers alone. Search reports
+stale lines after edits; refresh after branch changes, pulls or merges. Index
+freshness covers selected files and policy, not the entire world; exclusions
+and absent matches do not prove absence.
 
 `repository_coverage` checks references and exact quotations, not correctness.
 Use the project's actual tests and acceptance gates. For unavailable tools or

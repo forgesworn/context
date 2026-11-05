@@ -48,8 +48,9 @@ coverage and reports observed usage rather than claiming savings.
 
 3. Read the relevant source and tests using the returned paths, lines and
    hashes. A pointer or summary is not sufficient evidence for a code change.
-   On a server exposing `repository_packet`, request a bounded packet with the
-   current `expectedGeneration`: `plan` selects complete TS/JS, Rust and Kotlin syntax blocks;
+   On a server exposing `repository_packet`, request a bounded packet; omit
+   `expectedGeneration` to read current source, which refreshes a stale index
+   first (0.28.0 and later). `plan` selects complete TS/JS, Rust and Kotlin syntax blocks;
    `build` takes reviewed exact ranges. See the [inline MCP example](WORKER-PACKETS.md#request-a-packet-through-mcp).
    No shell helper is required by the consuming model.
    If more matches are needed, pass the returned `nextCursor` into the next
