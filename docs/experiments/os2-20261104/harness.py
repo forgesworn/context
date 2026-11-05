@@ -110,7 +110,9 @@ def command(codex, role, settings, cwd, final, prompt_text=None):
     """Argument list for one Codex session. Executors read the prompt on stdin."""
     if role == 'reviewer' and not prompt_text:
         raise ValueError('reviewer needs its prompt')
-    argv = [str(codex), 'exec', '--sandbox', SANDBOXES[role], '--ephemeral', '--ignore-rules']
+    # Not --ephemeral: the session log stays in the per-cell CODEX_HOME and is the only
+    # record of per-call usage and of what code-mode scripts showed the model.
+    argv = [str(codex), 'exec', '--sandbox', SANDBOXES[role], '--ignore-rules']
     if role == 'reviewer':
         argv.append('--skip-git-repo-check')
     argv += ['--json', '-m', settings['model'], '-c', 'model_reasoning_effort=' + toml_string(settings['effort']),
@@ -363,6 +365,37 @@ def outside_references(events_text, workspace):
     return sorted(hits)
 
 
+def session_calls(home):
+    """Per-call usage and model-visible tool traffic from the session log in one
+    CODEX_HOME. Codex 0.166 runs tools inside a JavaScript `exec` sandbox, so the
+    model sees what each script prints (custom_tool_call_output), not the raw tool
+    result in the --json stream. None when no log was written."""
+    logs = sorted(pathlib.Path(home).glob('sessions/**/rollout-*.jsonl'))
+    if len(logs) != 1:
+        return None if not logs else {'error': f'{len(logs)} session logs'}
+    calls, scripts, script_bytes, shown_bytes, other = [], 0, 0, 0, {}
+    for line in logs[0].read_text(encoding='utf8').splitlines():
+        try:
+            e = json.loads(line)
+        except ValueError:
+            continue
+        payload = e.get('payload') or {}
+        if e.get('type') == 'event_msg' and payload.get('type') == 'token_count' and (payload.get('info') or {}).get('last_token_usage'):
+            u = payload['info']['last_token_usage']
+            calls.append({k: u.get(f) for k, f in (('input', 'input_tokens'), ('cached', 'cached_input_tokens'),
+                                                    ('output', 'output_tokens'), ('reasoning', 'reasoning_output_tokens'))})
+        elif e.get('type') == 'response_item':
+            kind = payload.get('type')
+            if kind == 'custom_tool_call':
+                scripts += 1; script_bytes += len(payload.get('input') or '')
+            elif kind == 'custom_tool_call_output':
+                shown_bytes += len(json.dumps(payload.get('output')))
+            elif kind:
+                other[kind] = other.get(kind, 0) + 1
+    return {'log': str(logs[0].relative_to(home)), 'calls': calls, 'scripts': scripts, 'scriptBytes': script_bytes,
+            'shownBytes': shown_bytes, 'otherItems': other}
+
+
 def sandbox_probe(codex, home, ws, command_text, timeout=300):
     """Run one command under Codex's own workspace-write sandbox, with no model,
     to check the tool chain works where the executor will run it."""
@@ -425,6 +458,7 @@ def run_executor(codex, cell_dir, arm, task, template, auth, node, navigation_cl
     after = sandbox_probe(codex, cell_dir / 'probe-home', ws, READY[task['repository']]) if READY.get(task['repository']) else None
     environment['intactAfterRun'] = None if after is None else after['exitCode'] == 0
     return {'startedAt': started, 'seconds': seconds, 'exitCode': code, 'command': argv, 'environment': environment,
+            'session': session_calls(home),
             'usage': {k: v for k, v in usage(out).items() if k != 'raw'}, 'changedFiles': changed,
             'answerPresent': (ws / 'answer.json').is_file(),
             'metrics': json.loads(metrics.stdout) if metrics.returncode == 0 else {'error': metrics.stderr[-500:]},
@@ -545,7 +579,7 @@ def assess_cell(codex, cell_dir, task, acc, repo, auth, timeout):
     accepted = bool(verdict['accepted'] and answer is not None and code == 0
                     and (not checker['ran'] or checker['passed']))
     result = {'checker': {k: checker.get(k) for k in ('ran', 'passed', 'exitCode', 'seconds', 'relinkExit')}, 'dependencies': deps,
-              'reviewer': {'exitCode': code, 'seconds': seconds, 'usage': reviewer_usage, **verdict},
+              'reviewer': {'exitCode': code, 'seconds': seconds, 'usage': reviewer_usage, 'session': session_calls(home), **verdict},
               'accepted': accepted,
               'totalTokens': cell_total([receipt['usage'], reviewer_usage]),
               'reviewerSeconds': seconds}

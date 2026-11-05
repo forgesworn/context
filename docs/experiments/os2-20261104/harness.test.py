@@ -225,6 +225,15 @@ if a[1] == 'sandbox':
     sys.exit(subprocess.run(a[a.index('-c') + 2:]).returncode)
 cwd = pathlib.Path(a[a.index('-C') + 1]); out = pathlib.Path(a[a.index('-o') + 1])
 U = {"input_tokens": 100, "cached_input_tokens": 40, "output_tokens": 10, "reasoning_output_tokens": 2, "cache_write_input_tokens": 0}
+import os
+log = pathlib.Path(os.environ['CODEX_HOME']) / 'sessions' / '2026' / 'rollout-x.jsonl'
+log.parent.mkdir(parents=True, exist_ok=True)
+log.write_text('\n'.join(json.dumps(x) for x in [
+    {"type": "response_item", "payload": {"type": "custom_tool_call", "name": "exec", "input": "text(1)"}},
+    {"type": "response_item", "payload": {"type": "custom_tool_call_output", "output": "1"}},
+    {"type": "event_msg", "payload": {"type": "token_count", "info": {"last_token_usage": {"input_tokens": 60, "cached_input_tokens": 20, "output_tokens": 4, "reasoning_output_tokens": 1}}}},
+    {"type": "event_msg", "payload": {"type": "token_count", "info": None}},
+    {"type": "event_msg", "payload": {"type": "token_count", "info": {"last_token_usage": {"input_tokens": 40, "cached_input_tokens": 20, "output_tokens": 6, "reasoning_output_tokens": 1}}}}]) + '\n')
 if a[a.index('--sandbox') + 1] == 'workspace-write':
     sys.stdin.read()
     (cwd / 'src.ts').write_text('export const v = "fixed"\n')
@@ -312,6 +321,9 @@ class ExecutionPath(unittest.TestCase):
             self.assertEqual(ex['environment']['relink']['exitCode'], 0)
             self.assertEqual(ex['environment']['ready']['exitCode'], 0)
             self.assertTrue(ex['environment']['intactAfterRun'])
+            self.assertEqual([c['input'] for c in ex['session']['calls']], [60, 40])
+            self.assertEqual((ex['session']['scripts'], ex['session']['scriptBytes'], ex['session']['shownBytes']), (1, 7, 3))
+            self.assertNotIn('--ephemeral', ex['command'])
         self.assertEqual(h.main(['assess', *common, '--acceptance', str(self.acc), '--repos', str(self.d / 'repos')]), 0)
         for cell in cells:
             a = json.loads((cell / 'assessment.json').read_text())
@@ -320,6 +332,7 @@ class ExecutionPath(unittest.TestCase):
             self.assertTrue(a['reviewer']['valid'])
             self.assertTrue(a['accepted'])
             self.assertEqual(a['checker']['relinkExit'], 0)
+            self.assertEqual(len(a['reviewer']['session']['calls']), 2)
             self.assertEqual(a['totalTokens'], 220)
             self.assertFalse((cell / 'check').exists())
 

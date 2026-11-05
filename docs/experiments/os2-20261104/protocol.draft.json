@@ -111,7 +111,7 @@
     "model": "gpt-5.6-sol",
     "effort": "high",
     "sandbox": "workspace-write",
-    "session": "fresh, --ephemeral, per-arm CODEX_HOME",
+    "session": "fresh, per-cell CODEX_HOME, session log kept for per-call usage (not --ephemeral, from 2026-11-05)",
     "invocation": "absolute binary path with explicit flags, no shell, no inherited aliases",
     "maxTurns": null,
     "harness": "harness.py (derived from d5-20260921-v3/run-pair.py, which is unchanged); Context arm enables all seven 0.26.0 retrieval tools via `navigate <workspace>`"
@@ -409,7 +409,8 @@
         "phase2Recommendation": "revise-then-run",
         "confidence": "high"
       },
-      "correction": "Finding 8.8 (pnpm 12.3.4 vs 11.9.0) conflates commits: 12.3.4 is pinned at h3 f0e17808 (offline check), 11.9.0 at h3-code-change base 3eb3a57."
+      "correction": "Finding 8.8 (pnpm 12.3.4 vs 11.9.0) conflates commits: 12.3.4 is pinned at h3 f0e17808 (offline check), 11.9.0 at h3-code-change base 3eb3a57.",
+      "correction2026-11-05": "Section 1 of the review (and the attempt 2 summary) attributed the gap to tool descriptions carried per call. Probe: a one-call session used 10,565 input tokens for plain, Context-7-tools and Context-3-tools alike; Codex 0.166 runs tools in a JS exec sandbox (code mode) and the model sees only what scripts print. Phase 1 ran --ephemeral, so the per-call gap is unmeasured."
     },
     "phase2": {
       "paid": true,
@@ -493,5 +494,19 @@
     "the reviewer runs where the parent directory names the arm",
     "whether to replace the tasks touched by the author's leak",
     "whether reviewer seconds at n=1 per task is a usable gate input"
-  ]
+  ],
+  "overheadProbe": {
+    "ranAt": "2026-11-05",
+    "sessions": 7,
+    "approxTokens": 143000,
+    "model": "gpt-5.6-sol/high",
+    "oneCallInputTokens": {
+      "plain": 10565,
+      "context7": 10564,
+      "context3": 10565
+    },
+    "toolListBytes": 5777,
+    "finding": "MCP tools are not declared in the prompt; nested calls run in the exec sandbox; model-visible content is the script output",
+    "harnessChange": "drop --ephemeral; record per-call usage and script traffic from the session log"
+  }
 }

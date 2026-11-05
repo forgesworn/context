@@ -187,7 +187,7 @@ Known issues, for the protocol review:
 ## Executor, reviewer and harness
 
 - Executor: Codex CLI, `gpt-5.6-sol`, reasoning effort `high`. Both arms run in
-  separate fresh, ephemeral sessions. This is the Codex cohort; a Claude cohort
+  separate fresh sessions, each with its own `CODEX_HOME` (session logs kept for per-call accounting). This is the Codex cohort; a Claude cohort
   is separate work with its own fixed model and effort.
 - Reviewer: a fresh `gpt-5.6-sol`/high session with a read-only sandbox. It is
   blind to the arm and sees only the answer or diff, the checker result, the
@@ -478,6 +478,34 @@ Main points:
 One finding is mistaken: pnpm 12.3.4 is the pin at h3 `f0e17808` (offline
 check) and 11.9.0 the pin at h3-code-change's base `3eb3a57`, so they do not
 conflict.
+
+#### Correction and overhead probe (2026-11-05)
+
+The token-gap explanation above, and the review's section 1, assumed Codex
+carries the Context tool descriptions on every call. Measurement says it does
+not. Seven small Sol/high sessions on a copy of the h3-code-change template
+(about 143,000 tokens in all, mostly cached) found:
+
+- **No tool descriptions in the prompt.** A one-call "reply OK" session used
+  10,565 input tokens in all three set-ups: plain, Context with seven tools,
+  Context with three. The full tool list is only 5,777 bytes anyway.
+- **Code mode.** Codex 0.166 runs every tool call, shell or MCP, inside a
+  JavaScript `exec` sandbox. The model finds Context tools at run time through
+  `ALL_TOOLS` and sees only what its script prints, not the raw tool result.
+  The `--json` stream still shows nested calls as `mcp_tool_call` and
+  `command_execution` items, so phase 1's raw result sizes say nothing about
+  what the model read.
+- **Unrecorded.** Phase 1 ran with `--ephemeral`, which discarded the session
+  log, the only record of per-call usage and of what each script printed. The
+  per-call gap of about 12,300 tokens is therefore unmeasured, not explained.
+- **Friction seen.** In one probe the model's first script failed because
+  status and refresh return text-only JSON (no `structuredContent`), so it had
+  to guess how to read `generation`; packets also need a generation first, which
+  costs a round. These are hypotheses until measured.
+
+The runner no longer passes `--ephemeral`. Each cell's session log stays in its
+own `CODEX_HOME`, and `executor.json` and the reviewer record now carry
+per-call usage, script count, script bytes and bytes shown to the model.
 
 ### Phase 2: full comparison (paid, needs separate approval)
 
