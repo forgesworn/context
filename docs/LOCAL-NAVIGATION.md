@@ -88,9 +88,12 @@ refreshed first, and a packet built that way reports `refreshed` (JSON
 `navigation.refreshed`, text header `(refreshed)`). In recorded Codex sessions
 every edit was followed by a refresh call that re-read the whole conversation.
 A call that passes `expectedGeneration` keeps it: a stale index or mismatch is
-still an error, never a silent change. Search has no generation to pin and its
-cursors are bound to one, so it never refreshes itself; it reports `stale` lines
-after edits until a refresh. One refresh runs at a time; it waits for reads in
+still an error, never a silent change. Search never refreshes itself, because
+its cursors are bound to one generation; it reports `stale` lines after edits
+until a refresh. From 0.29.0 search also accepts `expectedGeneration` and rejects
+a mismatch, as explore does: agents passed the generation they held, and in a
+recorded Codex session two of four tool errors were searches rejected for the
+unknown key. One refresh runs at a time; it waits for reads in
 progress, and reads wait for it, so calls batched after an edit see one
 generation. A refresh invalidates cursors and packet references, as before.
 Explore one symbol with `repository_explore`, for example `RepositoryNavigation`

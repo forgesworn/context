@@ -110,6 +110,7 @@ const searchInputSchema = z.object({
   maxResults: z.number().int().min(1).max(100).optional(),
   maxVisited: z.number().int().min(1).max(10000).optional(),
   cursor: z.string().min(1).max(64).optional(),
+  expectedGeneration: z.string().min(1).optional(),
   format: readingFormatSchema,
 }).strict()
 
@@ -369,13 +370,20 @@ export function createRepositoryNavigationServer(root: string, options: Reposito
       let leave: (() => void) | undefined
       try {
         checkRoot(input.expectedRoot)
-        const { format, expectedRoot: _expectedRoot, ...options } = input
-        // Search has no generation to pin and pages are bound to one, so it never
-        // refreshes a stale index itself; it reports freshness and waits for any
-        // refresh another call has started.
+        const { format, expectedRoot: _expectedRoot, expectedGeneration, ...options } = input
+        // Pages are bound to one generation, so search never refreshes a stale index
+        // itself; it reports freshness and waits for any refresh another call has
+        // started. A passed generation is checked like explore's: agents pass the
+        // one they hold, and rejecting the key cost two calls in a recorded session.
         await buildOnFirstUse(extra.signal)
         leave = await enterRead()
+        if (expectedGeneration !== undefined && (await navigation.status(extra.signal)).generation !== expectedGeneration) {
+          throw new Error('repository search expectedGeneration does not match current navigation; call repository_refresh or omit it')
+        }
         const result = await navigation.search(options, extra.signal)
+        if (expectedGeneration !== undefined && result.generation !== expectedGeneration) {
+          throw new Error('repository search navigation changed during search; retry')
+        }
         return { content: [{ type: 'text' as const, text: format === 'json' ? JSON.stringify(result) : renderSearch(result) }] }
       } catch (error) {
         return { content: [{ type: 'text' as const, text: formatError(error) }], isError: true }

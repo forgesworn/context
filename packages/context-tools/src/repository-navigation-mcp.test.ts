@@ -289,7 +289,7 @@ describe('repository navigation MCP adapter', () => {
     }
   })
 
-  it('bumps generation after a refresh and rejects stale cursors', async () => {
+  it('bumps generation after a refresh, rejects stale cursors and checks a passed generation', async () => {
     const alpha = 'alphaToken\n'.repeat(4)
     const root = await makeRoot({ alpha })
     const { client, serverClose } = await connect(root)
@@ -322,6 +322,19 @@ describe('repository navigation MCP adapter', () => {
         arguments: { term: 'alphaToken', maxResults: 1, cursor: staleCursor },
       })) as { content: Array<{ type: string; text: string }>; isError?: boolean }
       expect(stale.isError).toBe(true)
+
+      const pinned = (await client.callTool({
+        name: 'repository_search',
+        arguments: { term: 'alphaToken', expectedGeneration: secondGen, format: 'json' },
+      })) as { content: Array<{ type: string; text: string }>; isError?: boolean }
+      expect(pinned.isError).toBeFalsy()
+      expect((JSON.parse(textOf(pinned)) as { generation: string }).generation).toBe(secondGen)
+      const old = (await client.callTool({
+        name: 'repository_search',
+        arguments: { term: 'alphaToken', expectedGeneration: firstGen },
+      })) as { content: Array<{ type: string; text: string }>; isError?: boolean }
+      expect(old.isError).toBe(true)
+      expect(textOf(old)).toContain('call repository_refresh or omit it')
     } finally {
       await serverClose()
     }
