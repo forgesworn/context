@@ -553,6 +553,36 @@
         "checkerPassed": true
       },
       "note": "one pair per version; plain varied 22% between runs, so the 0.77 ratio is not a gate result"
+    },
+    "diagnosticPair028": {
+      "ranAt": "2026-11-05",
+      "context": "0.28.0 (05bc501)",
+      "sessions": 2,
+      "context028": {
+        "calls": 36,
+        "total": 1788775,
+        "uncached": 50624,
+        "carried": 1388732,
+        "packetCalls": 7,
+        "packetAdded": 26823,
+        "packetCarried": 719405,
+        "searchExploreAdded": 9803,
+        "searchExploreCarried": 309566,
+        "statusRefreshCalls": 5,
+        "statusRefreshCarried": 48470,
+        "autoRefreshes": 1,
+          "explicitRefreshesAfterEdit": 1,
+        "checkerPassed": true
+      },
+      "plain": {
+        "calls": 26,
+        "total": 1211387,
+        "uncached": 61297,
+        "carried": 919605,
+        "checkerPassed": true,
+        "outsideReferences": "2 false positives (route strings /s and /o)"
+      },
+      "note": "the context-arm prompt still asks for status and refresh, so those calls remained; Context varied 1.11M-2.04M across three runs, more than any release effect"
     }
   }
 }

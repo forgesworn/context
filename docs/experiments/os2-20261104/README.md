@@ -563,6 +563,42 @@ per version cannot separate the release's effect from run-to-run variation, and
 the 0.77 ratio in this pair is not a gate result. Both arms passed the hidden
 checker with no missed or incorrect dependencies.
 
+#### Diagnostic pair on 0.28.0 (2026-11-05)
+
+Same task, order and prompts after Context 0.28.0: packet, explore, coverage
+and graph calls without `expectedGeneration` refresh a stale index themselves.
+Two Sol/high sessions, executors only, session logs kept; the hidden checker
+was run alone afterwards (no reviewer).
+
+| | Context 0.27.0 | Context 0.28.0 | Plain (with 0.27.0 run) | Plain (with 0.28.0 run) |
+|---|---|---|---|---|
+| Model calls | 27 | 36 | 29 | 26 |
+| Executor tokens | 1,106,828 | 1,788,775 | 1,432,286 | 1,211,387 |
+| Carried content | 805,606 | 1,388,732 | 1,105,533 | 919,605 |
+| Packet calls, added / carried | 5, 19,085 / 331,168 | 7, 26,823 / 719,405 | | |
+| Search and explore calls, added / carried | 3, 13,852 / 305,834 | 2, 9,803 / 309,566 | | |
+| Status and refresh calls, carried | 4, 23,542 | 5, 48,470 | | |
+| Test and check calls | 8 | 13 | 12 | 9 |
+| Hidden checker | passed | passed | passed | passed |
+
+The executor used the new behaviour once. After its first two edits it sent a
+packet without a generation; the server refreshed the index (a new generation,
+no refresh call) and the packet then failed on a wrong file path; a search and
+a packet on that generation followed. After a later edit it went back to
+`repository_status` and `repository_refresh` before a pinned packet. In all it
+made five status or refresh calls, as the context-arm prompt asks it to check
+status and refresh when not current; they cost 48,470 carried tokens, about 3%
+of the session. The larger difference from the 0.27.0 run is the path the agent
+took: two more packets, one of 11,833 tokens early in the session that 30 later
+calls re-read, and five more test runs.
+
+Across three runs (0.26.0, 0.27.0, 0.28.0) the Context arm used 2.04M, 1.11M
+and 1.79M tokens, and plain 1.17M, 1.43M and 1.21M. Context's 0.27.0 and 0.28.0
+runs differ by 62% with a small server change between them, more than any
+effect a release has shown, so these pairs cannot attribute a saving or a
+loss to a release. The plain cell's two outside-reference flags are false
+positives: route strings `"/s"` and `"/o"` in an inline test script.
+
 ### Phase 2: full comparison (paid, needs separate approval)
 
 Eight tasks, three repetitions, two arms (48 executor and 48 reviewer sessions), run as locked.
