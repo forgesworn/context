@@ -507,6 +507,39 @@ The runner no longer passes `--ephemeral`. Each cell's session log stays in its
 own `CODEX_HOME`, and `executor.json` and the reviewer record now carry
 per-call usage, script count, script bytes and bytes shown to the model.
 
+#### Diagnostic pair (2026-11-05)
+
+h3-code-change again, Context then plain, executors only, session logs kept
+(two Sol/high sessions; diagnostic, not a comparison: the task is used).
+`session-breakdown.py CODEX_HOME` lists every call.
+
+| | Context | Plain |
+|---|---|---|
+| Model calls | 35 | 26 |
+| Executor tokens | 2,043,898 | 1,172,732 |
+| Opening prompt, every call | 10,768 | 10,765 |
+| Carried content (added once, re-read by every later call) | 1,652,406 | 882,450 |
+| of which retrieval output | 1,416,007 | 676,059 |
+| of which edits, tests and checks | 235,455 | 206,391 |
+
+Total input is exactly the opening prompt on every call plus everything earlier
+calls added. The gap is retrieval: Context's retrieval scripts added about
+53,500 tokens, against about 36,700 for plain's `rg` and `sed`, and added them
+earlier, so more later calls carried them. By category, Context's:
+
+- **search and explore** (4 calls) added 23,939 tokens, carried 722,515. The
+  model asked for `format: "json"`, which wraps every line in an object and
+  repeats hashes and policy digests; one script of three searches and an
+  explore hit Codex's 10,000-token output cap. Explore also inlines whole
+  definition bodies (the 136-line `H3` class), which a packet then fetched
+  again;
+- **packets** (5) added 24,119, carried 567,863, about what plain's file reads
+  cost;
+- **status and refresh** (5, including three refreshes after edits) added
+  little but each re-read the whole conversation: 243,996 input tokens;
+- **tool discovery** (one `ALL_TOOLS` script) and **coverage** (one call at the
+  end) cost a further 156,129 between them.
+
 ### Phase 2: full comparison (paid, needs separate approval)
 
 Eight tasks, three repetitions, two arms (48 executor and 48 reviewer sessions), run as locked.

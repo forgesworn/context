@@ -507,6 +507,29 @@
     },
     "toolListBytes": 5777,
     "finding": "MCP tools are not declared in the prompt; nested calls run in the exec sandbox; model-visible content is the script output",
-    "harnessChange": "drop --ephemeral; record per-call usage and script traffic from the session log"
+    "harnessChange": "drop --ephemeral; record per-call usage and script traffic from the session log",
+    "diagnosticPair": {
+      "ranAt": "2026-11-05",
+      "task": "h3-code-change (used; diagnostic only)",
+      "sessions": 2,
+      "context": {
+        "calls": 35,
+        "total": 2043898,
+        "carried": 1652406,
+        "retrievalCarried": 1416007,
+        "statusRefreshCallInput": 243996,
+        "searchExploreAdded": 23939,
+        "searchExploreCarried": 722515,
+        "packetAdded": 24119,
+        "packetCarried": 567863
+      },
+      "plain": {
+        "calls": 26,
+        "total": 1172732,
+        "carried": 882450,
+        "retrievalCarried": 676059
+      },
+      "tool": "session-breakdown.py"
+    }
   }
 }
