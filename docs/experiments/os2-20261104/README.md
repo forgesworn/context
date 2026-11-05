@@ -407,7 +407,34 @@ probe fails under Codex's sandbox; with it, it passes. 28 harness tests.
   executor's config and prompt, which name the arm. Both reviewers' audits
   showed no outside reads.
 
-Attempt 2 needs its own approval: four more Sol/high sessions on the plan.
+#### Attempt 2 (2026-11-05): passed
+
+Same task, host and order. The blind workspace, the author transcript and
+attempt 1's outputs were on the M4 while executors ran (hashes matched) and
+were restored for assessment. Every copy was relinked (1.9 s) and probed under
+Codex's sandbox (2.1 s) before the model started; both arms ran their tests,
+and the tool chain still worked after each run. Four sessions were spent.
+
+| | Context | Plain |
+|---|---|---|
+| Accepted (checker and reviewer) | yes | yes |
+| Missed or incorrect dependencies | 0 | 0 |
+| Executor seconds | 249.4 | 234.7 |
+| Executor tokens | 1,211,829 | 927,795 |
+| Uncached input | 54,059 | 42,279 |
+| Output | 10,762 | 9,740 |
+| Reviewer tokens | 96,619 | 67,611 |
+| Reviewer seconds | 55.4 | 31.4 |
+| Cell total tokens | 1,308,448 | 995,406 |
+
+The Context arm used 3 packets, with no reads after a packet and no tool
+errors, so the phase 1 pass conditions are met. No outside reads were flagged
+in any of the four sessions.
+
+One pair is not a gate test, but on this pair the Context cell used 1.31 times
+the plain cell's tokens and its reviewer took longer. The cost gate needs at
+most 0.80 times and no higher reviewer seconds. Attempt 1, in a broken
+environment, pointed the same way (2.3 times).
 
 ### Independent protocol review (paid, needs approval)
 
@@ -499,9 +526,8 @@ Phase 2 is of that order. Phase 1 is one pair. No prices were looked up.
 1. ~~The write-capability probe~~ (run and passed 2026-11-04).
 2. ~~The blind task-author session~~ (run 2026-11-04; see Task pack as
    authored).
-3. Phase 1: attempt 1 run 2026-11-04 on h3-code-change, this Mac, and
-   invalid on a runner defect (see Attempt 1). Attempt 2, same task and
-   host, needs approval.
+3. ~~Phase 1~~ (attempt 1 invalid on a runner defect; attempt 2 passed
+   2026-11-05).
 4. The protocol review and phase 2, only if phase 1 passes.
 
 ## Not claimed

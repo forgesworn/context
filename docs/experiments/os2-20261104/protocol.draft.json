@@ -268,8 +268,75 @@
             "/tmp is exempt from outsideReferences: cell-001 moved a stray .pnpm-store to /private/tmp unflagged (removed afterwards); /tmp is shared across cells",
             "the reviewer runs inside the cell directory, whose parent holds executor-config.toml and executor-prompt.txt, which name the arm; reviewer outsideReferences were 0 in both cells"
           ]
+        },
+        {
+          "attempt": 2,
+          "ranAt": "2026-11-05",
+          "status": "passed",
+          "task": "h3-code-change",
+          "host": "this Mac",
+          "order": [
+            "context (cell-001)",
+            "plain (cell-002)"
+          ],
+          "readExposure": "blind workspace, author transcript and attempt 1 outputs moved to the M4 during execute (hashes matched), restored for assess",
+          "sessionsSpent": 4,
+          "environment": {
+            "relinkSeconds": 1.9,
+            "readySeconds": 2.1,
+            "intactAfterRun": {
+              "context": true,
+              "plain": true
+            },
+            "testsRan": {
+              "context": true,
+              "plain": true
+            }
+          },
+          "passIf": {
+            "contextAccepted": true,
+            "readsAfterPacket": 0,
+            "contextToolErrorRate": 0
+          },
+          "cells": {
+            "context": {
+              "accepted": true,
+              "checkerPassed": true,
+              "missed": 0,
+              "incorrect": 0,
+              "executorSeconds": 249.4,
+              "executorTotal": 1211829,
+              "uncached": 54059,
+              "cached": 1147008,
+              "output": 10762,
+              "packets": 3,
+              "commands": 9,
+              "reviewerTotal": 96619,
+              "reviewerSeconds": 55.4,
+              "cellTotal": 1308448,
+              "outsideReferences": 0
+            },
+            "plain": {
+              "accepted": true,
+              "checkerPassed": true,
+              "missed": 0,
+              "incorrect": 0,
+              "executorSeconds": 234.7,
+              "executorTotal": 927795,
+              "uncached": 42279,
+              "cached": 875776,
+              "output": 9740,
+              "commands": 18,
+              "reviewerTotal": 67611,
+              "reviewerSeconds": 31.4,
+              "cellTotal": 995406,
+              "outsideReferences": 0
+            }
+          },
+          "observation": "One pair is not a gate test. On this pair the Context cell used 1.31x the plain cell total and its reviewer took longer; the cost gate needs at most 0.80x and no higher reviewer seconds. Attempt 1 (invalid environment) showed the same direction at 2.3x."
         }
-      ]
+      ],
+      "status": "passed"
     },
     "protocolReview": {
       "paid": true,
@@ -334,11 +401,10 @@
     "screen-pro-040-20260923"
   ],
   "openDecisions": [
-    "Phase 1 attempt 2 (four Sol/high sessions on the plan)",
-    "Protocol review and phase 2 only if phase 1 passes",
+    "Protocol review (one Sol/high session) and whether to run phase 2 (48 executor and 48 reviewer sessions), given the phase 1 token direction",
     "Whether the protocol review replaces the tasks touched by the author's leak"
   ],
-  "revisedAt": "2026-11-04",
+  "revisedAt": "2026-11-05",
   "ownerDecisions": {
     "recordedAt": "2026-11-04",
     "repositories": "bray (ForgeSworn) and h3js/h3 (outside); each task pinned at its own commit",
