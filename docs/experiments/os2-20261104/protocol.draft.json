@@ -530,6 +530,29 @@
         "retrievalCarried": 676059
       },
       "tool": "session-breakdown.py"
+    },
+    "diagnosticPair027": {
+      "ranAt": "2026-11-05",
+      "context": "0.27.0 (f871d03)",
+      "sessions": 2,
+      "context027": {
+        "calls": 27,
+        "total": 1106828,
+        "carried": 805606,
+        "searchExploreAdded": 13852,
+        "searchExploreCarried": 305834,
+        "packetAdded": 19085,
+        "packetCarried": 331168,
+        "formatsRequested": "text only",
+        "checkerPassed": true
+      },
+      "plain": {
+        "calls": 29,
+        "total": 1432286,
+        "carried": 1105533,
+        "checkerPassed": true
+      },
+      "note": "one pair per version; plain varied 22% between runs, so the 0.77 ratio is not a gate result"
     }
   }
 }

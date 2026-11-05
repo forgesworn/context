@@ -540,6 +540,29 @@ earlier, so more later calls carried them. By category, Context's:
 - **tool discovery** (one `ALL_TOOLS` script) and **coverage** (one call at the
   end) cost a further 156,129 between them.
 
+#### Diagnostic pair on 0.27.0 (2026-11-05)
+
+Same task and order after Context 0.27.0 (search digests once per file, a
+"text is compact" hint on the search format, explore defaulting to 12 KiB with
+40-line declaration previews). Two Sol/high sessions, executors only, session
+logs kept; the hidden checker was run alone afterwards (no reviewer).
+
+| | Context 0.26.0 | Context 0.27.0 | Plain (with 0.26.0 run) | Plain (with 0.27.0 run) |
+|---|---|---|---|---|
+| Model calls | 35 | 27 | 26 | 29 |
+| Executor tokens | 2,043,898 | 1,106,828 | 1,172,732 | 1,432,286 |
+| Carried content | 1,652,406 | 805,606 | 882,450 | 1,105,533 |
+| Search and explore added / carried | 23,939 / 722,515 | 13,852 / 305,834 | | |
+| Packets added / carried | 24,119 / 567,863 | 19,085 / 331,168 | | |
+| Hidden checker | | passed | | passed |
+
+Every Context search, explore and packet call in the 0.27.0 run asked for
+text. The Context arm's tokens fell by 46% and its calls by eight. Plain's
+tokens differed by 22% between two runs of the same unchanged arm, so one pair
+per version cannot separate the release's effect from run-to-run variation, and
+the 0.77 ratio in this pair is not a gate result. Both arms passed the hidden
+checker with no missed or incorrect dependencies.
+
 ### Phase 2: full comparison (paid, needs separate approval)
 
 Eight tasks, three repetitions, two arms (48 executor and 48 reviewer sessions), run as locked.
