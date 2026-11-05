@@ -602,18 +602,22 @@ def outside_references(events_text, root):
     return sorted(hits)
 
 
-def denied_reads(events_text):
-    """Command outputs reporting a denied access: attempts the profile stopped."""
+def denied_reads(home):
+    """Tool outputs the model saw that report a denied access: attempts the profile
+    stopped. Read from the session log, because Codex 0.166 leaves a command the
+    sandbox denied out of the --json stream (isolation probe, 2026-11-05)."""
+    logs = sorted(pathlib.Path(home).glob('sessions/**/rollout-*.jsonl'))
     n = 0
-    for line in events_text.splitlines():
-        try:
-            e = json.loads(line)
-        except ValueError:
-            continue
-        e = e.get('event', e) if isinstance(e, dict) else {}
-        item = e.get('item') or {}
-        if item.get('type') == 'command_execution' and 'Operation not permitted' in str(item.get('aggregated_output') or ''):
-            n += 1
+    for log in logs:
+        for line in log.read_text(encoding='utf8').splitlines():
+            try:
+                e = json.loads(line)
+            except ValueError:
+                continue
+            payload = e.get('payload') or {}
+            if (e.get('type') == 'response_item' and payload.get('type') in ('custom_tool_call_output', 'function_call_output')
+                    and 'Operation not permitted' in json.dumps(payload.get('output'))):
+                n += 1
     return n
 
 
@@ -749,7 +753,7 @@ def run_executor(codex, plan_doc, cell_dir, arm, task, template, auth, node, nav
               'usage': {k: v for k, v in usage(out, 0 if code == 0 else 1, session).items() if k != 'raw'}, 'changedFiles': changed,
               'answerPresent': (ws / 'answer.json').is_file(),
               'metrics': json.loads(metrics.stdout) if metrics.returncode == 0 else {'error': metrics.stderr[-500:]},
-              'outsideReferences': outside_references(out, root), 'deniedAccesses': denied_reads(out)}
+              'outsideReferences': outside_references(out, root), 'deniedAccesses': denied_reads(home)}
     shutil.move(str(ws), str(cell_dir / 'workspace'))
     shutil.rmtree(root, ignore_errors=True)
     return result
@@ -920,7 +924,7 @@ def assess_cell(codex, plan_doc, cell_dir, task, acc, repo, auth, toolchain, tim
     result = {'checker': {k: checker.get(k) for k in ('ran', 'passed', 'exitCode', 'seconds', 'relinkExit')}, 'dependencies': deps,
               'scope': scope, 'excerpts': excerpts,
               'reviewer': {'exitCode': code, 'seconds': seconds, 'usage': reviewer_usage, 'session': session, 'isolation': probe['exitCode'] == 0,
-                           'outsideReferences': outside_references(out, root), 'deniedAccesses': denied_reads(out), **verdict},
+                           'outsideReferences': outside_references(out, root), 'deniedAccesses': denied_reads(home), **verdict},
               'accepted': accepted,
               'totalTokens': cell_total([receipt['usage'], reviewer_usage]),
               'sensitivity': sensitivity([receipt['usage'], reviewer_usage]),

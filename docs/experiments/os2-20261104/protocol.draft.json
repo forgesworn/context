@@ -434,6 +434,21 @@
       "countedAs": "setup",
       "launch": "claude --bare excludes CLAUDE.md, hooks and memory but needs an API key (metered cash); a plan-billed launch that keeps global instructions out is an owner choice",
       "status": "run 2026-11-04"
+    },
+    "isolationProbe": {
+      "ranAt": "2026-11-05",
+      "paid": true,
+      "sessions": 1,
+      "settings": "gpt-5.6-sol/low",
+      "result": "passed",
+      "tokens": {
+        "input": 43579,
+        "cached": 32000,
+        "output": 307,
+        "total": 43886
+      },
+      "seconds": 20.8,
+      "note": "first verdict failed because the denied command was missing from the --json stream; recomputed from the session log without a second session"
     }
   },
   "metrics": {
@@ -499,7 +514,7 @@
   "execution": {
     "stages": "toolchain, plan (records input hashes), prepare (fail-closed setup), execute (staged and probed per cell), assess (after every executor), analyse",
     "readExposure": "Enforced by the permission profile: model tool calls cannot read the home directory (plans, sibling cells, acceptance files, the author transcript, Codex and Claude state), /private/tmp or per-user temp. Before any model starts, a probe under the cell's profile must fail to read a canary in the cell directory and write its staged root. --forbid remains as defence in depth. outsideReferences and deniedAccesses are audit fields.",
-    "liveCheck": "codex sandbox honours the profile (tested 2026-11-05 on h3: hidden files, sibling plans, transcripts, /private/tmp and auth.json denied; rg, git and vitest work); one short codex exec session must confirm before lock",
+    "liveCheck": "Passed 2026-11-05: one gpt-5.6-sol/low codex exec session under the executor profile; the canary read was denied (Operation not permitted, text never shown), workspace read and write succeeded, 43,886 tokens, 20.8 s. Codex 0.166 omits sandbox-denied commands from the --json stream; denials are counted from the session log.",
     "cellNames": "opaque cell-NNN; the reviewer no longer runs inside the cell directory",
     "host": "this Mac; one staged root under /Users/Shared at a time (execute refuses if another exists)",
     "loopback": "h3 socket-backed tests fail under the Codex sandbox with or without the profile; open owner decision"

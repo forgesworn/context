@@ -30,6 +30,30 @@ What the [protocol review](protocol-review.md) asked for, and what changed:
 | Metrics fail open | `metrics.mjs` reports malformed lines, separates MCP and shell error rates, parses pipelines, `tail` and interpreter one-liners more strictly, and makes reads-after-packet invalid on malformed lines, packets without ranges, or an unclassified command that names a packet-covered file or could reach one indirectly (globs, variables, substitutions, loops, `xargs`). On the eight recorded cells the measure is valid in all eight. |
 | Forced status and refresh calls | The Context instruction no longer asks for `repository_status` or a refresh. From 0.28.0, packet, explore, coverage and graph calls without a generation refresh a stale index themselves. |
 
+### Live isolation probe (2026-11-05): passed
+
+One `codex exec` session (Codex 0.166.0, `gpt-5.6-sol`, effort low) under the
+version 2 executor profile, run by [`isolation-probe.py`](isolation-probe.py)
+with the owner's approval. It was told to `cat` a canary file in a directory
+inside the home, `cat` a file in its staged workspace and write one there.
+
+- The canary read returned `Operation not permitted` (exit 1); the canary text
+  never reached the model.
+- The workspace read and the write both succeeded; nothing was written outside
+  the staged root.
+- Usage: 43,886 tokens (43,579 input, of which 32,000 cached; 307 output),
+  complete under the A1-A4 checks; 20.8 seconds.
+
+The first verdict was a fail, wrongly: the probe judged from the `--json`
+event stream, and Codex 0.166 left the denied command out of that stream
+entirely (the two commands that succeeded were there). The session log, which
+records what the model was shown, has all three. The probe and the harness's
+`deniedAccesses` count now read the session log, and the verdict was
+recomputed from the recorded log with `--rejudge` (no second session). In the
+recorded plain cells the stream and the session log list the same commands
+(28 of 28 and 23 of 23), so ordinary commands are not lost; the gap applies to
+commands the sandbox denies, which read metrics do not count as reads.
+
 Still open, and not decided by this version:
 
 - **Task replacement (paid).** bray-impact, bray-diagnosis, h3-diagnosis and
@@ -42,8 +66,7 @@ Still open, and not decided by this version:
   outside phase 2.
 - **Reviewer independence (paid).** A different model family or several
   blinded reviewers, with an agreement sample.
-- **Live isolation check (paid, small).** `codex sandbox` honours the profile
-  (tested); one short `codex exec` session must show the same before lock.
+- ~~Live isolation check~~ (run 2026-11-05, passed; see below).
 - **Loopback.** h3's socket-backed tests fail under the Codex sandbox with or
   without the new profile (local ports are blocked). Whether to allow loopback
   in the profile is an owner decision.
@@ -636,9 +659,8 @@ Phase 2 is of that order. Phase 1 is one pair. No prices were looked up.
 4. ~~The protocol review~~ (run 2026-11-05: revise then run).
 5. Owner review of version 2, including the open decisions listed under
    Version 2 changes (loopback, task count, reviewer design).
-6. One short live isolation session: `isolation-probe.py`, one Sol/low
-   `codex exec` session under the executor profile, which must fail to read a
-   canary in the home and still read and write its staged workspace.
+6. ~~One short live isolation session~~ (`isolation-probe.py`, run and
+   passed 2026-11-05).
 7. Replacement tasks from an isolated custodian, plus a separate
    qualification task.
 8. The quality-measure pilot and the reviewer-independence design.

@@ -619,6 +619,13 @@ class ExecutionPath(unittest.TestCase):
         self.assertEqual(h.review_outcome({**good, 'findings': []}, ['R1'])['valid'], False)
         self.assertEqual(h.review_outcome(None, ['R1'])['valid'], False)
 
+    def test_denied_accesses_are_counted_from_the_session_log(self):
+        log = self.d / 'h' / 'sessions' / 'rollout-x.jsonl'; log.parent.mkdir(parents=True)
+        out = lambda t: json.dumps({'type': 'response_item', 'payload': {'type': 'custom_tool_call_output', 'output': [{'type': 'input_text', 'text': t}]}})
+        log.write_text('\n'.join([out('cat: /x: Operation not permitted'), out('fine'), 'junk']) + '\n')
+        self.assertEqual(h.denied_reads(self.d / 'h'), 1)
+        self.assertEqual(h.denied_reads(self.d / 'none'), 0)
+
     def test_evidence_excerpts_are_bounded_and_stay_inside_the_workspace(self):
         ws = self.d / 'ws'; ws.mkdir(); dest = self.d / 'dest'; dest.mkdir()
         (ws / 'big.ts').write_text(''.join(f'line {n}\n' for n in range(1, 1001)))

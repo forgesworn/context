@@ -28,12 +28,18 @@ if a[1] == 'sandbox':
 assert '--sandbox' not in a
 cwd = pathlib.Path(a[a.index('-C') + 1])
 task = sys.stdin.read()
+entries = []
 for cmd in re.findall(r'^\d\. (.+)$', task, re.M):
     r = run(cmd, cwd)
-    print(json.dumps({"type": "item.completed", "item": {"type": "command_execution", "command": "/bin/zsh -lc " + json.dumps(cmd),
-                      "aggregated_output": r.stdout + r.stderr, "exit_code": r.returncode, "status": "completed"}}))
+    js = 'const r = await tools.exec_command(' + json.dumps({"cmd": cmd, "workdir": str(cwd)}) + '); text(JSON.stringify(r))'
+    entries.append({"type": "response_item", "payload": {"type": "custom_tool_call", "name": "exec", "input": js}})
+    entries.append({"type": "response_item", "payload": {"type": "custom_tool_call_output", "output": [{"type": "input_text", "text": json.dumps({"exit_code": r.returncode, "output": r.stdout + r.stderr})}]}})
+    if r.returncode == 0:  # Codex 0.166 leaves sandbox-denied commands out of the --json stream
+        print(json.dumps({"type": "item.completed", "item": {"type": "command_execution", "command": "/bin/zsh -c " + json.dumps(cmd),
+                          "aggregated_output": r.stdout + r.stderr, "exit_code": r.returncode, "status": "completed"}}))
+entries.append({"type": "event_msg", "payload": {"type": "token_count", "info": {"last_token_usage": {"input_tokens": 9, "cached_input_tokens": 0, "output_tokens": 1, "reasoning_output_tokens": 0}}}})
 log = home / 'sessions' / 'rollout-x.jsonl'; log.parent.mkdir(parents=True, exist_ok=True)
-log.write_text(json.dumps({"type": "event_msg", "payload": {"type": "token_count", "info": {"last_token_usage": {"input_tokens": 9, "cached_input_tokens": 0, "output_tokens": 1, "reasoning_output_tokens": 0}}}}) + '\n')
+log.write_text('\n'.join(json.dumps(x) for x in entries) + '\n')
 print(json.dumps({"type": "turn.completed", "usage": {"input_tokens": 9, "cached_input_tokens": 0, "output_tokens": 1, "reasoning_output_tokens": 0, "cache_write_input_tokens": 0}}))
 """
 
@@ -73,13 +79,21 @@ class Probe(unittest.TestCase):
             probe.main(self.args('broken'))
         self.assertFalse((self.home / 'broken' / 'executor-events.jsonl').exists())
 
-    def test_judge_needs_a_denial_without_the_canary_text(self):
-        ev = lambda cmd, out: json.dumps({'type': 'item.completed', 'item': {'type': 'command_execution', 'command': cmd, 'aggregated_output': out}})
-        ws = self.d / 'ws'; ws.mkdir(); (ws / 'probe-out.txt').write_text('written\n')
-        leak = '\n'.join([ev('cat /x/isolation-canary.txt', 'SECRET'), ev('cat hello.txt', 'hello from the workspace')])
-        self.assertFalse(probe.judge(leak, ws, 'SECRET')['passed'])
-        ok = '\n'.join([ev('cat /x/isolation-canary.txt', 'cat: x: Operation not permitted'), ev('cat hello.txt', 'hello from the workspace')])
-        self.assertTrue(probe.judge(ok, ws, 'SECRET')['passed'])
+    def write_log(self, home, pairs):
+        log = home / 'sessions' / 'rollout-x.jsonl'; log.parent.mkdir(parents=True)
+        lines = []
+        for cmd, out in pairs:
+            lines.append({'type': 'response_item', 'payload': {'type': 'custom_tool_call', 'input': 'tools.exec_command(' + json.dumps({'cmd': cmd}) + ')'}})
+            lines.append({'type': 'response_item', 'payload': {'type': 'custom_tool_call_output', 'output': [{'type': 'input_text', 'text': out}]}})
+        log.write_text('\n'.join(json.dumps(x) for x in lines) + '\n')
+
+    def test_judge_uses_what_the_model_saw_and_needs_a_denial_without_the_canary_text(self):
+        leak, ok = self.d / 'leak', self.d / 'ok'
+        self.write_log(leak, [('cat /x/isolation-canary.txt', 'SECRET'), ('cat hello.txt', 'hello from the workspace')])
+        self.assertFalse(probe.judge(leak, True, 'SECRET')['passed'])
+        self.write_log(ok, [('cat /x/isolation-canary.txt', 'cat: x: Operation not permitted'), ('cat hello.txt', 'hello from the workspace')])
+        self.assertTrue(probe.judge(ok, True, 'SECRET')['passed'])
+        self.assertFalse(probe.judge(ok, False, 'SECRET')['passed'])
 
 
 if __name__ == '__main__':
