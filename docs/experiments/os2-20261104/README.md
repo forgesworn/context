@@ -563,6 +563,37 @@ gap, 271,232 (95%) is cached input; uncached input differs by 11,780 and output
 by 1,022. Both reviewers received near-identical material (5 cited files,
 about 39 KB each), so that does not explain their time difference.
 
+#### Requalification on version 2 (2026-11-06): failed on the MCP error gate
+
+h3-qualification, plain against Context 0.29.0, one repetition, new toolchain,
+Claude primary reviewer and Codex second reviewer on both cells.
+
+| Gate | Result |
+| --- | --- |
+| Context accepted | yes (checker passed, scope passed, both reviewers accepted) |
+| Reads after packet valid | yes (no malformed lines) |
+| Reads after packet at most 0.25 | yes (0) |
+| Context MCP error rate at most 5% | **no: 1 of 13 calls (7.7%)** |
+| Every isolation probe passed | yes (relink, isolation with loopback, readiness, intact after run; Codex reviewer probes) |
+| Usage complete in both cells | yes (executors and Claude reviews) |
+
+The one MCP error: the agent's second call asked `repository_packet` for two
+whole files (AGENTS.md, 254 lines, and a 437-line source file) with a 65,000
+byte budget. The tool refused because the excerpts exceeded 64 KiB, fetched
+nothing, and returned outlines with advice to request smaller ranges; the
+agent did so and finished. This is the same class as one of the four errors
+in the 0.28.0 pair.
+
+Also recorded: plain was accepted too; both reviewers agreed on both cells;
+executor tokens were 756,790 (Context) and 601,004 (plain), a single pair and
+not a gate. Dependency recall was 1.0 in both cells (precision 0.33 and 0.5).
+Claude reviews used 18,371 and 17,420 tokens; Codex reviews 53,180 and 37,682.
+No outside references and no denied reads in either executor.
+
+Under the protocol, phase 2 does not run after a failed requalification. The
+observed cause is fixed in Context as its own release, then requalification
+runs again under a new draft revision.
+
 ### Independent protocol review (paid, needs approval)
 
 A fresh Sol/high session reviews the frozen protocol, harness diff and phase 1
@@ -830,7 +861,9 @@ Phase 2 is of that order. Phase 1 is one pair. No prices were looked up.
    scopes and reviewed the problem list; the bray pair was rewritten).
 8. ~~The quality-measure pilot and the reviewer-independence design~~
    (2026-11-06; see Reviewer design, pilot and readiness).
-9. Requalification (phase 1) on version 2 with the qualification task.
+9. Requalification (phase 1) on version 2 with the qualification task:
+   run 2026-11-06, **failed** on the MCP error gate (1 of 13, 7.7%); a fix
+   ships as its own release, then requalification runs again.
 10. Phase 2.
 
 ## Not claimed

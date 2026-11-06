@@ -623,7 +623,8 @@
     "screen-pro-040-20260923"
   ],
   "openDecisions": [
-    "Owner review of version 2"
+    "Owner review of version 2",
+    "Context fix for oversize packet requests (own release), then requalification again"
   ],
   "revisedAt": "2026-11-05",
   "ownerDecisions": {
@@ -827,5 +828,56 @@
     ],
     "readiness": "nine templates: h3 relink 0 (5/5), isolation 0 (9/9), ready 0 (9/9)",
     "checkerSmoke": "five checker tasks fail at base and pass with the change on this Mac with the toolchain"
+  },
+  "requalification20261106": {
+    "task": "h3-qualification",
+    "build": "0.29.0 (6cd0ce2)",
+    "toolchain": "/Users/Shared/os2-toolchain-20261106",
+    "gates": {
+      "contextAccepted": true,
+      "readsAfterPacketValid": true,
+      "readsAfterPacketAtMost025": true,
+      "mcpErrorRateAtMost5pc": false,
+      "isolationProbesPassed": true,
+      "usageComplete": true
+    },
+    "passed": false,
+    "cause": "one repository_packet build request for two whole files (254 and 437 lines) exceeded the 64 KiB packet limit; the tool fetched nothing and returned outlines; the agent then requested smaller ranges",
+    "observed": {
+      "mcpCalls": 13,
+      "mcpErrors": 1,
+      "readsAfterPacket": 0,
+      "plainAccepted": true,
+      "reviewersAgree": "2/2",
+      "executorTokens": {
+        "context": 756790,
+        "plain": 601004
+      },
+      "executorSeconds": {
+        "context": 262.1,
+        "plain": 229.0
+      },
+      "claudeReviewTokens": [
+        18371,
+        17420
+      ],
+      "codexReviewTokens": [
+        53180,
+        37682
+      ],
+      "dependencies": {
+        "context": {
+          "missed": 0,
+          "recall": 1.0,
+          "precision": 0.33
+        },
+        "plain": {
+          "missed": 0,
+          "recall": 1.0,
+          "precision": 0.5
+        }
+      }
+    },
+    "consequence": "phase 2 not run; the cause is fixed as its own Context release and requalification reruns under a new draft revision"
   }
 }
