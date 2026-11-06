@@ -673,6 +673,39 @@ Findings:
 - Plain also varies widely between runs (590k to 1,418k), so single pairs
   cannot show a release effect.
 
+### What the Context arm reads (2026-11-06, no model)
+
+After the 0.31.0 requalification (ratio 1.78), [`read-volume.mjs`](read-volume.mjs)
+measured what each recorded session showed the model, for six pairs (three
+diagnostic pairs on the retired h3-code-change and the three requalification
+runs on h3-qualification):
+
+| Pair | Context tool calls / model calls | Plain tool calls / model calls | Context KB (navigation + packets) | Plain KB (search + read) | Packet lines near a cited or changed line |
+| --- | --- | --- | --- | --- | --- |
+| diag | 38 / 35 | 23 / 26 | 75 + 74 | 13 + 116 | 20% |
+| diag027 | 33 / 27 | 23 / 29 | 54 + 61 | 36 + 108 | 21% |
+| diag028 | 40 / 36 | 28 / 26 | 37 + 103 | 11 + 121 | 13% |
+| requal (0.29.0) | 22 / 21 | 16 / 15 | 11 + 102 | 25 + 75 | 28% |
+| requal r2 (0.30.0) | 31 / 28 | 21 / 23 | 25 + 123 | 5 + 145 | 24% |
+| requal r3 (0.31.0) | 24 / 23 | 9 / 16 | 14 + 90 | 6 + 90 | 24% |
+
+"Near" means within 15 lines of an answer evidence range or a changed range
+in the same file; it is a heuristic for where retrieval went, not a quality
+measure. Shell line counts are not comparable (one command often reads several
+files), so the shell side is compared by bytes.
+
+Findings:
+
+- Both arms read about the same amount of text. Context does not replace
+  reads; its packets are its reads.
+- Context makes more tool calls, one per search, explore or packet, and a
+  model call follows each. Plain often puts several searches and reads in one
+  shell command (9 tool calls in the latest run). The 0.31.0 run opened with
+  six separate navigation calls for three related names.
+- Every packet was a `build` of agent-chosen ranges; `plan` (complete syntax
+  blocks for a line) was never used. About three quarters of packet lines were
+  not near anything the agent later cited or changed.
+
 ### Independent protocol review (paid, needs approval)
 
 A fresh Sol/high session reviews the frozen protocol, harness diff and phase 1
