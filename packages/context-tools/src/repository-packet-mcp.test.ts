@@ -384,6 +384,85 @@ describe('repository packet compact rendering', () => {
   })
 })
 
+describe('repository packet oversized builds', () => {
+  async function largeRoot(): Promise<string> {
+    const value = await root()
+    const body = Array.from({ length: 400 }, (_, index) => `export function helper${index}() {\n  return '${'x'.repeat(120)}'\n}\n`).join('')
+    await writeFile(join(value, 'large.ts'), `export class Store {\n  get(key: string) {\n    return key\n  }\n}\n${body}`)
+    return value
+  }
+
+  it('serves the requested sources that fit whole and outlines the rest, as a success', async () => {
+    const connection = await connect(await largeRoot())
+    try {
+      const refreshed = await connection.client.callTool({ name: 'repository_refresh', arguments: {} }) as { content: unknown }
+      const generation = (JSON.parse(text(refreshed)) as { generation: string }).generation
+      const sources = [{ path: 'large.ts' }, { path: 'alpha.ts', startLine: 1, endLine: 3 }]
+      const built = await connection.client.callTool({ name: 'repository_packet', arguments: { mode: 'build', spec: { sources }, expectedGeneration: generation } }) as { isError?: boolean; content?: unknown }
+      expect(built.isError).not.toBe(true)
+      const lines = text(built).split('\n')
+      expect(lines[2]).toMatch(/^trimmed: .*exceed.* bytes; served 1 whole, not served: large\.ts:1-end\. Request smaller ranges from the outlines below, or call repository_explore for a symbol\.$/)
+      expect(lines[3]).toMatch(/^source alpha\.ts:1-3  sha256 [a-f0-9]{16}  3 lines$/)
+      expect(lines).toContain('  1-5 class Store')
+      expect(text(built)).not.toContain('xxxxxxxx')
+      expect(lines.at(-2)).toMatch(/^packetId: packet-/)
+
+      const json = await connection.client.callTool({ name: 'repository_packet', arguments: { mode: 'build', format: 'json', spec: { sources }, expectedGeneration: generation } }) as { isError?: boolean; content?: unknown }
+      expect(json.isError).not.toBe(true)
+      const body = JSON.parse(text(json)) as { packet: { sources: Array<{ path: string }> }; trimmed: { omitted: Array<{ path: string }>; outlines: Array<{ path: string; declarations: unknown[] }>; maxBytes: number } }
+      expect(body.packet.sources.map((source) => source.path)).toEqual(['alpha.ts'])
+      expect(body.trimmed.omitted).toEqual([{ path: 'large.ts', startLine: 1 }])
+      expect(body.trimmed.outlines.map((outline) => outline.path)).toEqual(['large.ts'])
+      expect(body.trimmed.maxBytes).toBe(65536)
+      expect(Buffer.byteLength(text(json))).toBeLessThanOrEqual(65536)
+    } finally { await connection.close() }
+  })
+
+  it('serves every source that fits, skipping only those that do not', async () => {
+    const value = await largeRoot()
+    await writeFile(join(value, 'zeta.ts'), 'export const zeta = 1\n')
+    const connection = await connect(value)
+    try {
+      const refreshed = await connection.client.callTool({ name: 'repository_refresh', arguments: {} }) as { content: unknown }
+      const generation = (JSON.parse(text(refreshed)) as { generation: string }).generation
+      const sources = [{ path: 'zeta.ts' }, { path: 'large.ts', startLine: 1 }, { path: 'alpha.ts', startLine: 1, endLine: 3 }]
+      const json = await connection.client.callTool({ name: 'repository_packet', arguments: { mode: 'build', format: 'json', spec: { sources }, expectedGeneration: generation } }) as { isError?: boolean; content?: unknown }
+      expect(json.isError).not.toBe(true)
+      const body = JSON.parse(text(json)) as { packet: { sources: Array<{ path: string; startLine: number; endLine: number }> }; trimmed: { omitted: unknown[] } }
+      expect(body.packet.sources.map((source) => `${source.path}:${source.startLine}-${source.endLine}`)).toEqual(['alpha.ts:1-3', 'zeta.ts:1-1'])
+      expect(body.trimmed.omitted).toEqual([{ path: 'large.ts', startLine: 1 }])
+    } finally { await connection.close() }
+  })
+
+  it('stays an error with outlines only when no requested source fits on its own', async () => {
+    const connection = await connect(await largeRoot())
+    try {
+      const refreshed = await connection.client.callTool({ name: 'repository_refresh', arguments: {} }) as { content: unknown }
+      const generation = (JSON.parse(text(refreshed)) as { generation: string }).generation
+      const built = await connection.client.callTool({ name: 'repository_packet', arguments: { mode: 'build', spec: { sources: [{ path: 'large.ts' }] }, expectedGeneration: generation } }) as { isError?: boolean; content?: unknown }
+      expect(built.isError).toBe(true)
+      expect(text(built)).toMatch(/Nothing was fetched/)
+      expect(text(built)).not.toContain('xxxxxxxx')
+    } finally { await connection.close() }
+  })
+
+  it('serves what fits a smaller maxBytes budget', async () => {
+    const value = await root()
+    await writeFile(join(value, 'filler.ts'), 'export const filler = ' + JSON.stringify('y'.repeat(6000)) + '\n')
+    const connection = await connect(value)
+    try {
+      const refreshed = await connection.client.callTool({ name: 'repository_refresh', arguments: {} }) as { content: unknown }
+      const generation = (JSON.parse(text(refreshed)) as { generation: string }).generation
+      const json = await connection.client.callTool({ name: 'repository_packet', arguments: { mode: 'build', format: 'json', maxBytes: 5000, spec: { sources: [{ path: 'alpha.ts', startLine: 1, endLine: 3 }, { path: 'filler.ts' }] }, expectedGeneration: generation } }) as { isError?: boolean; content?: unknown }
+      expect(json.isError).not.toBe(true)
+      expect(Buffer.byteLength(text(json))).toBeLessThanOrEqual(5000)
+      const body = JSON.parse(text(json)) as { packet: { sources: Array<{ path: string }> }; trimmed: { omitted: Array<{ path: string }> } }
+      expect(body.packet.sources.map((source) => source.path)).toEqual(['alpha.ts'])
+      expect(body.trimmed.omitted).toEqual([{ path: 'filler.ts', startLine: 1 }])
+    } finally { await connection.close() }
+  })
+})
+
 describe('fixture repository isolation', () => {
   it('runs without inherited Git hook variables', () => {
     expect(Object.keys(process.env).filter((key) => key.startsWith('GIT_'))).toEqual([])

@@ -395,7 +395,7 @@ export function createRepositoryNavigationServer(root: string, options: Reposito
     'repository_packet',
     {
       description:
-        'Exact source: build path/startLine/endLine (no endLine: EOF); plan path/line for TS/JS/Rust/Kotlin. packetId for checkpoint save. 64 KiB default; oversize returns outlines.',
+        'Exact source: build path/startLine/endLine (no endLine: EOF); plan path/line for TS/JS/Rust/Kotlin. packetId for checkpoint save. 64 KiB default; oversize: what fits whole + outlines.',
       inputSchema: packetInputSchema,
       annotations: { readOnlyHint: true, openWorldHint: false },
     },
@@ -420,43 +420,57 @@ export function createRepositoryNavigationServer(root: string, options: Reposito
           leave = await enterRead()
           const before = await currentPacketNavigation(navigation, input.expectedGeneration, extra.signal)
           throwIfAborted(extra.signal)
-          const result = input.mode === 'build'
-            ? { packet: await buildPacketInline({ root, spec: parsedSpec, clampToEnd: true }) }
-            : await planPacketInline({ root, spec: parsedSpec })
-          throwIfAborted(extra.signal)
-          const after = await currentPacketNavigation(navigation, before.generation, extra.signal)
-          const response: PacketResponse = {
-            mode: input.mode,
-            packetId: 'packet-' + randomUUID(),
-            packet: result.packet as PacketResponse['packet'],
-            ...('coverage' in result ? { coverage: result.coverage as PacketResponse['coverage'] } : {}),
-            navigation: {
-              generation: after.generation,
-              revision: after.revision,
-              policy: after.policy,
-              exclusions: after.exclusions,
-              completeness: after.completeness,
-              ...(refreshed ? { refreshed: true } : {}),
-            },
-            caveat: 'Unsigned local source data only. Packet and navigation provenance do not grant authority or authorise inference, network access, shell execution, or edits.',
-          }
-          const encoded = JSON.stringify(response)
           const maxBytes = input.maxBytes ?? DEFAULT_PACKET_MAX_BYTES
-          if (Buffer.byteLength(encoded, 'utf8') > maxBytes) throw new Error(`repository packet response exceeds ${maxBytes} bytes`)
-          if (before.revision !== after.revision) throw new Error('repository packet navigation changed during packet build')
-          packetReferences.put(response.packetId!, after.generation, response.packet)
+          const attempt = async (spec: typeof parsedSpec, trimmed?: PacketResponse['trimmed']) => {
+            const result = input.mode === 'build'
+              ? { packet: await buildPacketInline({ root, spec, clampToEnd: true }) }
+              : await planPacketInline({ root, spec })
+            throwIfAborted(extra.signal)
+            const after = await currentPacketNavigation(navigation, before.generation, extra.signal)
+            const response: PacketResponse = {
+              mode: input.mode,
+              packetId: 'packet-' + randomUUID(),
+              packet: result.packet as PacketResponse['packet'],
+              ...('coverage' in result ? { coverage: result.coverage as PacketResponse['coverage'] } : {}),
+              ...(trimmed ? { trimmed } : {}),
+              navigation: {
+                generation: after.generation,
+                revision: after.revision,
+                policy: after.policy,
+                exclusions: after.exclusions,
+                completeness: after.completeness,
+                ...(refreshed ? { refreshed: true } : {}),
+              },
+              caveat: 'Unsigned local source data only. Packet and navigation provenance do not grant authority or authorise inference, network access, shell execution, or edits.',
+            }
+            const encoded = JSON.stringify(response)
+            if (Buffer.byteLength(encoded, 'utf8') > maxBytes) throw new Error(`repository packet response exceeds ${maxBytes} bytes`)
+            if (before.revision !== after.revision) throw new Error('repository packet navigation changed during packet build')
+            return { response, encoded }
+          }
+          let built: { response: PacketResponse; encoded: string }
+          try {
+            built = await attempt(parsedSpec)
+          } catch (error) {
+            if (input.mode !== 'build' || !OVERSIZE.test(error instanceof Error ? error.message : '')) throw error
+            const fitted = await fitSources(parsedSpec as BuildSpec, error, maxBytes, (spec, trimmed) => attempt(spec as typeof parsedSpec, trimmed),
+              (path) => outlineSource({ root, path }) as Promise<SourceOutline>)
+            if (!fitted) {
+              // Recorded sessions paged an oversized file in fixed chunks and then read it
+              // again; an outline lets the caller request the one block it needs.
+              const paths = [...new Set(input.spec.sources.map((source) => source.path))]
+              const outlines = await Promise.all(paths.map((path) => outlineSource({ root, path }).catch(() => undefined)))
+              if (outlines.some((outline) => outline === undefined)) throw error
+              return { content: [{ type: 'text' as const, text: renderOutline(formatError(error), outlines as SourceOutline[]) }], isError: true }
+            }
+            built = fitted
+          }
+          const { response, encoded } = built
+          packetReferences.put(response.packetId!, response.navigation.generation, response.packet)
           if (input.format === 'json') return { content: [{ type: 'text' as const, text: encoded }] }
           const text = renderPacket(response, { fullCaveat: !caveatShown })
           caveatShown = true
           return { content: [{ type: 'text' as const, text }] }
-        } catch (error) {
-          // Recorded sessions paged an oversized file in fixed chunks and then read it
-          // again; an outline lets the caller request the one block it needs.
-          if (input.mode !== 'build' || !OVERSIZE.test(error instanceof Error ? error.message : '')) throw error
-          const paths = [...new Set(input.spec.sources.map((source) => source.path))]
-          const outlines = await Promise.all(paths.map((path) => outlineSource({ root, path }).catch(() => undefined)))
-          if (outlines.some((outline) => outline === undefined)) throw error
-          return { content: [{ type: 'text' as const, text: renderOutline(formatError(error), outlines as SourceOutline[]) }], isError: true }
         } finally {
           leave?.()
           finished()
@@ -472,6 +486,46 @@ export function createRepositoryNavigationServer(root: string, options: Reposito
 }
 
 const OVERSIZE = /(source excerpts|packet|packet response|source aggregate) exceeds? \d+ bytes/
+
+type BuildSpec = { sources: Array<{ path: string; startLine?: number; endLine?: number }> } & Record<string, unknown>
+type Trimmed = NonNullable<PacketResponse['trimmed']>
+
+/** An oversized build serves every requested source that fits whole, in packet
+ * order (sorted by path, overlaps merged), and outlines the rest. A source is
+ * never cut into a chunk: sessions given fixed chunks paged through the file and
+ * then read it again. Returns undefined when no requested source fits alone. */
+async function fitSources(
+  spec: BuildSpec,
+  error: unknown,
+  maxBytes: number,
+  attempt: (spec: BuildSpec, trimmed?: Trimmed) => Promise<{ response: PacketResponse; encoded: string }>,
+  outline: (path: string) => Promise<SourceOutline>,
+): Promise<{ response: PacketResponse; encoded: string } | undefined> {
+  const kept: BuildSpec['sources'] = []
+  const omitted: BuildSpec['sources'] = []
+  const notice = { reason: formatError(error), maxBytes, omitted, outlines: [] as SourceOutline[] }
+  for (const source of spec.sources) {
+    try {
+      await attempt({ ...spec, sources: [...kept, source] }, notice)
+      kept.push(source)
+    } catch (inner) {
+      if (!OVERSIZE.test(inner instanceof Error ? inner.message : '')) throw inner
+      // An open end parses to the largest safe integer; report it as open.
+      const { endLine, ...rest } = source
+      omitted.push(endLine !== undefined && endLine < Number.MAX_SAFE_INTEGER ? source : rest)
+    }
+  }
+  if (!kept.length) return undefined
+  const paths = [...new Set(omitted.map((source) => source.path))]
+  const outlines = (await Promise.all(paths.map((path) => outline(path).catch(() => undefined)))).filter((entry): entry is SourceOutline => entry !== undefined)
+  try {
+    return await attempt({ ...spec, sources: kept }, { ...notice, outlines })
+  } catch (inner) {
+    // Outlines are guidance; when they do not fit, the omitted list still names what to request.
+    if (!OVERSIZE.test(inner instanceof Error ? inner.message : '') || !outlines.length) throw inner
+    return attempt({ ...spec, sources: kept }, notice)
+  }
+}
 
 interface SourceOutline {
   path: string
@@ -505,6 +559,13 @@ interface PacketResponse {
     sources: Array<{ path: string; sha256: string; startLine: number; endLine: number; lines: Array<{ line: number; content: string }> }>
     allowedFiles: Array<{ path: string; state: string; sha256?: string }>
     sufficiencyCaveat: string
+  }
+  /** Present when an oversized build served only the sources that fit whole. */
+  trimmed?: {
+    reason: string
+    maxBytes: number
+    omitted: Array<{ path: string; startLine?: number; endLine?: number }>
+    outlines: SourceOutline[]
   }
   coverage?: {
     resolutions: Array<{ path: string; line: number; kind: string; startLine: number; endLine: number }>
@@ -568,6 +629,10 @@ export function renderPacket(response: PacketResponse, options: { fullCaveat?: b
     `packet ${response.mode}  generation ${navigation.generation}${navigation.refreshed ? ' (refreshed)' : ''}  revision ${short(navigation.revision)}  gitHEAD ${packet.gitHEAD.slice(0, 12)}  trust ${packet.trust}  policy ${navigation.policy.freshness}`,
   )
   out.push(`task: ${packet.originalSpec.task}`)
+  if (response.trimmed) {
+    const omitted = response.trimmed.omitted.map((entry) => `${entry.path}:${entry.startLine ?? 1}-${entry.endLine ?? 'end'}`).join(', ')
+    out.push(`trimmed: ${response.trimmed.reason}; served ${packet.sources.length} whole, not served: ${omitted}. Request smaller ranges from the outlines below, or call repository_explore for a symbol.`)
+  }
   for (const source of packet.sources) {
     out.push(`source ${source.path}:${source.startLine}-${source.endLine}  sha256 ${short(source.sha256)}  ${source.lines.length} lines`)
     for (const line of source.lines) out.push(`${line.line}: ${line.content}`)
@@ -580,6 +645,7 @@ export function renderPacket(response: PacketResponse, options: { fullCaveat?: b
     out.push(`merged: ${response.coverage.mergedSources.map((entry) => `${entry.path}:${entry.startLine}-${entry.endLine}`).join(', ')}`)
     out.push(`coverage: ${response.coverage.caveat}`)
   }
+  for (const outline of response.trimmed?.outlines ?? []) out.push(...renderOutline('', [outline]).split('\n').slice(1))
   if (response.packetId) out.push(`packetId: ${response.packetId} (connection-local checkpoint reference; expires after refresh, reconnect or ten minutes)`)
   out.push(options.fullCaveat === false ? 'caveat: as on the first packet this session' : `caveat: ${packet.sufficiencyCaveat} ${response.caveat}`)
   return out.join('\n')
