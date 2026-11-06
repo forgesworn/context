@@ -34,6 +34,30 @@ function stable(value) {
   return value;
 }
 export function serializePacket(value) { return JSON.stringify(stable(value)); }
+/** The compact JSON view of a packet (from 0.31.0): each source's `lines` objects
+ * become one `text` block of `N: content` rows, as in the text form. */
+export function compactPacket(packet) {
+  return { ...packet, sources: packet.sources.map(({ lines, ...source }) => ({ ...source, text: lines.map((line) => `${line.line}: ${line.content}`).join('\n') })) };
+}
+/** The inverse of compactPacket: a packet received in the compact JSON view gets
+ * its `lines` objects back, so it verifies and is stored exactly as the full
+ * packet. A full packet, or a source whose text does not parse, is unchanged. */
+export function expandPacket(packet) {
+  if (!packet || typeof packet !== 'object' || !Array.isArray(packet.sources)) return packet;
+  return { ...packet, sources: packet.sources.map((source) => {
+    if (!source || typeof source !== 'object' || 'lines' in source || typeof source.text !== 'string') return source;
+    const lines = [];
+    for (const row of source.text.split('\n')) {
+      const cut = row.indexOf(': ');
+      const number = row.slice(0, cut);
+      if (cut < 1 || !/^[1-9][0-9]*$/.test(number)) return source;
+      lines.push({ line: Number(number), content: row.slice(cut + 2) });
+    }
+    const { text: _text, ...rest } = source;
+    return { ...rest, lines };
+  }) };
+}
+const isCompact = (packet) => Array.isArray(packet.sources) && packet.sources.some((source) => source && typeof source.text === 'string' && !('lines' in source));
 const serialize = serializePacket;
 function strictText(bytes, label) {
   try { return new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }).decode(bytes); }
@@ -497,7 +521,8 @@ export async function verifyPacket({ root: rootInput, packet: packetInput }) {
   const packetBytes = await regularBytes(packetInput, 'packet', MAX_PACKET_BYTES);
   const packet = parsePacket(strictText(packetBytes, 'packet'));
   const rebuilt = await buildPacketFromSpec({ root: rootInput, spec: packet.originalSpec });
-  assert(serialize(packet) === serialize(rebuilt), 'packet is stale or has been tampered with');
+  // A packet saved from the compact JSON view verifies against the same view of the rebuild.
+  assert(serialize(packet) === serialize(isCompact(packet) ? compactPacket(rebuilt) : rebuilt), 'packet is stale or has been tampered with');
   return { status: 'current' };
 }
 

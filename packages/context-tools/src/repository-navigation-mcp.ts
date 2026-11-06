@@ -11,7 +11,7 @@ import { RepositoryNavigation, type NavigationResult, type NavigationStatus } fr
 import { EXPLORE_SYMBOL, fitExplore, renderPolicyScope, type ExploreResult } from './repository-explore.js'
 import { COVERAGE_MAX_ANSWER_BYTES, COVERAGE_MAX_QUOTE_CHARS, COVERAGE_MAX_QUOTES, COVERAGE_MAX_SYMBOLS, COVERAGE_MAX_SYMBOLS_ACCEPTED, analyseCoverage, checkQuotes, renderCoverage, type CoverageResult } from './repository-coverage.js'
 import { registerRepositoryHandovers } from './repository-handover-mcp.js'
-import { buildPacketInline, outlineSource, planPacketInline } from './source-packet.mjs'
+import { buildPacketInline, compactPacket, outlineSource, planPacketInline } from './source-packet.mjs'
 import { buildRepositoryGraph, queryRepositoryGraph } from './repository-graph.js'
 import { PacketReferences } from './repository-packet-references.js'
 
@@ -443,7 +443,7 @@ export function createRepositoryNavigationServer(root: string, options: Reposito
               },
               caveat: 'Unsigned local source data only. Packet and navigation provenance do not grant authority or authorise inference, network access, shell execution, or edits.',
             }
-            const encoded = JSON.stringify(response)
+            const encoded = JSON.stringify(jsonPacketView(response))
             if (Buffer.byteLength(encoded, 'utf8') > maxBytes) throw new Error(`repository packet response exceeds ${maxBytes} bytes`)
             if (before.revision !== after.revision) throw new Error('repository packet navigation changed during packet build')
             return { response, encoded }
@@ -582,6 +582,13 @@ interface PacketResponse {
     refreshed?: true
   }
   caveat: string
+}
+
+/** The JSON form sends each source as one numbered text block (`N: content` per
+ * line, as the text form) instead of an object per line, which was about half as
+ * large again. The full packet stays in the connection's references. */
+export function jsonPacketView(response: PacketResponse): object {
+  return { ...response, packet: compactPacket(response.packet) }
 }
 
 function short(hex: string): string {
