@@ -54,13 +54,14 @@ TypeScript parsing; rejection is not a parser failure on those languages.
   exercise each added suffix, plus uppercase `.HPP`, through exact search, packet
   lines and hashes, checkout/commit provenance, stale rejection, generation
   replacement and retrieval after an edit. Git-ignore exclusions still suppress
-  search and reject packets. Syntax planning still rejects these suffixes.
+  search and reject packets. These suffixes have no syntax planner: from 0.33.0 a
+  `plan` anchor in one selects the whole file up to 16 KiB and reports larger files.
 - [Broad scanner tests](../packages/context-tools/src/broad-source-scan.test.ts)
   cover declarations and lexical provenance for all six suffixes and uppercase
   `.HPP`. The broad scanner still infers no Dart declarations, and a test says so.
 - The [MCP packet tests](../packages/context-tools/src/repository-packet-mcp.test.ts)
   also cover Dart: exact search and `build` packets return it, and `plan` packets
-  reject it with the planner's unsupported-extension error. This is exact-token
+  return the whole file (no syntax planner). This is exact-token
   navigation only; there is no Dart parser, import resolution or pub package evidence.
 - [Installed package smoke](../test/context-package-smoke.mjs) retrieves all six
   suffixes through the installed stdio MCP server outside the workspace.

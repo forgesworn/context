@@ -395,7 +395,7 @@ export function createRepositoryNavigationServer(root: string, options: Reposito
     'repository_packet',
     {
       description:
-        'Exact source: build path/startLine/endLine (no endLine: EOF); plan path/line for TS/JS/Rust/Kotlin. packetId for checkpoint save. 64 KiB default; oversize: what fits whole + outlines.',
+        'Exact source: build path/startLine/endLine (no endLine: EOF); plan path/line: enclosing block or small file. packetId for checkpoints. 64 KiB default; oversize: what fits whole + outlines.',
       inputSchema: packetInputSchema,
       annotations: { readOnlyHint: true, openWorldHint: false },
     },
@@ -476,7 +476,7 @@ export function createRepositoryNavigationServer(root: string, options: Reposito
           finished()
         }
       } catch (error) {
-        return { content: [{ type: 'text' as const, text: formatError(error) }], isError: true }
+        return { content: [{ type: 'text' as const, text: withPathCandidates(formatError(error), navigation) }], isError: true }
       }
     },
   )
@@ -652,9 +652,9 @@ export function renderPacket(response: PacketResponse, options: { fullCaveat?: b
   if (response.coverage) {
     out.push(`resolved: ${response.coverage.resolutions.map((entry) => `${entry.path}:${entry.line} -> ${entry.startLine}-${entry.endLine} (${entry.kind})`).join('; ')}`)
     out.push(`merged: ${response.coverage.mergedSources.map((entry) => `${entry.path}:${entry.startLine}-${entry.endLine}`).join(', ')}`)
-    if (response.coverage.unresolved?.length) {
-      out.push(`unresolved: ${response.coverage.unresolved.map((entry) => `${entry.path}:${entry.line}`).join(', ')} (no supported syntax block contains these lines; request exact ranges with mode build)`)
-    }
+    const byReason = new Map<string, string[]>()
+    for (const entry of response.coverage.unresolved ?? []) byReason.set(entry.reason, [...(byReason.get(entry.reason) ?? []), `${entry.path}:${entry.line}`])
+    for (const [reason, anchors] of byReason) out.push(`unresolved: ${anchors.join(', ')} (${reason})`)
     out.push(`coverage: ${response.coverage.caveat}`)
   }
   for (const outline of response.trimmed?.outlines ?? []) out.push(...renderOutline('', [outline]).split('\n').slice(1))
@@ -665,6 +665,17 @@ export function renderPacket(response: PacketResponse, options: { fullCaveat?: b
 
 function displayRoot(root: string): string {
   try { return realpathSync(root) } catch { return resolvePath(root) }
+}
+
+/** A packet source that does not exist gets the indexed paths ending in its name,
+ * so the next request can name the file instead of searching for it. */
+export function withPathCandidates(message: string, navigation: Pick<RepositoryNavigation, 'pathCandidates'>): string {
+  const missing = /cannot inspect source (\S+): ENOENT/.exec(message)
+  if (!missing) return message
+  const name = missing[1].slice(missing[1].lastIndexOf('/') + 1)
+  const { paths, more } = navigation.pathCandidates(name)
+  if (!paths.length) return `${message}; no indexed path ends in ${name}`
+  return `${message}; indexed paths ending in ${name}: ${paths.join(', ')}${more ? ` (+${more} more)` : ''}`
 }
 
 function formatError(error: unknown): string {

@@ -103,9 +103,25 @@ test('planner rejects unsupported, malformed, signature-only and ambiguous same-
   await writeFile(join(root, 'src.ts'), 'function a() {} function b() {}\ndeclare function absent(): void;\n');
   await assert.rejects(planPacket({ root, spec: await spec(root, planBase({ sources: [{ path: 'src.ts', line: 1 }] })) }), /ambiguous/);
   await assert.rejects(planPacket({ root, spec: await spec(root, planBase({ sources: [{ path: 'src.ts', line: 2 }] })) }), /no supported/);
-  await assert.rejects(planPacket({ root, spec: await spec(root, planBase({ sources: [{ path: 'src.py', line: 1 }] })) }), /unsupported/);
+  await assert.rejects(planPacket({ root, spec: await spec(root, planBase({ sources: [{ path: 'Dockerfile', line: 1 }] })) }), /unsupported/);
   await writeFile(join(root, 'bad.ts'), 'function broken( {\n');
   await assert.rejects(planPacket({ root, spec: await spec(root, planBase({ sources: [{ path: 'bad.ts', line: 1 }] })) }), /parse errors/);
+});
+
+test('planner serves files with no syntax planner whole, and reports oversized ones', async () => {
+  const root = await fixture();
+  await writeFile(join(root, 'src.ts'), 'export function a() {\n  return 1;\n}\n');
+  await writeFile(join(root, 'AGENTS.md'), '# Rules\n\nRun the tests.\n');
+  await writeFile(join(root, 'big.json'), JSON.stringify({ rows: 'x'.repeat(17 * 1024) }) + '\n');
+  await writeFile(join(root, 'tool.py'), 'def run():\n    return 2\n');
+  const result = await planPacket({ root, spec: await spec(root, planBase({ allowedFiles: ['src.ts', 'AGENTS.md', 'big.json', 'tool.py'], sources: [
+    { path: 'AGENTS.md', line: 2 }, { path: 'big.json', line: 1 }, { path: 'src.ts', line: 2 }, { path: 'tool.py', line: 1 }] })) });
+  assert.deepEqual(result.packet.sources.map(({ path, startLine, endLine }) => [path, startLine, endLine]), [['AGENTS.md', 1, 3], ['src.ts', 1, 3], ['tool.py', 1, 2]]);
+  assert.deepEqual(result.coverage.resolutions.map(({ path, kind }) => [path, kind]), [['AGENTS.md', 'file'], ['src.ts', 'function'], ['tool.py', 'file']]);
+  assert.deepEqual(result.coverage.unresolved.map(({ path, line }) => [path, line]), [['big.json', 1]]);
+  assert.match(result.coverage.unresolved[0].reason, /no syntax planner .* exceeds 16384 bytes/);
+  await assert.rejects(planPacket({ root, spec: await spec(root, planBase({ allowedFiles: ['big.json'], sources: [{ path: 'big.json', line: 1 }] })) }), /no syntax planner and exceeds 16384 bytes/);
+  await assert.rejects(planPacket({ root, spec: await spec(root, planBase({ allowedFiles: ['AGENTS.md'], sources: [{ path: 'AGENTS.md', line: 4 }] })) }), /anchor line exceeds source length: AGENTS.md has 3 lines/);
 });
 
 test('planner selects class, interface, type and enum declarations for lines outside any function', async () => {

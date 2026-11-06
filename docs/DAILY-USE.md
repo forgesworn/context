@@ -50,8 +50,8 @@ coverage and reports observed usage rather than claiming savings.
    hashes. A pointer or summary is not sufficient evidence for a code change.
    On a server exposing `repository_packet`, request a bounded packet; omit
    `expectedGeneration` to read current source, which refreshes a stale index
-   first (0.28.0 and later). `plan` selects complete TS/JS, Rust and Kotlin syntax blocks;
-   `build` takes reviewed exact ranges. See the [inline MCP example](WORKER-PACKETS.md#request-a-packet-through-mcp).
+   first (0.28.0 and later). `plan` selects complete TS/JS, Rust and Kotlin syntax blocks
+   and other files whole up to 16 KiB; `build` takes reviewed exact ranges. See the [inline MCP example](WORKER-PACKETS.md#request-a-packet-through-mcp).
    No shell helper is required by the consuming model.
    If more matches are needed, pass the returned `nextCursor` into the next
    search with the same term. Each cursor is single-use and expires after five
