@@ -8,6 +8,7 @@ import { promisify } from 'node:util'
 import { Client } from '@modelcontextprotocol/sdk/client/index.js'
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js'
 import { createRepositoryNavigationServer } from './repository-navigation-mcp.js'
+import { compactPacket, expandPacket } from './source-packet.mjs'
 
 const exec = promisify(execFile)
 const roots: string[] = []
@@ -71,7 +72,7 @@ describe('repository packet MCP adapter', () => {
       const packet = JSON.parse(text(built)).packet
       expect(packet.canonicalRoot).toBe(await realpath(value))
       expect(packet.gitHEAD).toBe((await exec('git', ['-C', value, 'rev-parse', 'HEAD'])).stdout.trim())
-      expect(packet.sources[0]).toMatchObject({ path: file, sha256: digest, startLine: 2, endLine: 2, lines: [{ line: 2, content: 'class EvidenceMarker {}' }] })
+      expect(packet.sources[0]).toMatchObject({ path: file, sha256: digest, startLine: 2, endLine: 2, text: '2: class EvidenceMarker {}' })
       expect(packet.allowedFiles[0]).toMatchObject({ path: file, state: 'present', sha256: digest })
       const planned = await call(connection.client, { mode: 'plan', expectedGeneration: generation, spec: fixtureSpec([{ path: file, line: 2 }]) })
       if (file.endsWith('.kts')) {
@@ -99,7 +100,7 @@ describe('repository packet MCP adapter', () => {
       expect(updated.isError).not.toBe(true)
       expect(JSON.parse(text(updated)).packet.sources[0]).toMatchObject({
         sha256: createHash('sha256').update(changed).digest('hex'),
-        lines: [{ line: 2, content: 'class UpdatedEvidenceMarker {}' }],
+        text: '2: class UpdatedEvidenceMarker {}',
       })
 
       await writeFile(join(value, '.gitignore'), `${file}\n`)
@@ -125,7 +126,7 @@ describe('repository packet MCP adapter', () => {
       const fixtureSpec = (sources: unknown[]) => ({ ...spec(sources), allowedFiles: ['sample.dart'] })
       const built = await call(connection.client, { mode: 'build', expectedGeneration, spec: fixtureSpec([{ path: 'sample.dart', startLine: 1, endLine: 1 }]) })
       expect(built.isError).not.toBe(true)
-      expect(JSON.parse(text(built)).packet.sources[0].lines).toEqual([{ line: 1, content: 'class DartMarker {}' }])
+      expect(JSON.parse(text(built)).packet.sources[0].text).toBe('1: class DartMarker {}')
       const planned = await call(connection.client, { mode: 'plan', expectedGeneration, spec: fixtureSpec([{ path: 'sample.dart', line: 1 }]) })
       expect(planned.isError).toBe(true)
       expect(text(planned)).toMatch(/planner source extension is unsupported/)
@@ -164,7 +165,7 @@ describe('repository packet MCP adapter', () => {
       let generation = (JSON.parse(text(refreshed)) as { generation: string }).generation
       const built = await call(connection.client, { mode: 'build', spec: spec([{ path: 'alpha.ts', startLine: 2, endLine: 2 }]), expectedGeneration: generation })
       expect(built.isError).not.toBe(true)
-      expect((JSON.parse(text(built)) as { packet: { sources: Array<{ lines: Array<{ line: number }> }> } }).packet.sources[0].lines).toEqual([{ line: 2, content: '  return 1' }])
+      expect((JSON.parse(text(built)) as { packet: { sources: Array<{ text: string }> } }).packet.sources[0].text).toBe('2:   return 1')
       const planned = await call(connection.client, { mode: 'plan', spec: spec([{ path: 'alpha.ts', line: 2 }]), expectedGeneration: generation })
       expect((JSON.parse(text(planned)) as { coverage: { mergedSources: unknown[] } }).coverage.mergedSources).toEqual([{ path: 'alpha.ts', startLine: 1, endLine: 3 }])
       await writeFile(join(value, '.gitignore'), 'alpha.ts\n')
@@ -197,7 +198,7 @@ describe('repository packet MCP adapter', () => {
       const parsed = JSON.parse(text(current)) as { navigation: { generation: string; refreshed?: true }; packet: { sources: Array<{ lines: Array<{ content: string }> }> } }
       expect(parsed.navigation.refreshed).toBe(true)
       expect(parsed.navigation.generation).not.toBe(firstNavigation.generation)
-      expect(parsed.packet.sources[0].lines).toEqual([{ line: 2, content: '  return 2' }])
+      expect(parsed.packet.sources[0].text).toBe('2:   return 2')
       const rendered = await connection.client.callTool({ name: 'repository_packet', arguments: { mode: 'build', spec: spec([{ path: 'alpha.ts', startLine: 2, endLine: 2 }]) } }) as { content?: unknown }
       expect(text(rendered).split('\n')[0]).not.toContain('(refreshed)')
     } finally { await connection.close() }
@@ -220,7 +221,7 @@ describe('repository packet MCP adapter', () => {
       expect(exploreGeneration).not.toBe(before)
       expect((JSON.parse(text(packet)) as { navigation: { generation: string } }).navigation.generation).toBe(exploreGeneration)
       expect((JSON.parse(text(coverage)) as { generation: string }).generation).toBe(exploreGeneration)
-      expect((JSON.parse(text(packet)) as { packet: { sources: Array<{ lines: Array<{ content: string }> }> } }).packet.sources[0].lines[0].content).toBe('  return 3')
+      expect((JSON.parse(text(packet)) as { packet: { sources: Array<{ text: string }> } }).packet.sources[0].text).toBe('2:   return 3')
     } finally { await connection.close() }
   })
 
@@ -282,7 +283,8 @@ describe('repository packet MCP adapter', () => {
       expect(past.isError).not.toBe(true)
       const packet = JSON.parse(text(past)).packet
       expect(packet.sources[0]).toMatchObject({ path: 'alpha.ts', startLine: 2, endLine: 3 })
-      expect(packet.sources[0].lines.map((line: { line: number }) => line.line)).toEqual([2, 3])
+      expect(packet.sources[0].text.split('\n').map((line: string) => Number(line.split(':')[0]))).toEqual([2, 3])
+      expect(packet.sources[0]).not.toHaveProperty('lines')
       expect(packet.originalSpec.sources[0]).toEqual({ path: 'alpha.ts', startLine: 2, endLine: 3 })
       const { verifyPacket, serializePacket } = await import('./source-packet.mjs') as unknown as { verifyPacket: (input: { root: string; packet: string }) => Promise<{ status: string }>; serializePacket: (value: unknown) => string }
       const saved = join(value, 'packet.json')
@@ -434,6 +436,24 @@ describe('repository packet oversized builds', () => {
     } finally { await connection.close() }
   })
 
+  it('sends JSON sources as one numbered text block, close to the text form in size', async () => {
+    const value = await root()
+    await writeFile(join(value, 'many.ts'), Array.from({ length: 300 }, (_, index) => `export const value${index} = "${'z'.repeat(20)}"`).join('\n') + '\n')
+    const connection = await connect(value)
+    try {
+      const refreshed = await connection.client.callTool({ name: 'repository_refresh', arguments: {} }) as { content: unknown }
+      const generation = (JSON.parse(text(refreshed)) as { generation: string }).generation
+      const args = { mode: 'build', spec: { sources: [{ path: 'many.ts' }] }, expectedGeneration: generation }
+      const json = await connection.client.callTool({ name: 'repository_packet', arguments: { ...args, format: 'json' } }) as { isError?: boolean; content?: unknown }
+      const plain = await connection.client.callTool({ name: 'repository_packet', arguments: { ...args, format: 'text' } }) as { isError?: boolean; content?: unknown }
+      const source = (JSON.parse(text(json)) as { packet: { sources: Array<{ text: string; startLine: number; endLine: number }> } }).packet.sources[0]
+      expect(source).toMatchObject({ startLine: 1, endLine: 300 })
+      expect(source.text.split('\n')).toHaveLength(300)
+      expect(source.text.split('\n')[299]).toBe(`300: export const value299 = "${'z'.repeat(20)}"`)
+      expect(Buffer.byteLength(text(json))).toBeLessThan(Buffer.byteLength(text(plain)) * 1.25)
+    } finally { await connection.close() }
+  })
+
   it('stays an error with outlines only when no requested source fits on its own', async () => {
     const connection = await connect(await largeRoot())
     try {
@@ -466,5 +486,20 @@ describe('repository packet oversized builds', () => {
 describe('fixture repository isolation', () => {
   it('runs without inherited Git hook variables', () => {
     expect(Object.keys(process.env).filter((key) => key.startsWith('GIT_'))).toEqual([])
+  })
+})
+
+describe('packet JSON helpers', () => {
+  it('expands the compact view back to the full packet exactly, and leaves other packets alone', () => {
+    const full = { version: 1, sources: [{ path: 'a.ts', sha256: 'f', startLine: 2, endLine: 4, lines: [{ line: 2, content: '  return 1' }, { line: 3, content: 'a: b: c' }, { line: 4, content: '' }] }] }
+    const compact = compactPacket(full) as { sources: Array<{ text: string }> }
+    expect(compact.sources[0].text).toBe('2:   return 1\n3: a: b: c\n4: ')
+    expect(compact.sources[0]).not.toHaveProperty('lines')
+    expect(expandPacket(compact)).toEqual(full)
+    expect(expandPacket(full)).toEqual(full)
+    for (const text of ['x: y', '0: y', '01: y', '3 y']) {
+      const odd = { sources: [{ path: 'a.ts', text }] }
+      expect(expandPacket(odd)).toEqual(odd)
+    }
   })
 })

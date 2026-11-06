@@ -186,7 +186,7 @@ export const view = await vault.create({ title: 'Independent consumer', scope: '
           spec: { ...spec, allowedFiles: [path], sources: [{ path, startLine: 1, endLine: 1 }] }, format: 'json',
         } })
         assert.notEqual(result.isError, true, text(result))
-        assert.deepEqual(JSON.parse(text(result)).packet.sources[0].lines, [{ line: 1, content: 'class InstalledSuffixMarker {}' }])
+        assert.equal(JSON.parse(text(result)).packet.sources[0].text, '1: class InstalledSuffixMarker {}')
       }
       const explored = await client.callTool({ name: 'repository_explore', arguments: { symbol: 'example' } })
       assert.notEqual(explored.isError, true, text(explored))
@@ -204,7 +204,7 @@ export const view = await vault.create({ title: 'Independent consumer', scope: '
       const current = await client.callTool({ name: 'repository_packet', arguments: { mode: 'build', format: 'json', spec: { ...spec, sources: [{ path: 'example.ts', startLine: 2, endLine: 2 }] } } })
       assert.notEqual(current.isError, true, text(current))
       assert.equal(JSON.parse(text(current)).navigation.refreshed, true)
-      assert.equal(JSON.parse(text(current)).packet.sources[0].lines[0].content, '  return 23')
+      assert.equal(JSON.parse(text(current)).packet.sources[0].text, '2:   return 23')
     } finally { await client.close() }
     client = await open()
     try {

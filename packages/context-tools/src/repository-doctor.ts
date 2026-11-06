@@ -4,6 +4,7 @@ import { realpath } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
+import { expandPacket } from './source-packet.mjs';
 
 const execFile = promisify(execFileCb);
 
@@ -547,18 +548,15 @@ export async function diagnoseRepository(
         'packet source line range does not match search hit line',
       );
     }
-    const sourceLines = Array.isArray(source.lines) ? (source.lines as unknown[]) : [];
-    if (sourceLines.length !== 1) {
+    const expanded = (expandPacket({ sources: [source] }) as { sources: Array<{ lines?: unknown }> }).sources[0].lines;
+    const returned = Array.isArray(expanded) ? (expanded as Array<{ line: number; content: string }>) : [];
+    if (returned.length !== 1) {
       throw new DoctorError(
-        `packet source lines expected exactly 1, got ${sourceLines.length}`,
+        `packet source lines expected exactly 1, got ${returned.length}`,
       );
     }
-    const lineObj = requireObject(sourceLines[0], 'packet.sources[0].lines[0]');
-    const returnedLine = requireNumber(lineObj.line, 'packet.sources[0].lines[0].line');
-    const returnedContent = requireString(
-      lineObj.content,
-      'packet.sources[0].lines[0].content',
-    );
+    const returnedLine = returned[0].line;
+    const returnedContent = returned[0].content;
     if (returnedLine !== hit.line) {
       throw new DoctorError('packet line number does not match search hit line');
     }

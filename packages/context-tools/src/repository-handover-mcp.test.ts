@@ -10,6 +10,7 @@ import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js'
 import { createRepositoryNavigationServer } from './repository-navigation-mcp.js'
 import { buildPacketFromSpec } from './source-packet.mjs'
 import { saveHandoverRecord } from './task-handover.mjs'
+import { expandPacket } from './source-packet.mjs'
 
 const exec = promisify(execFile)
 const roots: string[] = []
@@ -176,7 +177,8 @@ it('saves the exact server-held packet by reference without copying source into 
     const saved = await c.client.callTool({ name: 'repository_handover_save', arguments: args })
     expect(saved.isError, text(saved)).not.toBe(true)
     const record = JSON.parse(await readFile(join(f.directory, args.name), 'utf8'))
-    expect(record.packet).toEqual(built.packet)
+    expect(record.packet).toEqual(expandPacket(built.packet))
+    expect(built.packet.sources[0]).toHaveProperty('text')
     expect((await c.client.callTool({ name: 'repository_handover_save', arguments: { ...args, name: 'ambiguous.json', packet: built.packet } })).isError).toBe(true)
   } finally { await c.close() }
 })

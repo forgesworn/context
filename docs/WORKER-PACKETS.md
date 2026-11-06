@@ -75,7 +75,11 @@ for planning, coverage metadata. The complete response must fit `maxBytes`
 packet order) and reports the rest under `trimmed`, with their declaration
 outlines, as a successful result; the text form starts with a `trimmed:` line.
 When no requested source fits on its own, the call fails with outlines only, as
-before. `expectedGeneration` is optional from 0.28.0: omitted, a
+before. From 0.31.0, the JSON form gives each source as one `text` block of
+numbered lines (`N: content`, as in the text form) instead of a `lines` array
+of objects, which made JSON packets about half as large again. A packet passed
+back to `repository_handover_save` by value may use either form; a `packetId`
+remains the preferred reference. `expectedGeneration` is optional from 0.28.0: omitted, a
 stale or unknown index is refreshed first and the packet reports `refreshed`;
 given, unavailable, stale or unknown navigation and a mismatched generation are
 rejected. Freshness is checked again before returning. This is bounded freshness checking, not an

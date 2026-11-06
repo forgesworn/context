@@ -2,7 +2,7 @@
 import { createHash, randomUUID } from 'node:crypto';
 import { constants, promises as fs } from 'node:fs';
 import { dirname, isAbsolute, parse, resolve, join } from 'node:path';
-import { buildPacketFromSpec, serializePacket } from './source-packet.mjs';
+import { buildPacketFromSpec, expandPacket, serializePacket } from './source-packet.mjs';
 
 const MAX_PACKET = 65536;
 const MAX_STATE = 16384;
@@ -84,8 +84,9 @@ export async function saveHandover({ root, packet: packetPath, state: statePath,
 }
 
 /** @param {{root: string, packet: any, state: any, out: string, signal?: AbortSignal}} options */
-export async function saveHandoverRecord({ root, packet, state, out, signal }) {
+export async function saveHandoverRecord({ root, packet: received, state, out, signal }) {
   signal?.throwIfAborted();
+  const packet = expandPacket(received); // the compact JSON view is stored as the full packet
   await verifyCurrent(root, packet);
   validateState(state, packet);
   const record = { format: FORMAT, savedAt: new Date().toISOString(), packetSha256: digest(packet), packet, state };
