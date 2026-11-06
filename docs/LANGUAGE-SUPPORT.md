@@ -54,8 +54,8 @@ TypeScript parsing; rejection is not a parser failure on those languages.
   exercise each added suffix, plus uppercase `.HPP`, through exact search, packet
   lines and hashes, checkout/commit provenance, stale rejection, generation
   replacement and retrieval after an edit. Git-ignore exclusions still suppress
-  search and reject packets. These suffixes have no syntax planner: from 0.33.0 a
-  `plan` anchor in one selects the whole file up to 16 KiB and reports larger files.
+  search and reject packets. These suffixes have no syntax planner: a `plan`
+  anchor in one selects the whole file up to 16 KiB and reports larger files.
 - [Broad scanner tests](../packages/context-tools/src/broad-source-scan.test.ts)
   cover declarations and lexical provenance for all six suffixes and uppercase
   `.HPP`. The broad scanner still infers no Dart declarations, and a test says so.

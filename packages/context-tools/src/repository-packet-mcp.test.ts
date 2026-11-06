@@ -130,6 +130,28 @@ describe('repository packet MCP adapter', () => {
     } finally { await connection.close() }
   })
 
+  it('answers the code blocks of an oversized plan without its whole non-code files, or outlines when nothing fits', async () => {
+    const value = await root()
+    const body = Array.from({ length: 600 }, (_, i) => `  // ${String(i).padStart(4, '0')} ${'x'.repeat(50)}`).join('\n')
+    await writeFile(join(value, 'big.ts'), `export function big() {\n${body}\n  return 1\n}\n`)
+    await writeFile(join(value, 'huge.ts'), `export function huge() {\n${body}\n${body}\n  return 1\n}\n`)
+    await writeFile(join(value, 'AGENTS.md'), Array.from({ length: 300 }, (_, i) => `rule ${i} ${'y'.repeat(30)}`).join('\n') + '\n')
+    const connection = await connect(value)
+    try {
+      const refreshed = await connection.client.callTool({ name: 'repository_refresh', arguments: {} })
+      const expectedGeneration = JSON.parse(text(refreshed)).generation
+      const planned = await connection.client.callTool({ name: 'repository_packet', arguments: { mode: 'plan', expectedGeneration, spec: { sources: [{ path: 'AGENTS.md', line: 1 }, { path: 'big.ts', line: 2 }] } } }) as { isError?: boolean; content?: unknown }
+      expect(planned.isError, text(planned).slice(0, 300)).not.toBe(true)
+      expect(text(planned)).toContain('source big.ts:1-603')
+      expect(text(planned)).not.toContain('source AGENTS.md')
+      expect(text(planned)).toContain('unresolved: AGENTS.md:1 (whole file left out because the packet would exceed its size limit; request an exact range with mode build)')
+      const outlined = await connection.client.callTool({ name: 'repository_packet', arguments: { mode: 'plan', expectedGeneration, spec: { sources: [{ path: 'huge.ts', line: 2 }] } } }) as { isError?: boolean; content?: unknown }
+      expect(outlined.isError).toBe(true)
+      expect(text(outlined)).toMatch(/exceed.*Nothing was fetched/s)
+      expect(text(outlined)).toContain('outline huge.ts')
+    } finally { await connection.close() }
+  })
+
   it('names the indexed paths ending in a missing source file, in build and plan mode', async () => {
     const value = await root()
     await mkdir(join(value, 'src/utils/internal'), { recursive: true })

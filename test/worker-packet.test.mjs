@@ -124,6 +124,18 @@ test('planner serves files with no syntax planner whole, and reports oversized o
   await assert.rejects(planPacket({ root, spec: await spec(root, planBase({ allowedFiles: ['AGENTS.md'], sources: [{ path: 'AGENTS.md', line: 4 }] })) }), /anchor line exceeds source length: AGENTS.md has 3 lines/);
 });
 
+test('planner leaves whole files out rather than failing when they would oversize the packet', async () => {
+  const root = await fixture();
+  const body = Array.from({ length: 600 }, (_, i) => `  // ${String(i).padStart(4, '0')} ${'x'.repeat(50)}`).join('\n');
+  await writeFile(join(root, 'src.ts'), `export function big() {\n${body}\n  return 1;\n}\n`);
+  await writeFile(join(root, 'AGENTS.md'), Array.from({ length: 300 }, (_, i) => `rule ${i} ${'y'.repeat(30)}`).join('\n') + '\n');
+  const result = await planPacket({ root, spec: await spec(root, planBase({ allowedFiles: ['src.ts', 'AGENTS.md'], sources: [{ path: 'AGENTS.md', line: 1 }, { path: 'src.ts', line: 2 }] })) });
+  assert.deepEqual(result.packet.sources.map(({ path, startLine, endLine }) => [path, startLine, endLine]), [['src.ts', 1, 603]]);
+  assert.deepEqual(result.coverage.unresolved, [{ requestIndex: 0, path: 'AGENTS.md', line: 1, reason: 'whole file left out because the packet would exceed its size limit; request an exact range with mode build' }]);
+  const alone = await planPacket({ root, spec: await spec(root, planBase({ allowedFiles: ['AGENTS.md'], sources: [{ path: 'AGENTS.md', line: 1 }] })) });
+  assert.deepEqual(alone.packet.sources.map(({ path, startLine, endLine }) => [path, startLine, endLine]), [['AGENTS.md', 1, 300]]);
+});
+
 test('planner selects class, interface, type and enum declarations for lines outside any function', async () => {
   const root = await fixture();
   await writeFile(join(root, 'src.ts'), `import { a } from './a';\n/** Doc. */\nexport class Owner extends Base {\n  field = 1;\n  method() {\n    return a;\n  }\n}\ninterface Shape {\n  size: number;\n}\ntype Pair = {\n  left: string;\n};\nenum Mode {\n  On,\n}\n`);

@@ -421,10 +421,10 @@ export function createRepositoryNavigationServer(root: string, options: Reposito
           const before = await currentPacketNavigation(navigation, input.expectedGeneration, extra.signal)
           throwIfAborted(extra.signal)
           const maxBytes = input.maxBytes ?? DEFAULT_PACKET_MAX_BYTES
-          const attempt = async (spec: typeof parsedSpec, trimmed?: PacketResponse['trimmed']) => {
+          const attempt = async (spec: typeof parsedSpec, trimmed?: PacketResponse['trimmed'], wholeFiles = true) => {
             const result = input.mode === 'build'
               ? { packet: await buildPacketInline({ root, spec, clampToEnd: true }) }
-              : await planPacketInline({ root, spec })
+              : await planPacketInline({ root, spec, wholeFiles })
             throwIfAborted(extra.signal)
             const after = await currentPacketNavigation(navigation, before.generation, extra.signal)
             const response: PacketResponse = {
@@ -452,18 +452,28 @@ export function createRepositoryNavigationServer(root: string, options: Reposito
           try {
             built = await attempt(parsedSpec)
           } catch (error) {
-            if (input.mode !== 'build' || !OVERSIZE.test(error instanceof Error ? error.message : '')) throw error
-            const fitted = await fitSources(parsedSpec as BuildSpec, error, maxBytes, (spec, trimmed) => attempt(spec as typeof parsedSpec, trimmed),
-              (path) => outlineSource({ root, path }) as Promise<SourceOutline>)
-            if (!fitted) {
+            if (!OVERSIZE.test(error instanceof Error ? error.message : '')) throw error
+            const outlineError = async (cause: unknown) => {
               // Recorded sessions paged an oversized file in fixed chunks and then read it
               // again; an outline lets the caller request the one block it needs.
               const paths = [...new Set(input.spec.sources.map((source) => source.path))]
               const outlines = await Promise.all(paths.map((path) => outlineSource({ root, path }).catch(() => undefined)))
-              if (outlines.some((outline) => outline === undefined)) throw error
-              return { content: [{ type: 'text' as const, text: renderOutline(formatError(error), outlines as SourceOutline[]) }], isError: true }
+              if (outlines.some((outline) => outline === undefined)) throw cause
+              return { content: [{ type: 'text' as const, text: renderOutline(formatError(cause), outlines as SourceOutline[]) }], isError: true }
             }
-            built = fitted
+            if (input.mode === 'plan') {
+              // Whole non-code files go first; the code blocks are answered if they fit alone.
+              try { built = await attempt(parsedSpec, undefined, false) }
+              catch (inner) {
+                if (!OVERSIZE.test(inner instanceof Error ? inner.message : '')) throw inner
+                return await outlineError(inner)
+              }
+            } else {
+              const fitted = await fitSources(parsedSpec as BuildSpec, error, maxBytes, (spec, trimmed) => attempt(spec as typeof parsedSpec, trimmed),
+                (path) => outlineSource({ root, path }) as Promise<SourceOutline>)
+              if (!fitted) return await outlineError(error)
+              built = fitted
+            }
           }
           const { response, encoded } = built
           packetReferences.put(response.packetId!, response.navigation.generation, response.packet)

@@ -148,7 +148,9 @@ ambiguous or unsupported anchors, excluded paths, and an oversized result rather
 than truncating a branch. A plan anchor in any other packet file type (Markdown,
 JSON, Python and the rest) selects the whole file, coverage kind `file`, up to
 16 KiB; a larger file is listed under `coverage.unresolved` for an exact `build`
-range.
+range. When whole files would push the packet over its size limit they are left
+out and listed the same way, so the code blocks are still answered; a plan that
+is oversized without them returns the requested files' outlines, as `build` does.
 Source, root, HEAD and relevant policy must agree between planning and assembly.
 Line anchors use the packet format's LF/CRLF convention; bare CR and Unicode
 line separators require the exact-range fallback. A selected block's boundary
