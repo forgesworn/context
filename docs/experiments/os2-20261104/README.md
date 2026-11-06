@@ -620,6 +620,24 @@ Dependency recall was 1.0 in both cells (precision 0.33 each). Claude reviews
 used 19,721 and 16,493 tokens; Codex reviews 38,017 and
 37,559.
 
+#### Requalification on version 2, revision r3 (2026-11-06): passed
+
+Same task, settings, seed and order, on Context 0.31.0. Every gate passed:
+Context accepted (checker, scope, both reviewers), reads after packet 0 and
+valid, MCP errors 0 of 13, every isolation probe passed, usage complete.
+Plain was accepted too and both reviewers agreed on both cells.
+
+Executor tokens: 1,009,865 (Context, 23 model calls) and
+568,547 (plain, 16 calls), a ratio of
+1.78. This run used the text form for every
+Context call, so 0.31.0's compact JSON did not apply. Its five packets
+returned about 90 KB of source from call 7 on, carried by every later call
+(434k carried MCP-result tokens against plain's 274k of shell output).
+
+Across the three requalification runs on h3-qualification the ratio was 1.26
+(0.29.0), 1.49 (0.30.0) and 1.78 (0.31.0); single pairs, but every one above
+plain.
+
 ### Where the Context arm's tokens go (2026-11-06, no model)
 
 Phase 2 was paused on the owner's decision after both requalification pairs

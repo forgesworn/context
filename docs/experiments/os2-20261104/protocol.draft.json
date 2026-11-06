@@ -941,5 +941,37 @@
         }
       }
     }
+  },
+  "requalification20261106r3": {
+    "task": "h3-qualification",
+    "build": "0.31.0 (69d5f03)",
+    "gates": {
+      "contextAccepted": true,
+      "readsAfterPacketValid": true,
+      "readsAfterPacketAtMost025": true,
+      "mcpErrorRateAtMost5pc": true,
+      "isolationProbesPassed": true,
+      "usageComplete": true
+    },
+    "passed": true,
+    "observed": {
+      "readsAfterPacket": 0,
+      "mcpErrorRate": 0,
+      "mcpCalls": 13,
+      "plainAccepted": true,
+      "executorTokens": {
+        "context": 1009865,
+        "plain": 568547
+      },
+      "reviewersAgree": {
+        "context": true,
+        "plain": true
+      }
+    },
+    "calls": {
+      "context": 23,
+      "plain": 16
+    },
+    "note": "text form used for every Context call, so compact JSON did not apply"
   }
 }
