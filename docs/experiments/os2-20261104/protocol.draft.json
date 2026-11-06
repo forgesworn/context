@@ -7,11 +7,11 @@
   "lockRule": "Set lockedAt and the hashes below only after owner approval, a passed phase 1 and an accepted independent protocol review, and before any phase 2 cell. Any change after lock is a new version; earlier versions and their results are retained.",
   "purpose": "OS2: whether Context gives better accepted outcomes at lower complete model token cost than a competent ordinary workflow (and optionally Graphify) with the same frontier model in every arm.",
   "buildUnderTest": {
-    "version": "0.29.0",
-    "commit": "6cd0ce2c2cf7649eaca67b439b25059e83d943cf",
+    "version": "0.30.0",
+    "commit": "697f8d7c6d585bb76b5774d56cbd40a8ce13594b",
     "artifacts": {
-      "forgesworn-context-0.29.0.tgz": "5fa7a7aaba06fa34d7d69526277a6ea1820b8fae3869b4261bc4891c19580337",
-      "forgesworn-context-tools-0.29.0.tgz": "8392fd461e59378bb54b8f419a42266d540d6d94be056d75da2dfaaad94b6f9d"
+      "forgesworn-context-0.30.0.tgz": "7f3de3539aab25fa08a8d97983174d1e2cd763d0111f5bde9ad0377b3072832c",
+      "forgesworn-context-tools-0.30.0.tgz": "2e356cae75ecf1777abe2f81c9363ef7ad133b59e851b000f76fd337cfad30f6"
     },
     "repinRule": "A fix found later ships as its own release; this block is repinned and the protocol requalified before lock."
   },
@@ -257,7 +257,7 @@
   },
   "arms": {
     "plain": "Built-in shell, read and edit; no MCP server.",
-    "context": "As plain, plus the pinned 0.29.0 repository MCP server bound to the arm's staged root; fresh server per arm. Instruction: search or explore, then read exact implementation and tests with repository_packet (no forced status or refresh).",
+    "context": "As plain, plus the pinned 0.30.0 repository MCP server bound to the arm's staged root; fresh server per arm. Instruction: search or explore, then read exact implementation and tests with repository_packet (no forced status or refresh).",
     "graphify": {
       "description": "As plain, plus a graph prebuilt with `graphify update <workspace>` (no model).",
       "package": "graphifyy",
@@ -623,8 +623,7 @@
     "screen-pro-040-20260923"
   ],
   "openDecisions": [
-    "Owner review of version 2",
-    "Context fix for oversize packet requests (own release), then requalification again"
+    "Owner review of version 2"
   ],
   "revisedAt": "2026-11-05",
   "ownerDecisions": {
@@ -760,6 +759,13 @@
       "build": "0.29.0 (6cd0ce2)",
       "repinnedAt": "2026-11-05",
       "repinNote": "repinned from 0.28.0 (05bc501) after repository_search accepted expectedGeneration; not yet run on a model"
+    },
+    {
+      "version": 2,
+      "revision": "r2",
+      "revisedAt": "2026-11-06",
+      "build": "0.30.0 (697f8d7)",
+      "basis": "requalification on 0.29.0 failed on the MCP error gate (one oversized packet request); the fix shipped as its own release (PR #74, v0.30.0); harness and gates unchanged"
     }
   ],
   "reviewerDesign": {

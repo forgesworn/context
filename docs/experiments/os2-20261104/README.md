@@ -1,4 +1,4 @@
-# OS2 protocol draft v2: Codex Sol/high, Context 0.29.0
+# OS2 protocol draft v2: Codex Sol/high, Context 0.30.0
 
 Status: **draft v2 for owner review, not locked.** Version 1 qualified in phase
 1 and was then reviewed; the review said revise before phase 2. Version 2
@@ -128,19 +128,21 @@ repairs and failed attempts.
 
 ## Build under test
 
-Context 0.29.0, commit `6cd0ce2c2cf7649eaca67b439b25059e83d943cf`, installed
+Context 0.30.0, commit `697f8d7c6d585bb76b5774d56cbd40a8ce13594b`, installed
 from the public release assets:
 
-- `forgesworn-context-0.29.0.tgz`
-  sha256 `5fa7a7aaba06fa34d7d69526277a6ea1820b8fae3869b4261bc4891c19580337`
-- `forgesworn-context-tools-0.29.0.tgz`
-  sha256 `8392fd461e59378bb54b8f419a42266d540d6d94be056d75da2dfaaad94b6f9d`
+- `forgesworn-context-0.30.0.tgz`
+  sha256 `7f3de3539aab25fa08a8d97983174d1e2cd763d0111f5bde9ad0377b3072832c`
+- `forgesworn-context-tools-0.30.0.tgz`
+  sha256 `2e356cae75ecf1777abe2f81c9363ef7ad133b59e851b000f76fd337cfad30f6`
 
-Version 1 ran 0.26.0 (`8cbb616`); the diagnostic pairs ran 0.27.0 and 0.28.0.
-0.29.0 adds one change over 0.28.0: `repository_search` accepts an optional
-`expectedGeneration`, so a search that passes one (two of the four MCP errors
-in the 0.28.0 pair) is no longer rejected. No model session has run on 0.29.0
-yet; requalification covers it.
+Version 1 ran 0.26.0 (`8cbb616`); the diagnostic pairs ran 0.27.0 and 0.28.0;
+the first version 2 requalification ran 0.29.0 (`6cd0ce2`) and failed on the
+MCP error gate. 0.30.0 is the fix for that failure: an oversized
+`repository_packet` build serves every requested source that fits whole and
+outlines the rest, as a successful result, instead of fetching nothing
+(PR #74). It changes nothing else.
+
 If a later phase exposes a tool defect, the fix ships as its own release and
 PR, and the draft is repinned and requalified before lock. Fixes are never
 made inside the experiment.
@@ -328,7 +330,7 @@ copy and pass with the merged change applied.
 | Arm | Tools | Notes |
 | --- | --- | --- |
 | plain | Codex built-in shell, read and edit; no MCP | Retrieval instruction of similar length and force to the other arms |
-| context | Same, plus the pinned 0.29.0 repository MCP server bound to the arm's staged root | Fresh server per arm; the first call builds the index, and later calls without a generation refresh it when stale |
+| context | Same, plus the pinned 0.30.0 repository MCP server bound to the arm's staged root | Fresh server per arm; the first call builds the index, and later calls without a generation refresh it when stale |
 | graphify (later round) | Same as plain, plus a graph prebuilt with `graphify update` (no model) from `graphifyy` 0.9.65 | Not in this run; see below |
 
 This run uses two arms: 8 × 2 × 3 = 48 executor cells, each with a reviewer
