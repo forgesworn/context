@@ -62,8 +62,9 @@ required: omitted handoff metadata gets a neutral task and acceptance check. A
 build source without `startLine` starts at line 1; without `endLine`, or with one
 past the end of the file, it reads to the last line; overlapping or adjacent
 ranges in one file are merged. The packet records the ranges actually read. A range starting past the end is still rejected with
-the file's line count. A plan anchor outside every supported block is rejected
-with a pointer to `mode: "build"`. The CLI keeps the strict spec. The server accepts an inline spec;
+the file's line count. A plan anchor outside every supported block is listed
+under `coverage.unresolved` with a pointer to `mode: "build"`, and the other
+anchors are still answered; a plan request fails only when no anchor resolves. The CLI keeps the strict spec. The server accepts an inline spec;
 it cannot accept a different root, spec-file path, output path or shell command.
 The configured root must be a Git repository with a committed HEAD. Internal
 `git rev-parse` calls read provenance; the tool does not execute acceptance checks.

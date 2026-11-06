@@ -569,6 +569,8 @@ interface PacketResponse {
   }
   coverage?: {
     resolutions: Array<{ path: string; line: number; kind: string; startLine: number; endLine: number }>
+    /** Anchors outside every supported syntax block; the rest were still answered. */
+    unresolved?: Array<{ path: string; line: number; reason: string }>
     mergedSources: Array<{ path: string; startLine: number; endLine: number }>
     caveat: string
   }
@@ -650,6 +652,9 @@ export function renderPacket(response: PacketResponse, options: { fullCaveat?: b
   if (response.coverage) {
     out.push(`resolved: ${response.coverage.resolutions.map((entry) => `${entry.path}:${entry.line} -> ${entry.startLine}-${entry.endLine} (${entry.kind})`).join('; ')}`)
     out.push(`merged: ${response.coverage.mergedSources.map((entry) => `${entry.path}:${entry.startLine}-${entry.endLine}`).join(', ')}`)
+    if (response.coverage.unresolved?.length) {
+      out.push(`unresolved: ${response.coverage.unresolved.map((entry) => `${entry.path}:${entry.line}`).join(', ')} (no supported syntax block contains these lines; request exact ranges with mode build)`)
+    }
     out.push(`coverage: ${response.coverage.caveat}`)
   }
   for (const outline of response.trimmed?.outlines ?? []) out.push(...renderOutline('', [outline]).split('\n').slice(1))
