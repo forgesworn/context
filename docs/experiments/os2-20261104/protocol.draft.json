@@ -39,12 +39,12 @@
     "excluded": "The eight d5-20260921 tasks are not reused: both repositories are ForgeSworn and the 0.4.0 fixes were found on that set.",
     "hiddenAcceptance": "Required evidence, dependency set, checker and scope rules per task. Mined tasks take them from the merged change; the blind Claude session writes the rest and vets all. Hashes recorded here at lock; unread by the tool side, including the owner, until results are recorded.",
     "hiddenAcceptanceSha256": {
-      "bray-orientation": "7956e85c1810511590f9987252d399ebf3d99cbbda21becb18c6c4dca6770c4f",
+      "bray-orientation": "4180087923ef2ed393f56b7733f3021bc36688eee55b511f1e73053e54586f47",
       "bray-impact": "9a8f20bb70912b455d8b36d7b203730733dd6196e7186668aa890a5dd7ce1a4a",
       "bray-diagnosis": "2c88f253eebef2dea4038f87817490d0a66f93d590c12d02c67aa7331c257eef",
-      "bray-code-change": "9356af29aa6a1b4f335c192b429bd848e316ded26bf39c73705ce75f1223e089",
-      "h3-orientation": "896f58cfb662d4da2a94ee05828a695f3e15f1abbfc4dfb6dd20743f5908a401",
-      "h3-impact": "81cfcce27a1d76e0c01c60d27d4cca6ab190297a43b45ff069cb8bead30261ba",
+      "bray-code-change": "8bad9d70781445492383b5a76cc91ff9f31e55879ac056da137823597e0d13dc",
+      "h3-orientation": "0d4ce81f11ad9eb22385ca4a40352f5886558e127c6e9b26611b17d30d26472e",
+      "h3-impact": "994ccdc36cfd45b5571ac27859a21166f95a5fedf0d64b75d051a174564ca20a",
       "h3-diagnosis": "35b88bef3e2c5d5b1e0d1a7b3b60a519aad122abf0d11bd0a3320bf3b033032c",
       "h3-code-change": "308cc5d80826f7051868557cc948df45596ac4cb58b68a519b476d965874d779"
     },
@@ -157,10 +157,33 @@
       },
       "checks": "exclusion-check.py all clean (first run gave a false positive across repositories; fixed to repository-qualified paths); blind-check freeze: all four checker tasks fail at base and pass with the change, no reinstall; packets: every task sufficient in one 0.29.0 packet",
       "openPoints": [
-        "The two bray replacements have April 2026 base commits, earlier than the brief's preferred 2026-07-01; reasons are in the private manifest, unread",
-        "The private manifest lists problems the tool side has not read; a hidden-side reader must review them before lock",
-        "The kept four acceptance files give scope as text, not {\"allowedPaths\": [...]}; assess stops on them until converted on the hidden side"
+        "The follow-up custodian recommends replacing bray-impact and bray-diagnosis again and judged their April 2026 base commits not acceptable; reasons private, unread",
+        "The two bray replacements have April 2026 base commits, earlier than the brief's preferred 2026-07-01; reasons are in the private manifest, unread"
       ]
+    },
+    "followUp": {
+      "at": "2026-11-06",
+      "session": "Claude Code 2.1.318 headless, claude-opus-5-5, plan-billed, same isolation; step 0 refused outbound HTTPS (403) and a write outside its folder",
+      "run": {
+        "turns": 35,
+        "seconds": 293,
+        "inputTokens": 70,
+        "cacheReadInputTokens": 2260911,
+        "cacheCreationInputTokens": 111429,
+        "outputTokens": 24173,
+        "apiRateEquivalentUSD": 1.83
+      },
+      "scopes": "kept four converted to {\"allowedPaths\": [...]} (old text in scopeText; blind check: scope valid, scopeText equals the old scope, every other field unchanged)",
+      "problemReview": {
+        "reviewed": 10,
+        "edited": [],
+        "replace": [
+          "bray-impact",
+          "bray-diagnosis"
+        ],
+        "brayAgeAcceptable": false
+      },
+      "reply": "fixed JSON shape checked by a guard script; valid; every hash matched its file; reasons in a private review file, unread"
     }
   },
   "executor": {
@@ -552,7 +575,7 @@
   ],
   "openDecisions": [
     "Owner review of version 2",
-    "Convert the kept four acceptance files' scope to {\"allowedPaths\": [...]} and review the custodian's private problem list, on the hidden side (small paid custodian session)",
+    "Replace bray-impact and bray-diagnosis again (small paid custodian session), as the follow-up review recommends",
     "Reviewer design detail (paid): model, agreement sample size and threshold",
     "Quality-measure pilot on tasks outside phase 2 (paid)"
   ],

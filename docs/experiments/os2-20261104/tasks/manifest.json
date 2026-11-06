@@ -8,7 +8,7 @@
       "class": "orientation",
       "baseCommit": "8d6713d8d68b3cecfc42630642ab4fada67968a6",
       "taskSha256": "7c045db6adcf891d3dfeb3eb877b71cf4f8778a084926a9b974b5299367dd918",
-      "acceptanceSha256": "7956e85c1810511590f9987252d399ebf3d99cbbda21becb18c6c4dca6770c4f"
+      "acceptanceSha256": "4180087923ef2ed393f56b7733f3021bc36688eee55b511f1e73053e54586f47"
     },
     {
       "id": "bray-impact",
@@ -32,7 +32,7 @@
       "class": "code-change",
       "baseCommit": "0cac309e1dfbf76a4865c0e34b33ebe16fb6ec8d",
       "taskSha256": "291518f777a6326700d65d3f445e2546b0a8032069b29c4520041d51d1a4e00e",
-      "acceptanceSha256": "9356af29aa6a1b4f335c192b429bd848e316ded26bf39c73705ce75f1223e089"
+      "acceptanceSha256": "8bad9d70781445492383b5a76cc91ff9f31e55879ac056da137823597e0d13dc"
     },
     {
       "id": "h3-orientation",
@@ -40,7 +40,7 @@
       "class": "orientation",
       "baseCommit": "f0e17808ac2439b6434bb10609a961067f4d555b",
       "taskSha256": "07c5a9aeec0944ed1d10c00f08e9993e2f01b1e7b5e04229874e733c7500383d",
-      "acceptanceSha256": "896f58cfb662d4da2a94ee05828a695f3e15f1abbfc4dfb6dd20743f5908a401"
+      "acceptanceSha256": "0d4ce81f11ad9eb22385ca4a40352f5886558e127c6e9b26611b17d30d26472e"
     },
     {
       "id": "h3-impact",
@@ -48,7 +48,7 @@
       "class": "impact",
       "baseCommit": "2a164f3651bf9bde25749c12a5270b01c9c2b2c4",
       "taskSha256": "119b3328554293c0afce102d86563370dec0a215ba5acfcc08382cc040e0c5eb",
-      "acceptanceSha256": "81cfcce27a1d76e0c01c60d27d4cca6ab190297a43b45ff069cb8bead30261ba"
+      "acceptanceSha256": "994ccdc36cfd45b5571ac27859a21166f95a5fedf0d64b75d051a174564ca20a"
     },
     {
       "id": "h3-diagnosis",
@@ -123,5 +123,21 @@
     "taskSha256": "6675944aed632a27426a6d2d82aa9d138c7d8ff9c6fb0b02115a3a63b7259bb2",
     "acceptanceSha256": "3aacc1d09e098c2edb2b23f73fbc34e28483db5bcc17c8ad3215dddb385c7dca",
     "statement": "tasks-qualification/h3-qualification.json (never used in phase 2)"
+  },
+  "scopeConversion": {
+    "at": "2026-11-06",
+    "tasks": [
+      "bray-code-change",
+      "bray-orientation",
+      "h3-impact",
+      "h3-orientation"
+    ],
+    "previousAcceptanceSha256": {
+      "bray-orientation": "7956e85c1810511590f9987252d399ebf3d99cbbda21becb18c6c4dca6770c4f",
+      "bray-code-change": "9356af29aa6a1b4f335c192b429bd848e316ded26bf39c73705ce75f1223e089",
+      "h3-orientation": "896f58cfb662d4da2a94ee05828a695f3e15f1abbfc4dfb6dd20743f5908a401",
+      "h3-impact": "81cfcce27a1d76e0c01c60d27d4cca6ab190297a43b45ff069cb8bead30261ba"
+    },
+    "note": "scope converted to {\"allowedPaths\": [...]} by a hidden-side custodian; the old text is kept in scopeText; no other field changed (checked blind)"
   }
 }

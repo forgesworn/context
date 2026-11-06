@@ -57,9 +57,8 @@ commands the sandbox denies, which read metrics do not count as reads.
 Still open, and not decided by this version:
 
 - ~~Task replacement~~ (custodian run 2026-11-06; see Replacement tasks).
-  Still open: the kept four acceptance files give scope as text, so `assess`
-  stops on them until a hidden-side session converts them to
-  `{"allowedPaths": [...]}`.
+  Still open: the follow-up review recommends replacing the two new bray
+  tasks again.
 - **Quality measure (paid pilot).** Symbol and call-site recall and precision,
   and rules for alternative valid implementations, need a pilot on tasks
   outside phase 2.
@@ -193,15 +192,24 @@ Blind checks (counts only, in
 - Packets with Context 0.29.0: every task's required evidence fits one
   packet (5 to 37 KB).
 
-Open points:
+### Follow-up custodian (2026-11-06)
 
-- The two bray replacements are from April 2026, earlier than the brief's
-  preferred 1 July; the reasons are in the private manifest.
-- The private manifest lists ten problems the tool side has not read. A
-  hidden-side reader should review them before lock.
-- The kept four acceptance files (bray-orientation, bray-code-change,
-  h3-orientation, h3-impact) give scope as text; protocol v2's `assess` needs
-  `{"allowedPaths": [...]}`.
+A second isolated session (same setup and reply guard; 35 turns, 293
+seconds, about 2.3M cached input read and 24,000 output tokens, about $1.83
+at API rates, plan-billed) did two hidden-side jobs:
+
+- Converted the kept four acceptance files (bray-orientation,
+  bray-code-change, h3-orientation, h3-impact) to
+  `{"allowedPaths": [...]}`, keeping the old text in `scopeText`. A blind
+  check confirmed the new scope is valid, `scopeText` equals the old scope,
+  and no other field changed. Their new hashes are in the manifest and
+  protocol.
+- Reviewed the first custodian's ten listed problems. It edited no file. It
+  recommends replacing bray-impact and bray-diagnosis again and judged their
+  April 2026 base commits not acceptable. Its reasons are private and unread.
+
+Open point: replace bray-impact and bray-diagnosis (one more small custodian
+session) before requalification.
 
 ## Executor, reviewer and harness
 
@@ -734,9 +742,9 @@ Phase 2 is of that order. Phase 1 is one pair. No prices were looked up.
 6. ~~One short live isolation session~~ (`isolation-probe.py`, run and
    passed 2026-11-05).
 7. ~~Replacement tasks from an isolated custodian, plus a separate
-   qualification task~~ (run 2026-11-06). Follow-up, paid and small: a
-   hidden-side session converts the kept four scopes and reads the
-   custodian's private problem list.
+   qualification task~~ (run 2026-11-06; follow-up converted the kept
+   scopes and reviewed the problem list). Still to do, paid and small:
+   replace bray-impact and bray-diagnosis again.
 8. The quality-measure pilot and the reviewer-independence design.
 9. Requalification (phase 1) on version 2 with the qualification task.
 10. Phase 2.
