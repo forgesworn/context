@@ -43,7 +43,8 @@ The dedicated TS/JS scanner and packet planner use TypeScript syntax trees. The
 selected local import/re-export aliases; it does not load tsconfig, external
 libraries or establish project-wide type-checked semantic resolution. Nested
 callable bodies are not counted as direct calls of their parents. The packet
-planner still establishes syntax completeness only. Exact build packets copy
+planner still establishes syntax completeness only; its scope headers (leading
+imports, types, constants and test setup) are TS/JS only. Exact build packets copy
 selected lines with provenance; they make no syntax-completeness guarantee.
 Unsupported plan suffixes are explicitly rejected by the planner guard before
 TypeScript parsing; rejection is not a parser failure on those languages.

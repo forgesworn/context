@@ -395,7 +395,7 @@ export function createRepositoryNavigationServer(root: string, options: Reposito
     'repository_packet',
     {
       description:
-        'Exact source: build path/startLine/endLine (no endLine: EOF); plan path/line: enclosing block or small file. packetId for checkpoints. 64 KiB default; oversize: what fits whole + outlines.',
+        'Exact source: build path/startLine/endLine (no endLine: EOF); plan path/line: block + headers, or small file. packetId: checkpoints. 64 KiB default; oversize: what fits whole + outlines.',
       inputSchema: packetInputSchema,
       annotations: { readOnlyHint: true, openWorldHint: false },
     },
@@ -421,10 +421,10 @@ export function createRepositoryNavigationServer(root: string, options: Reposito
           const before = await currentPacketNavigation(navigation, input.expectedGeneration, extra.signal)
           throwIfAborted(extra.signal)
           const maxBytes = input.maxBytes ?? DEFAULT_PACKET_MAX_BYTES
-          const attempt = async (spec: typeof parsedSpec, trimmed?: PacketResponse['trimmed'], wholeFiles = true) => {
+          const attempt = async (spec: typeof parsedSpec, trimmed?: PacketResponse['trimmed'], { wholeFiles = true, headers = true } = {}) => {
             const result = input.mode === 'build'
               ? { packet: await buildPacketInline({ root, spec, clampToEnd: true }) }
-              : await planPacketInline({ root, spec, wholeFiles })
+              : await planPacketInline({ root, spec, wholeFiles, headers })
             throwIfAborted(extra.signal)
             const after = await currentPacketNavigation(navigation, before.generation, extra.signal)
             const response: PacketResponse = {
@@ -462,12 +462,18 @@ export function createRepositoryNavigationServer(root: string, options: Reposito
               return { content: [{ type: 'text' as const, text: renderOutline(formatError(cause), outlines as SourceOutline[]) }], isError: true }
             }
             if (input.mode === 'plan') {
-              // Whole non-code files go first; the code blocks are answered if they fit alone.
-              try { built = await attempt(parsedSpec, undefined, false) }
-              catch (inner) {
-                if (!OVERSIZE.test(inner instanceof Error ? inner.message : '')) throw inner
-                return await outlineError(inner)
+              // Added headers go first, then whole non-code files; the anchored code blocks
+              // are answered if they fit alone.
+              let fitted: typeof built | undefined, last: unknown = error
+              for (const drop of [{ headers: false }, { headers: false, wholeFiles: false }]) {
+                try { fitted = await attempt(parsedSpec, undefined, drop); break }
+                catch (inner) {
+                  if (!OVERSIZE.test(inner instanceof Error ? inner.message : '')) throw inner
+                  last = inner
+                }
               }
+              if (!fitted) return await outlineError(last)
+              built = fitted
             } else {
               const fitted = await fitSources(parsedSpec as BuildSpec, error, maxBytes, (spec, trimmed) => attempt(spec as typeof parsedSpec, trimmed),
                 (path) => outlineSource({ root, path }) as Promise<SourceOutline>)
@@ -579,6 +585,10 @@ interface PacketResponse {
   }
   coverage?: {
     resolutions: Array<{ path: string; line: number; kind: string; startLine: number; endLine: number }>
+    /** Scope headers (imports, types, constants, test setup) added around planned blocks. */
+    included?: Array<{ path: string; kind: string; startLine: number; endLine: number }>
+    /** The headers that were not sent because the packet would exceed its size limit. */
+    headersLeftOut?: Array<{ path: string; kind: string; startLine: number; endLine: number }>
     /** Anchors outside every supported syntax block; the rest were still answered. */
     unresolved?: Array<{ path: string; line: number; reason: string }>
     mergedSources: Array<{ path: string; startLine: number; endLine: number }>
@@ -661,6 +671,9 @@ export function renderPacket(response: PacketResponse, options: { fullCaveat?: b
   }
   if (response.coverage) {
     out.push(`resolved: ${response.coverage.resolutions.map((entry) => `${entry.path}:${entry.line} -> ${entry.startLine}-${entry.endLine} (${entry.kind})`).join('; ')}`)
+    const ranges = (entries: Array<{ path: string; startLine: number; endLine: number }>) => entries.map((entry) => `${entry.path}:${entry.startLine}-${entry.endLine}`).join(', ')
+    if (response.coverage.included?.length) out.push(`included headers: ${ranges(response.coverage.included)}`)
+    if (response.coverage.headersLeftOut?.length) out.push(`headers left out for size: ${ranges(response.coverage.headersLeftOut)} (request with mode build)`)
     out.push(`merged: ${response.coverage.mergedSources.map((entry) => `${entry.path}:${entry.startLine}-${entry.endLine}`).join(', ')}`)
     const byReason = new Map<string, string[]>()
     for (const entry of response.coverage.unresolved ?? []) byReason.set(entry.reason, [...(byReason.get(entry.reason) ?? []), `${entry.path}:${entry.line}`])

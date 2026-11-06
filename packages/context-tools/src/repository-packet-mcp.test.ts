@@ -152,6 +152,28 @@ describe('repository packet MCP adapter', () => {
     } finally { await connection.close() }
   })
 
+  it('leaves the added headers out first when a plan would exceed maxBytes, and names them', async () => {
+    const value = await root()
+    const constants = Array.from({ length: 40 }, (_, i) => `export const C${i} = '${'z'.repeat(60)}'`).join('\n')
+    await writeFile(join(value, 'gamma.ts'), `${constants}\nexport function gamma() {\n  return C0\n}\n`)
+    const connection = await connect(value)
+    try {
+      const refreshed = await connection.client.callTool({ name: 'repository_refresh', arguments: {} })
+      const expectedGeneration = JSON.parse(text(refreshed)).generation
+      const request = { mode: 'plan', expectedGeneration, spec: { sources: [{ path: 'gamma.ts', line: 42 }] } }
+      const full = await call(connection.client, request)
+      expect(full.isError, text(full)).not.toBe(true)
+      expect(JSON.parse(text(full)).coverage.included).toEqual([{ path: 'gamma.ts', kind: 'header', startLine: 1, endLine: 40 }])
+      // The header is about 2.8 KB, so 1000 bytes less fits the block alone.
+      const maxBytes = Buffer.byteLength(text(full), 'utf8') - 1000
+      const fitted = await connection.client.callTool({ name: 'repository_packet', arguments: { ...request, maxBytes } }) as { isError?: boolean; content?: unknown }
+      expect(fitted.isError, text(fitted)).not.toBe(true)
+      expect(text(fitted)).toContain('source gamma.ts:41-43')
+      expect(text(fitted)).not.toContain('source gamma.ts:1-')
+      expect(text(fitted)).toContain('headers left out for size: gamma.ts:1-40 (request with mode build)')
+    } finally { await connection.close() }
+  })
+
   it('names the indexed paths ending in a missing source file, in build and plan mode', async () => {
     const value = await root()
     await mkdir(join(value, 'src/utils/internal'), { recursive: true })
@@ -369,34 +391,39 @@ describe('repository packet MCP adapter', () => {
 
   it('points a plan anchor outside any block at an exact build range', async () => {
     const value = await root()
-    await writeFile(join(value, 'beta.ts'), "import { alpha } from './alpha'\nexport function beta() {\n  return alpha()\n}\n")
+    await writeFile(join(value, 'beta.ts'), "import { alpha } from './alpha'\nexport function beta() {\n  return alpha()\n}\nbeta()\n")
     const connection = await connect(value)
     try {
       const refreshed = await connection.client.callTool({ name: 'repository_refresh', arguments: {} }) as { content: unknown }
       const generation = (JSON.parse(text(refreshed)) as { generation: string }).generation
-      const outside = await call(connection.client, { mode: 'plan', spec: { sources: [{ path: 'beta.ts', line: 1 }] }, expectedGeneration: generation })
+      const outside = await call(connection.client, { mode: 'plan', spec: { sources: [{ path: 'beta.ts', line: 5 }] }, expectedGeneration: generation })
       expect(outside.isError).toBe(true)
-      expect(text(outside)).toMatch(/no supported syntax block contains beta\.ts:1; request an exact range with mode build instead/)
+      expect(text(outside)).toMatch(/no supported syntax block contains beta\.ts:5; request an exact range with mode build instead/)
+      const header = await connection.client.callTool({ name: 'repository_packet', arguments: { mode: 'plan', spec: { sources: [{ path: 'beta.ts', line: 1 }] }, expectedGeneration: generation } }) as { isError?: boolean; content?: unknown }
+      expect(header.isError, text(header)).not.toBe(true)
+      expect(text(header)).toContain('resolved: beta.ts:1 -> 1-1 (header)')
     } finally { await connection.close() }
   })
 
   it('answers the plan anchors inside blocks and reports the others instead of failing the request', async () => {
     const value = await root()
-    await writeFile(join(value, 'beta.ts'), "import { alpha } from './alpha'\nexport function beta() {\n  return alpha()\n}\n")
+    await writeFile(join(value, 'beta.ts'), "import { alpha } from './alpha'\nexport function beta() {\n  return alpha()\n}\nbeta()\n")
     const connection = await connect(value)
     try {
       const refreshed = await connection.client.callTool({ name: 'repository_refresh', arguments: {} }) as { content: unknown }
       const generation = (JSON.parse(text(refreshed)) as { generation: string }).generation
-      const sources = [{ path: 'beta.ts', line: 1 }, { path: 'beta.ts', line: 3 }, { path: 'alpha.ts', line: 2 }]
+      const sources = [{ path: 'beta.ts', line: 5 }, { path: 'beta.ts', line: 3 }, { path: 'alpha.ts', line: 2 }]
       const mixed = await call(connection.client, { mode: 'plan', spec: { sources }, expectedGeneration: generation })
       expect(mixed.isError, text(mixed)).not.toBe(true)
       const body = JSON.parse(text(mixed)) as { packet: { sources: Array<{ path: string; startLine: number; endLine: number }> }; coverage: { resolutions: Array<{ path: string; line: number }>; unresolved: Array<{ path: string; line: number; requestIndex: number }> } }
-      expect(body.packet.sources.map((source) => `${source.path}:${source.startLine}-${source.endLine}`)).toEqual(['alpha.ts:1-3', 'beta.ts:2-4'])
+      // beta.ts:1 is the file header, added around the planned block.
+      expect(body.packet.sources.map((source) => `${source.path}:${source.startLine}-${source.endLine}`)).toEqual(['alpha.ts:1-3', 'beta.ts:1-4'])
       expect(body.coverage.resolutions.map((entry) => `${entry.path}:${entry.line}`)).toEqual(['beta.ts:3', 'alpha.ts:2'])
-      expect(body.coverage.unresolved).toEqual([{ requestIndex: 0, path: 'beta.ts', line: 1, reason: 'no supported syntax block contains this line; request an exact range with mode build' }])
+      expect(body.coverage.unresolved).toEqual([{ requestIndex: 0, path: 'beta.ts', line: 5, reason: 'no supported syntax block contains this line; request an exact range with mode build' }])
       const plain = await connection.client.callTool({ name: 'repository_packet', arguments: { mode: 'plan', spec: { sources }, expectedGeneration: generation } }) as { isError?: boolean; content?: unknown }
-      expect(text(plain)).toContain('unresolved: beta.ts:1 (no supported syntax block contains this line; request an exact range with mode build)')
-      const all = await call(connection.client, { mode: 'plan', spec: { sources: [{ path: 'beta.ts', line: 1 }] }, expectedGeneration: generation })
+      expect(text(plain)).toContain('unresolved: beta.ts:5 (no supported syntax block contains this line; request an exact range with mode build)')
+      expect(text(plain)).toContain('included headers: beta.ts:1-1')
+      const all = await call(connection.client, { mode: 'plan', spec: { sources: [{ path: 'beta.ts', line: 5 }] }, expectedGeneration: generation })
       expect(all.isError).toBe(true)
     } finally { await connection.close() }
   })
