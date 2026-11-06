@@ -1,7 +1,7 @@
 // Replay the recorded pre-edit plan requests from OS2 Context cells through the
 // two builds of the planner (OLD and NEW source-packet.mjs), against h3 at the task base.
 // Model-free. Reports errors, returned line ranges and whether each later
-// build request's lines were already in an earlier plan response.
+// build request's lines were already in an earlier plan response (covered/requested).
 //   node plan-replay.mjs ROOT OLD_SOURCE_PACKET NEW_SOURCE_PACKET CELL.jsonl...
 import { readFileSync } from 'node:fs'
 
@@ -17,7 +17,12 @@ async function plan(mod, spec) {
     return { ok: true, ranges: packet.sources.map((s) => [s.path, s.startLine, s.endLine]), lines: packet.sources.reduce((n, s) => n + s.lines.length, 0), unresolved: coverage.unresolved?.length ?? 0, included: coverage.included?.length ?? 0 }
   } catch (error) { return { ok: false, error: error.message.replace(/^worker-packet: /, '').slice(0, 110) } }
 }
-const covers = (ranges, path, start, end) => ranges.some(([p, a, b]) => p === path && a <= start && b >= end)
+// Lines of path:start-end already returned by an earlier plan, as covered/requested.
+const covers = (ranges, path, start, end) => {
+  let n = 0
+  for (let line = start; line <= end; line++) if (ranges.some(([p, a, b]) => p === path && a <= line && b >= line)) n++
+  return `${n}/${end - start + 1}`
+}
 
 for (const cell of cells) {
   console.log(`== ${cell.split('/').pop()}`)
@@ -39,7 +44,7 @@ for (const cell of cells) {
         let lines = 0
         try { lines = readFileSync(`${root}/${s.path}`, 'utf8').replace(/\n$/, '').split('\n').length } catch {}
         const start = s.startLine ?? 1, end = Math.min(s.endLine ?? lines, lines || Infinity)
-        console.log(`  build ${s.path}:${start}-${end}  already in an earlier plan: old ${covers(seen.old, s.path, start, end)}, new ${covers(seen.new, s.path, start, end)}`)
+        console.log(`  build ${s.path}:${start}-${end}  lines already in an earlier plan: old ${covers(seen.old, s.path, start, end)}, new ${covers(seen.new, s.path, start, end)}`)
       }
     }
   }

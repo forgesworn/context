@@ -793,6 +793,23 @@ cell-002's first plan, which failed outright on 0.32.0, returns 806 lines of cod
 blocks and reports AGENTS.md and one anchor. None of this measures tokens; that
 needs a new paid pair.
 
+The replay also shows what the models asked for: 7 of the 11 pre-edit plans
+anchored line 1 of a TS file (6 of them `session.ts` or `session.test.ts`), an
+import line that the planner reported as unresolved. A Context branch (`perf/plan-scope-headers`)
+returns each planned TS/JS block's scope headers: the file's leading imports,
+types and constants, and a `describe` callback's setup before its first test;
+an anchor on a header line selects that header. On the same replay, the later
+`build` of `session.ts:1-97` or `1-100` was 96 of 97 (99 of 100) lines already
+returned by an earlier plan in all three cells, against 0 and 9 on 0.33.0. The
+test-file reads (`1-125`, `1-130`) were 44 lines covered, against 16 and 23,
+because they also took the first tests. The plan anchored on line 1 of
+`internal/session.ts`, which failed, returns its 16 lines. The AGENTS.md,
+`package.json`, `context.ts` and `session.ts:341-430` reads are not covered:
+cell-002's AGENTS.md was left out of an oversized plan, and the others were not
+anchored. Plans grew by 57 to 124 lines, and later plans repeat the 96-line
+header. This is line coverage with no model; whether it saves a call is
+unmeasured.
+
 The first second-review attempt timed out on all six cells without sending a
 request: the reviewer's prompt is an argument, and `codex exec` appends a
 piped stdin to it and waits for end of input. The harness now gives the
