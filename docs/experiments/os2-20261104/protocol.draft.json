@@ -885,5 +885,54 @@
       }
     },
     "consequence": "phase 2 not run; the cause is fixed as its own Context release and requalification reruns under a new draft revision"
+  },
+  "requalification20261106r2": {
+    "task": "h3-qualification",
+    "build": "0.30.0 (697f8d7)",
+    "gates": {
+      "contextAccepted": true,
+      "readsAfterPacketValid": true,
+      "readsAfterPacketAtMost025": true,
+      "mcpErrorRateAtMost5pc": true,
+      "isolationProbesPassed": true,
+      "usageComplete": true
+    },
+    "passed": true,
+    "observed": {
+      "readsAfterPacket": 0,
+      "mcpErrorRate": 0,
+      "mcpCalls": 18,
+      "plainAccepted": true,
+      "executorTokens": {
+        "context": 1600113,
+        "plain": 1070517
+      },
+      "reviewersAgree": {
+        "context": true,
+        "plain": true
+      }
+    },
+    "detail": {
+      "context": {
+        "claudeTokens": 19721,
+        "codexTokens": 38017,
+        "seconds": 326.9,
+        "dependencies": {
+          "missed": 0,
+          "recall": 1.0,
+          "precision": 0.3333333333333333
+        }
+      },
+      "plain": {
+        "claudeTokens": 16493,
+        "codexTokens": 37559,
+        "seconds": 265.7,
+        "dependencies": {
+          "missed": 0,
+          "recall": 1.0,
+          "precision": 0.3333333333333333
+        }
+      }
+    }
   }
 }

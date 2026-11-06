@@ -596,6 +596,28 @@ Under the protocol, phase 2 does not run after a failed requalification. The
 observed cause is fixed in Context as its own release, then requalification
 runs again under a new draft revision.
 
+#### Requalification on version 2, revision r2 (2026-11-06): passed
+
+Same task, settings, seed and order, on Context 0.30.0.
+
+| Gate | Result |
+| --- | --- |
+| Context accepted | yes (checker, scope and both reviewers) |
+| Reads after packet valid | yes |
+| Reads after packet at most 0.25 | yes (0) |
+| Context MCP error rate at most 5% | yes (0 of 18) |
+| Every isolation probe passed | yes |
+| Usage complete in both cells | yes |
+
+Also recorded: plain was accepted; both reviewers agreed on both cells.
+Executor tokens were 1,600,113 (Context, 326.9 s) and
+1,070,517 (plain, 265.7 s), a ratio of
+1.49. With the 0.29.0 pair (1.26) that is two
+single pairs on one task, not a gate result, but both point the same way.
+Dependency recall was 1.0 in both cells (precision 0.33 each). Claude reviews
+used 19,721 and 16,493 tokens; Codex reviews 38,017 and
+37,559.
+
 ### Independent protocol review (paid, needs approval)
 
 A fresh Sol/high session reviews the frozen protocol, harness diff and phase 1
@@ -864,8 +886,8 @@ Phase 2 is of that order. Phase 1 is one pair. No prices were looked up.
 8. ~~The quality-measure pilot and the reviewer-independence design~~
    (2026-11-06; see Reviewer design, pilot and readiness).
 9. Requalification (phase 1) on version 2 with the qualification task:
-   run 2026-11-06, **failed** on the MCP error gate (1 of 13, 7.7%); a fix
-   ships as its own release, then requalification runs again.
+   run 2026-11-06, **failed** on the MCP error gate (1 of 13, 7.7%); fixed
+   in 0.30.0 (PR #74) and rerun the same day under revision r2: **passed**.
 10. Phase 2.
 
 ## Not claimed
