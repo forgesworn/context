@@ -102,7 +102,9 @@ With `--cache-dir`, the session advertises three additional tools:
 | `repository_coordination` | Read activity plus notes addressed to this connection, using bounded pages. |
 | `repository_message` | Send a local addressed note with a caller-retained UUID for retry reconciliation. |
 
-Choose a unique `slot` per agent/task, including each worker represented by a
+Activity is for checkouts that another session or worker may edit, and for
+sessions that send or expect addressed notes. A session working alone can skip
+it; each call costs a model turn. Choose a unique `slot` per agent/task, including each worker represented by a
 host. Keep that slot until the task ends. Initial `expectedRevision` is 0;
 subsequent updates use the returned agent revision. Read/reconcile an uncertain
 update before retrying. Publish the actual task and paths before edits, renew
