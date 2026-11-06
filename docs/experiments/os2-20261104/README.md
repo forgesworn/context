@@ -11,6 +11,9 @@ approving this draft approves none of them. Sections below that record runs
 (phase 0, phase 1, the review and the diagnostic pairs) describe version 1 as
 it was run and are kept unchanged.
 
+Phase 2 is paused on the owner's decision (2026-11-06); see
+[Conclusion so far](#conclusion-so-far-2026-11-06).
+
 ## Version 2 changes (2026-11-05)
 
 What the [protocol review](protocol-review.md) asked for, and what changed:
@@ -936,6 +939,31 @@ effect a release has shown, so these pairs cannot attribute a saving or a
 loss to a release. The plain cell's two outside-reference flags are false
 positives: route strings `"/s"` and `"/o"` in an inline test script.
 
+### Conclusion so far (2026-11-06)
+
+On h3-qualification, one task in one repository, with Codex Sol/high, the
+Context arm used more executor tokens than plain in six of seven pairs:
+
+| Run | Context | Ratio (Context / plain) |
+| --- | --- | --- |
+| Requalification r1 | 0.29.0 | 1.26 |
+| Requalification r2 | 0.30.0 | 1.49 |
+| Requalification r3 | 0.31.0 | 1.78 |
+| Instruction variant, one pair | 0.31.0 | 0.94 (plain's own total doubled) |
+| Instruction variant, three pairs | 0.32.0 | median 1.53 (1.10, 2.22, 1.60) |
+
+Both arms were accepted in every pair. Context reads fewer lines than plain
+but takes more model calls (median 21 against 16 in the three pairs), and
+each call carries the transcript again, so its cost follows the call count.
+The 0.30.0 to 0.32.0 releases and the instruction variant changed what
+Context reads, not how many calls it takes.
+
+This is a one-task diagnostic, not the eight-task comparison: phase 2 was
+not run, so there is no pack result and no cost-gate result. Phase 2 is
+paused until a Context change reduces model calls on this task; trying that
+needs new paid pairs, each approved separately. `buildUnderTest` stays at
+0.31.0 until requalification is rerun on a newer build.
+
 ### Phase 2: full comparison (paid, needs separate approval)
 
 Eight tasks, three repetitions, two arms (48 executor and 48 reviewer sessions), run as locked.
@@ -1046,10 +1074,14 @@ Phase 2 is of that order. Phase 1 is one pair. No prices were looked up.
 9. Requalification (phase 1) on version 2 with the qualification task:
    run 2026-11-06, **failed** on the MCP error gate (1 of 13, 7.7%); fixed
    in 0.30.0 (PR #74) and rerun the same day under revision r2: **passed**.
-10. Phase 2.
+10. Phase 2: paused on the owner's decision (2026-11-06) pending a Context
+    change that reduces model calls; see Conclusion so far.
 
 ## Not claimed
 
-This draft delivers no measurement, savings or quality result. It changes no
-package code and does not reopen or alter any earlier protocol or result. Any
-phase 2 result applies to this eight-task pack only.
+This draft delivers no savings or pack-level quality result. Its only
+measurements are the one-task requalification and diagnostic pairs on
+h3-qualification, summarised in Conclusion so far; they say nothing about the
+other seven tasks or other models. It changes no package code and does not
+reopen or alter any earlier protocol or result. Any phase 2 result applies
+to this eight-task pack only.
