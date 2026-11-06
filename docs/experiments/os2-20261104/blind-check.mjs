@@ -103,7 +103,7 @@ function freeze({ tasks, accDir, repos, out }) {
     d.atBaseTail = atBase.tail
     execFileSync('git', ['-C', wt, 'reset', '-q', '--hard']); execFileSync('git', ['-C', wt, 'clean', '-fdq'])
     const changed = git(repo, 'diff', '--name-only', task.baseCommit, acc.sourceChange).split('\n').filter(Boolean)
-    execFileSync('git', ['-C', wt, 'checkout', '--detach', acc.sourceChange])
+    execFileSync('git', ['-C', wt, 'checkout', '-q', '--detach', acc.sourceChange])
     row.reinstalled = changed.some(f => LOCKFILES.test(f))
     if (row.reinstalled) { const re = sh(acc.checker.setup || INSTALL[task.repository], wt); if (re.code !== 0) sh(INSTALL[task.repository], wt) }
     const withChange = sh(acc.checker.command, wt, { offline: true, seconds: 900 })

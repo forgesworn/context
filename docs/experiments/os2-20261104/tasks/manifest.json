@@ -14,17 +14,17 @@
       "id": "bray-impact",
       "repository": "bray",
       "class": "impact",
-      "baseCommit": "f49cada6779ac787a099dc698e0a93c1830d4ed1",
-      "taskSha256": "4f95f2c1d74982e6cc368530293f560612f4e41af874da5541f54edc6900af12",
-      "acceptanceSha256": "add0d44847a09daec309ef52418527fc6f80af0467f68a3d03d453dd7a21a6e6"
+      "baseCommit": "cdc900c9e0f427e804b18a784775af6f5630b89c",
+      "taskSha256": "825b1bfa72afa5aa230cb6a9c5f57d5d5683dd51a16cc5725e0f2f7af1af7b5d",
+      "acceptanceSha256": "9a8f20bb70912b455d8b36d7b203730733dd6196e7186668aa890a5dd7ce1a4a"
     },
     {
       "id": "bray-diagnosis",
       "repository": "bray",
       "class": "diagnosis",
-      "baseCommit": "264acc6f7c76fb4c4720f9c928d338ca71f38c23",
-      "taskSha256": "956f6fc6f03866756ff679e3b4ca37ced71c583a3ef5852da15e38092ad12bab",
-      "acceptanceSha256": "a2ae70e50255eaf374bf204728407a987ccb1d4c080000b285b2d2aa735df640"
+      "baseCommit": "44beee9c94b204ae24b42fb2ca23b5264a5a5314",
+      "taskSha256": "e46e196502ff5ae24de0c1ee4058ac6d39a7286f0168553da8e51dfa4d521e8c",
+      "acceptanceSha256": "2c88f253eebef2dea4038f87817490d0a66f93d590c12d02c67aa7331c257eef"
     },
     {
       "id": "bray-code-change",
@@ -54,19 +54,74 @@
       "id": "h3-diagnosis",
       "repository": "h3",
       "class": "diagnosis",
-      "baseCommit": "ae4d6ee0bc371688b666044fbbd0064f3b6ac076",
-      "taskSha256": "4344a84aeff747a611812f1473f7de3e45fff72ced6ed585f90d893845a51a53",
-      "acceptanceSha256": "6a5ea3f5076c89390e4f8df72bf5b64e68dc4d951dc353c8f6694f524cfec81f"
+      "baseCommit": "8f21c7176d8dc9f1331622cd13aac1b44e2c71ed",
+      "taskSha256": "0585e99f037d355727bcded4b82735fe0ec0e5224c914d9f0799ad16b9543c4d",
+      "acceptanceSha256": "35b88bef3e2c5d5b1e0d1a7b3b60a519aad122abf0d11bd0a3320bf3b033032c"
     },
     {
       "id": "h3-code-change",
       "repository": "h3",
       "class": "code-change",
-      "baseCommit": "3eb3a57f9c5c3cc6dfc8daefefa78393fa8fdbd2",
-      "taskSha256": "c4ba962b5a308f20946b7503c999f708538a383788688f80e42d5837489dcc91",
-      "acceptanceSha256": "49ce8377eac7d544a1eb3f9d99210d1f150ffabb87ced62b6c7a83cbd4c49135"
+      "baseCommit": "1ff4999eccc2d055c38b083d9be55d01d69d671d",
+      "taskSha256": "51e495d2aac5354c4ca5c0cedfea8a3cb67aa37dc71528a9d12003409de1accd",
+      "acceptanceSha256": "308cc5d80826f7051868557cc948df45596ac4cb58b68a519b476d965874d779"
     }
   ],
   "privateManifestSha256": "6b0fe9756b17c2111d8f2a1a1e3387e17681a21c09deb9e6e34daf80cd232d82",
-  "note": "Acceptance files are private and unread by the tool side; only their hashes are recorded. The private manifest also holds the author's problem notes."
+  "note": "Acceptance files are private and unread by the tool side; only their hashes are recorded. The private manifest also holds the author's problem notes.",
+  "replacedAt": "2026-11-06",
+  "replacement": {
+    "tasks": [
+      "bray-impact",
+      "bray-diagnosis",
+      "h3-diagnosis",
+      "h3-code-change"
+    ],
+    "custodianRejectedCandidates": 173,
+    "custodianPrivateManifestSha256": "1ce764b214e2d7a14d578092d5ced68481f5dcac8beccfd4eab2d344e3008f92",
+    "retired": [
+      {
+        "id": "bray-impact",
+        "repository": "bray",
+        "class": "impact",
+        "baseCommit": "f49cada6779ac787a099dc698e0a93c1830d4ed1",
+        "taskSha256": "4f95f2c1d74982e6cc368530293f560612f4e41af874da5541f54edc6900af12",
+        "acceptanceSha256": "add0d44847a09daec309ef52418527fc6f80af0467f68a3d03d453dd7a21a6e6"
+      },
+      {
+        "id": "bray-diagnosis",
+        "repository": "bray",
+        "class": "diagnosis",
+        "baseCommit": "264acc6f7c76fb4c4720f9c928d338ca71f38c23",
+        "taskSha256": "956f6fc6f03866756ff679e3b4ca37ced71c583a3ef5852da15e38092ad12bab",
+        "acceptanceSha256": "a2ae70e50255eaf374bf204728407a987ccb1d4c080000b285b2d2aa735df640"
+      },
+      {
+        "id": "h3-diagnosis",
+        "repository": "h3",
+        "class": "diagnosis",
+        "baseCommit": "ae4d6ee0bc371688b666044fbbd0064f3b6ac076",
+        "taskSha256": "4344a84aeff747a611812f1473f7de3e45fff72ced6ed585f90d893845a51a53",
+        "acceptanceSha256": "6a5ea3f5076c89390e4f8df72bf5b64e68dc4d951dc353c8f6694f524cfec81f"
+      },
+      {
+        "id": "h3-code-change",
+        "repository": "h3",
+        "class": "code-change",
+        "baseCommit": "3eb3a57f9c5c3cc6dfc8daefefa78393fa8fdbd2",
+        "taskSha256": "c4ba962b5a308f20946b7503c999f708538a383788688f80e42d5837489dcc91",
+        "acceptanceSha256": "49ce8377eac7d544a1eb3f9d99210d1f150ffabb87ced62b6c7a83cbd4c49135"
+      }
+    ],
+    "note": "Replaced by an isolated custodian session because the tool side had seen hints about them; the retired entries are kept as history."
+  },
+  "qualification": {
+    "id": "h3-qualification",
+    "repository": "h3",
+    "class": "code-change",
+    "baseCommit": "07273db68ae84cf658301c20ca4156308e300206",
+    "taskSha256": "6675944aed632a27426a6d2d82aa9d138c7d8ff9c6fb0b02115a3a63b7259bb2",
+    "acceptanceSha256": "3aacc1d09e098c2edb2b23f73fbc34e28483db5bcc17c8ad3215dddb385c7dca",
+    "statement": "tasks-qualification/h3-qualification.json (never used in phase 2)"
+  }
 }

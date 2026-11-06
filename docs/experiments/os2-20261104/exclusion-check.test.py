@@ -26,17 +26,22 @@ class Exclusions(unittest.TestCase):
     def setUp(self):
         self.existing = {'k-orientation': acc('k-orientation', None, [], ['secret/kept.ts']),
                          'old-impact': acc('old-impact', A, ['secret/old.ts'])}
-        self.tasks = {'k-orientation': {'id': 'k-orientation', 'baseCommit': B}, 'old-impact': {'id': 'old-impact', 'baseCommit': C}}
+        self.tasks = {'k-orientation': {'id': 'k-orientation', 'repository': 'r', 'baseCommit': B},
+                      'old-impact': {'id': 'old-impact', 'repository': 'r', 'baseCommit': C}}
 
     def run_check(self, new):
         return x.check(self.existing, self.tasks, ['k-orientation'], new)
 
     def test_a_clean_task_passes(self):
-        out = self.run_check({'n-impact': (acc('n-impact', 'd' * 40, ['src/new.ts']), {'id': 'n-impact', 'baseCommit': 'e' * 40})})
+        out = self.run_check({'n-impact': (acc('n-impact', 'd' * 40, ['src/new.ts']), {'id': 'n-impact', 'repository': 'r', 'baseCommit': 'e' * 40})})
+        self.assertTrue(out['allClean'])
+
+    def test_the_same_path_in_another_repository_is_not_an_overlap(self):
+        out = self.run_check({'n': (acc('n', 'd' * 40, ['secret/old.ts'], ['secret/kept.ts']), {'id': 'n', 'repository': 'other', 'baseCommit': 'e' * 40})})
         self.assertTrue(out['allClean'])
 
     def test_each_exclusion_is_caught(self):
-        t = lambda base='e' * 40: {'id': 'n', 'baseCommit': base}
+        t = lambda base='e' * 40: {'id': 'n', 'repository': 'r', 'baseCommit': base}
         cases = {'sourceChangeReused': (acc('n', A, ['src/new.ts']), t()),
                  'baseCommitReused': (acc('n', 'd' * 40, ['src/new.ts']), t(C)),
                  'pathsInExistingDependencySets': (acc('n', 'd' * 40, ['secret/old.ts']), t()),
@@ -47,15 +52,15 @@ class Exclusions(unittest.TestCase):
             self.assertFalse(out['allClean'], field)
 
     def test_new_tasks_must_not_share_dependency_paths(self):
-        new = {'n1': (acc('n1', 'd' * 40, ['src/same.ts']), {'id': 'n1', 'baseCommit': 'e' * 40}),
-               'n2': (acc('n2', 'f' * 40, ['src/same.ts']), {'id': 'n2', 'baseCommit': '1' * 40})}
+        new = {'n1': (acc('n1', 'd' * 40, ['src/same.ts']), {'id': 'n1', 'repository': 'r', 'baseCommit': 'e' * 40}),
+               'n2': (acc('n2', 'f' * 40, ['src/same.ts']), {'id': 'n2', 'repository': 'r', 'baseCommit': '1' * 40})}
         self.assertFalse(self.run_check(new)['allClean'])
 
     def test_stdout_never_names_a_path_or_commit(self):
         with tempfile.TemporaryDirectory() as d:
             d = pathlib.Path(d)
             for name, files in (('existing', self.existing), ('etasks', self.tasks),
-                                ('nacc', {'n': acc('n', A, ['secret/old.ts'], ['secret/kept.ts'])}), ('ntasks', {'n': {'id': 'n', 'baseCommit': C}})):
+                                ('nacc', {'n': acc('n', A, ['secret/old.ts'], ['secret/kept.ts'])}), ('ntasks', {'n': {'id': 'n', 'repository': 'r', 'baseCommit': C}})):
                 (d / name).mkdir()
                 for i, body in files.items():
                     (d / name / f'{i}.json').write_text(json.dumps(body))

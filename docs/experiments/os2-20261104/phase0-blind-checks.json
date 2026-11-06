@@ -191,5 +191,158 @@
         "sufficient": true
       }
     ]
+  },
+  "replacement20261106": {
+    "ranAt": "2026-11-06",
+    "scripts": [
+      "exclusion-check.py",
+      "blind-check.mjs"
+    ],
+    "note": "Counts and pass/fail only; details stay private.",
+    "exclusions": {
+      "newTasks": 5,
+      "allClean": true,
+      "note": "no reused sourceChange or baseCommit; no new path in any existing dependency set or kept required evidence (repository-qualified); no dependency path shared between new tasks; scope in the v2 shape"
+    },
+    "freeze": {
+      "host": "M4, clean install at each base commit, tests with outbound network denied except localhost",
+      "tasks": [
+        {
+          "id": "bray-diagnosis",
+          "class": "diagnosis",
+          "schemaErrors": 0,
+          "scopeValid": true,
+          "archiveSha256": "46a1f10f39f678a14954c8e4342bdd865bf9ef5b32fdece8e14769d087fb2e25",
+          "evidenceValidAtBase": "2/2",
+          "dependencyPathsAtBase": "2/2",
+          "authorSetupExit": 0,
+          "failsAtBase": true,
+          "reinstalled": false,
+          "passesWithChange": true,
+          "checkerDiscriminates": true
+        },
+        {
+          "id": "bray-impact",
+          "class": "impact",
+          "schemaErrors": 0,
+          "scopeValid": true,
+          "archiveSha256": "b82fefa16bb20c8b28df795c272cc095aaa95adc10e9708d28597d68e0a04858",
+          "evidenceValidAtBase": "9/9",
+          "dependencyPathsAtBase": "16/16"
+        },
+        {
+          "id": "h3-code-change",
+          "class": "code-change",
+          "schemaErrors": 0,
+          "scopeValid": true,
+          "archiveSha256": "258beccee06dd217611a296031a32ef3c640d9c8acef7417df71f2d5c4bf1d2a",
+          "evidenceValidAtBase": "3/3",
+          "dependencyPathsAtBase": "1/1",
+          "authorSetupExit": 0,
+          "failsAtBase": true,
+          "reinstalled": false,
+          "passesWithChange": true,
+          "checkerDiscriminates": true
+        },
+        {
+          "id": "h3-diagnosis",
+          "class": "diagnosis",
+          "schemaErrors": 0,
+          "scopeValid": true,
+          "archiveSha256": "2fe97378fd1fc761459c7281437abc8f83c08aa79bf9356a8c85417b3aeb0850",
+          "evidenceValidAtBase": "2/2",
+          "dependencyPathsAtBase": "1/1",
+          "authorSetupExit": 0,
+          "failsAtBase": true,
+          "reinstalled": false,
+          "passesWithChange": true,
+          "checkerDiscriminates": true
+        },
+        {
+          "id": "h3-qualification",
+          "class": "code-change",
+          "schemaErrors": 0,
+          "scopeValid": true,
+          "archiveSha256": "6f6e34e2f6254a9b90b0e5c1c0edeb6f2f736805066cb0c9e999639627d77e9c",
+          "evidenceValidAtBase": "5/5",
+          "dependencyPathsAtBase": "3/3",
+          "authorSetupExit": 0,
+          "failsAtBase": true,
+          "reinstalled": false,
+          "passesWithChange": true,
+          "checkerDiscriminates": true
+        }
+      ]
+    },
+    "packets": {
+      "context": "0.29.0 (6cd0ce2) connect, one build packet per task, 64 KiB budget",
+      "tasks": [
+        {
+          "id": "bray-diagnosis",
+          "class": "diagnosis",
+          "schemaErrors": 0,
+          "scopeValid": true,
+          "ranges": 2,
+          "covered": 2,
+          "pastEnd": 0,
+          "packetBytes": 7651,
+          "failure": null,
+          "singles": null,
+          "sufficient": true
+        },
+        {
+          "id": "bray-impact",
+          "class": "impact",
+          "schemaErrors": 0,
+          "scopeValid": true,
+          "ranges": 9,
+          "covered": 9,
+          "pastEnd": 0,
+          "packetBytes": 36627,
+          "failure": null,
+          "singles": null,
+          "sufficient": true
+        },
+        {
+          "id": "h3-code-change",
+          "class": "code-change",
+          "schemaErrors": 0,
+          "scopeValid": true,
+          "ranges": 3,
+          "covered": 3,
+          "pastEnd": 0,
+          "packetBytes": 5807,
+          "failure": null,
+          "singles": null,
+          "sufficient": true
+        },
+        {
+          "id": "h3-diagnosis",
+          "class": "diagnosis",
+          "schemaErrors": 0,
+          "scopeValid": true,
+          "ranges": 2,
+          "covered": 2,
+          "pastEnd": 0,
+          "packetBytes": 5254,
+          "failure": null,
+          "singles": null,
+          "sufficient": true
+        },
+        {
+          "id": "h3-qualification",
+          "class": "code-change",
+          "schemaErrors": 0,
+          "scopeValid": true,
+          "ranges": 5,
+          "covered": 5,
+          "pastEnd": 0,
+          "packetBytes": 12304,
+          "failure": null,
+          "singles": null,
+          "sufficient": true
+        }
+      ]
+    }
   }
 }

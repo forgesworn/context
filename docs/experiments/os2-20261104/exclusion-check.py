@@ -17,8 +17,9 @@ def load(d):
     return {p.stem: json.loads(p.read_text(encoding='utf8')) for p in sorted(pathlib.Path(d).glob('*.json')) if p.name != 'manifest.json'}
 
 
-def paths(acc, *keys):
-    return {x.get('path') for k in keys for x in (acc.get(k) or []) if isinstance(x, dict) and x.get('path')}
+def paths(acc, repo, *keys):
+    """(repository, path) pairs, so the same relative path in two repositories is not an overlap."""
+    return {(repo, x.get('path')) for k in keys for x in (acc.get(k) or []) if isinstance(x, dict) and x.get('path')}
 
 
 def scope_valid(acc):
@@ -30,12 +31,13 @@ def check(existing, existing_tasks, kept, new):
     """existing/new: {id: acceptance}; existing_tasks/new tasks: {id: task}. Returns counts only."""
     old_changes = {a.get('sourceChange') for a in existing.values()} - {None}
     old_bases = {t.get('baseCommit') for t in existing_tasks.values()}
-    old_deps = set().union(*(paths(a, 'dependencySet') for a in existing.values())) if existing else set()
-    kept_evidence = set().union(*(paths(existing[k], 'requiredEvidence') for k in kept if k in existing)) if kept else set()
+    repo = lambda tasks, i: (tasks.get(i) or {}).get('repository')
+    old_deps = set().union(*(paths(a, repo(existing_tasks, i), 'dependencySet') for i, a in existing.items())) if existing else set()
+    kept_evidence = set().union(*(paths(existing[k], repo(existing_tasks, k), 'requiredEvidence') for k in kept if k in existing)) if kept else set()
     rows, seen = [], {}
     for i, (acc, task) in sorted(new.items()):
-        mine = paths(acc, 'dependencySet', 'requiredEvidence')
-        deps = paths(acc, 'dependencySet')
+        mine = paths(acc, task.get('repository'), 'dependencySet', 'requiredEvidence')
+        deps = paths(acc, task.get('repository'), 'dependencySet')
         rows.append({'id': i, 'class': task.get('class'), 'idMatches': acc.get('id') == task.get('id') == i,
                      'sourceChangeReused': acc.get('sourceChange') in old_changes,
                      'baseCommitReused': task.get('baseCommit') in old_bases,

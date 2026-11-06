@@ -56,11 +56,10 @@ commands the sandbox denies, which read metrics do not count as reads.
 
 Still open, and not decided by this version:
 
-- **Task replacement (paid).** bray-impact, bray-diagnosis, h3-diagnosis and
-  h3-code-change are exposed. They need replacing by an isolated custodian,
-  with a separate qualification task that phase 2 never uses. Replacement
-  acceptance files must give scope as `{"allowedPaths": [glob, ...]}`;
-  `assess` stops on any other shape.
+- ~~Task replacement~~ (custodian run 2026-11-06; see Replacement tasks).
+  Still open: the kept four acceptance files give scope as text, so `assess`
+  stops on them until a hidden-side session converts them to
+  `{"allowedPaths": [...]}`.
 - **Quality measure (paid pilot).** Symbol and call-site recall and precision,
   and rules for alternative valid implementations, need a pilot on tasks
   outside phase 2.
@@ -148,6 +147,61 @@ yet; requalification covers it.
 If a later phase exposes a tool defect, the fix ships as its own release and
 PR, and the draft is repinned and requalified before lock. Fixes are never
 made inside the experiment.
+
+## Replacement tasks (2026-11-06)
+
+bray-impact, bray-diagnosis, h3-diagnosis and h3-code-change were replaced,
+keeping their ids and classes, and `h3-qualification` (code-change) was added
+for requalification only, in [`tasks-qualification/`](tasks-qualification)
+so that `plan` never schedules it. The retired entries stay in
+`tasks/manifest.json` and the protocol as history.
+
+| Task | Class | Base commit | Base date |
+| --- | --- | --- | --- |
+| bray-impact | impact | `cdc900c9` | 2026-04-14 |
+| bray-diagnosis | diagnosis | `44beee9c` | 2026-04-05 |
+| h3-diagnosis | diagnosis | `8f21c717` | 2026-10-03 |
+| h3-code-change | code-change | `1ff4999e` | 2026-07-05 |
+| h3-qualification | code-change | `07273db6` | 2026-09-02 |
+
+How it ran:
+
+- One custodian session, Claude Code headless, Opus 5.5, on the owner's
+  plan: 54 turns, 628 seconds, about 3.7M cached input read, 0.13M cache
+  writes and 41,000 output tokens (about $2.64 at API rates; not billed as
+  cash). It examined and rejected 173 candidates.
+- Isolation as the 4 Nov author. Step 0 confirmed outbound HTTPS refused
+  (403) and a write outside its folder refused. It had the eight existing
+  acceptance files so it could apply the overlap rules.
+- Its reply had to be one fixed JSON shape (ids, classes, commits, hashes, an
+  exclusions flag and a rejected count). A guard script checked the shape and
+  printed nothing else; the reply was valid and every hash matched its file.
+  Problems and reasons went only to its private manifest, which the tool side
+  has not read.
+
+Blind checks (counts only, in
+[`phase0-blind-checks.json`](phase0-blind-checks.json)):
+
+- [`exclusion-check.py`](exclusion-check.py): no reused merged change or
+  base commit, no new path in any existing dependency set or kept task's
+  required evidence, no dependency path shared between new tasks, and every
+  scope in the v2 shape. Its first run flagged one overlap that was the same
+  relative path in the other repository; the check now compares repository
+  and path, with a test.
+- Freeze on the M4 from clean installs, outbound network denied: all four
+  checker tasks fail at base and pass with the change, with no reinstall.
+- Packets with Context 0.29.0: every task's required evidence fits one
+  packet (5 to 37 KB).
+
+Open points:
+
+- The two bray replacements are from April 2026, earlier than the brief's
+  preferred 1 July; the reasons are in the private manifest.
+- The private manifest lists ten problems the tool side has not read. A
+  hidden-side reader should review them before lock.
+- The kept four acceptance files (bray-orientation, bray-code-change,
+  h3-orientation, h3-impact) give scope as text; protocol v2's `assess` needs
+  `{"allowedPaths": [...]}`.
 
 ## Executor, reviewer and harness
 
@@ -679,8 +733,10 @@ Phase 2 is of that order. Phase 1 is one pair. No prices were looked up.
    different-family reviewer with an agreement sample.
 6. ~~One short live isolation session~~ (`isolation-probe.py`, run and
    passed 2026-11-05).
-7. Replacement tasks from an isolated custodian, plus a separate
-   qualification task.
+7. ~~Replacement tasks from an isolated custodian, plus a separate
+   qualification task~~ (run 2026-11-06). Follow-up, paid and small: a
+   hidden-side session converts the kept four scopes and reads the
+   custodian's private problem list.
 8. The quality-measure pilot and the reviewer-independence design.
 9. Requalification (phase 1) on version 2 with the qualification task.
 10. Phase 2.
