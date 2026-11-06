@@ -771,6 +771,28 @@ number of model calls, not the bytes read.
 Codex second reviewer: accepted all six, agreeing with Claude on `accepted`
 (6 of 6) and on every rubric item (30 of 30); 37k to 50k tokens a review.
 
+Where the extra calls went (model-free, from the session logs of the three
+Context cells, executor-side only). Plain reached its first edit in 4 to 6 model
+calls, Context in 6 to 9; Context also spent one call listing its tools and two
+late calls (a refresh and packet after editing, and a coverage check) that plain
+does not make. Retrieval was already batched: only 6 to 9 of 19 to 25 calls used
+the repository tools. Every Context cell then asked for the top of a file in a
+separate `build`: `src/utils/session.ts:1-97` (imports and type declarations)
+and `test/session.test.ts:1-125` or `1-130` (imports and test setup), and each
+fetched AGENTS.md by `build` (140 to 254 lines). Plain read those with `sed` in
+its first reads.
+
+[`plan-replay.mjs`](plan-replay.mjs) replays the recorded pre-edit `plan` requests against h3 at the task
+base with no model. Adding each file's import header (about 10 to 16 lines) to
+a plan would have covered none of those follow-up reads, so that change was not
+opened. Leading imports plus top-level declarations up to the first function
+would have covered `session.ts:1-96`, but not the test setup, which sits inside
+a `describe` callback. Context PR #77 lets `plan` answer non-code files such as
+AGENTS.md whole and name the indexed paths for a missing source; on the replay,
+cell-002's first plan, which failed outright on 0.32.0, returns 806 lines of code
+blocks and reports AGENTS.md and one anchor. None of this measures tokens; that
+needs a new paid pair.
+
 The first second-review attempt timed out on all six cells without sending a
 request: the reviewer's prompt is an argument, and `codex exec` appends a
 piped stdin to it and waits for end of input. The harness now gives the
