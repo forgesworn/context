@@ -40,8 +40,8 @@
     "hiddenAcceptance": "Required evidence, dependency set, checker and scope rules per task. Mined tasks take them from the merged change; the blind Claude session writes the rest and vets all. Hashes recorded here at lock; unread by the tool side, including the owner, until results are recorded.",
     "hiddenAcceptanceSha256": {
       "bray-orientation": "4180087923ef2ed393f56b7733f3021bc36688eee55b511f1e73053e54586f47",
-      "bray-impact": "9a8f20bb70912b455d8b36d7b203730733dd6196e7186668aa890a5dd7ce1a4a",
-      "bray-diagnosis": "2c88f253eebef2dea4038f87817490d0a66f93d590c12d02c67aa7331c257eef",
+      "bray-impact": "61fe54afed0adedc7adcb07cdca60b6678b62ab3f533cc78124db1bde48589b7",
+      "bray-diagnosis": "28f2ccb1aaf240d8b796428770910aa8e50dbae784844543842c3d1f5d9d5ce1",
       "bray-code-change": "8bad9d70781445492383b5a76cc91ff9f31e55879ac056da137823597e0d13dc",
       "h3-orientation": "0d4ce81f11ad9eb22385ca4a40352f5886558e127c6e9b26611b17d30d26472e",
       "h3-impact": "994ccdc36cfd45b5571ac27859a21166f95a5fedf0d64b75d051a174564ca20a",
@@ -96,8 +96,8 @@
     },
     "archives": {
       "bray-code-change": "0c2eb4074f06485279c459c6d3e251d0d7f842cbbb909ef1e532c3598ad9609a",
-      "bray-diagnosis": "46a1f10f39f678a14954c8e4342bdd865bf9ef5b32fdece8e14769d087fb2e25",
-      "bray-impact": "b82fefa16bb20c8b28df795c272cc095aaa95adc10e9708d28597d68e0a04858",
+      "bray-diagnosis": "1b7f919d6bf2618ca4426c3de1b3169b1c7f7d5ff68278eb9809da632f750e72",
+      "bray-impact": "911a0d4658d2c9e94a10dc5042aab06c8f0064432e1c541e09ff066b2962c36e",
       "bray-orientation": "c58c5388d935ce1811fe594381762db312d82927a68b12eebac54137b9d57f81",
       "h3-code-change": "258beccee06dd217611a296031a32ef3c640d9c8acef7417df71f2d5c4bf1d2a",
       "h3-diagnosis": "2fe97378fd1fc761459c7281437abc8f83c08aa79bf9356a8c85417b3aeb0850",
@@ -156,10 +156,7 @@
         "rejectedCandidates": 173
       },
       "checks": "exclusion-check.py all clean (first run gave a false positive across repositories; fixed to repository-qualified paths); blind-check freeze: all four checker tasks fail at base and pass with the change, no reinstall; packets: every task sufficient in one 0.29.0 packet",
-      "openPoints": [
-        "The follow-up custodian recommends replacing bray-impact and bray-diagnosis again and judged their April 2026 base commits not acceptable; reasons private, unread",
-        "The two bray replacements have April 2026 base commits, earlier than the brief's preferred 2026-07-01; reasons are in the private manifest, unread"
-      ]
+      "openPoints": []
     },
     "followUp": {
       "at": "2026-11-06",
@@ -184,6 +181,58 @@
         "brayAgeAcceptable": false
       },
       "reply": "fixed JSON shape checked by a guard script; valid; every hash matched its file; reasons in a private review file, unread"
+    },
+    "brayRewrite": {
+      "at": "2026-11-06",
+      "session3": {
+        "wrote": [
+          "bray-impact",
+          "bray-diagnosis"
+        ],
+        "isolation": "same isolation and reply guard as the first custodian; step 0 refused outbound HTTPS (403) and a write outside its folder",
+        "run": {
+          "turns": 47,
+          "seconds": 485,
+          "inputTokens": 94,
+          "cacheReadInputTokens": 3408383,
+          "cacheCreationInputTokens": 119638,
+          "outputTokens": 37509,
+          "apiRateEquivalentUSD": 2.39
+        },
+        "rejectedCandidates": 54,
+        "reply": {
+          "exclusionsMet": false,
+          "baseDateRuleMet": true
+        },
+        "outcome": "bray-diagnosis kept (all exclusions clean); bray-impact rejected: 2 of its 5 dependency files were in the retired bray-impact and 1 in the kept bray-code-change (disclosed by the custodian as relaxed)"
+      },
+      "session4": {
+        "wrote": [
+          "bray-impact"
+        ],
+        "isolation": "same isolation and reply guard as the first custodian; step 0 refused outbound HTTPS (403) and a write outside its folder",
+        "run": {
+          "turns": 49,
+          "seconds": 467,
+          "inputTokens": 96,
+          "cacheReadInputTokens": 3563842,
+          "cacheCreationInputTokens": 130845,
+          "outputTokens": 32646,
+          "apiRateEquivalentUSD": 2.41
+        },
+        "rejectedCandidates": 100,
+        "reply": {
+          "otherExclusionsMet": false,
+          "baseDateRuleMet": true
+        },
+        "rule": "no overlap with the retired bray-impact, not relaxable",
+        "outcome": "kept: no shared path with the retired bray-impact or any current, retired or second-rejected task; shares two paths with the first rejected bray-diagnosis, which never entered the pack"
+      },
+      "bases": {
+        "bray-impact": "754f1b75 (2026-07-27)",
+        "bray-diagnosis": "4136501b (2026-09-24)"
+      },
+      "checks": "freeze on the M4 (bray-diagnosis checker fails at base, passes with the change, no reinstall; bray-impact evidence and dependency paths valid at base); packets sufficient with 0.29.0; final pack exclusion check clean"
     }
   },
   "executor": {
@@ -575,7 +624,6 @@
   ],
   "openDecisions": [
     "Owner review of version 2",
-    "Replace bray-impact and bray-diagnosis again (small paid custodian session), as the follow-up review recommends",
     "Reviewer design detail (paid): model, agreement sample size and threshold",
     "Quality-measure pilot on tasks outside phase 2 (paid)"
   ],

@@ -57,8 +57,6 @@ commands the sandbox denies, which read metrics do not count as reads.
 Still open, and not decided by this version:
 
 - ~~Task replacement~~ (custodian run 2026-11-06; see Replacement tasks).
-  Still open: the follow-up review recommends replacing the two new bray
-  tasks again.
 - **Quality measure (paid pilot).** Symbol and call-site recall and precision,
   and rules for alternative valid implementations, need a pilot on tasks
   outside phase 2.
@@ -157,8 +155,8 @@ so that `plan` never schedules it. The retired entries stay in
 
 | Task | Class | Base commit | Base date |
 | --- | --- | --- | --- |
-| bray-impact | impact | `cdc900c9` | 2026-04-14 |
-| bray-diagnosis | diagnosis | `44beee9c` | 2026-04-05 |
+| bray-impact | impact | `754f1b75` | 2026-07-27 |
+| bray-diagnosis | diagnosis | `4136501b` | 2026-09-24 |
 | h3-diagnosis | diagnosis | `8f21c717` | 2026-10-03 |
 | h3-code-change | code-change | `1ff4999e` | 2026-07-05 |
 | h3-qualification | code-change | `07273db6` | 2026-09-02 |
@@ -208,8 +206,29 @@ at API rates, plan-billed) did two hidden-side jobs:
   recommends replacing bray-impact and bray-diagnosis again and judged their
   April 2026 base commits not acceptable. Its reasons are private and unread.
 
-Open point: replace bray-impact and bray-diagnosis (one more small custodian
-session) before requalification.
+### Bray rewrite (2026-11-06)
+
+The two bray tasks were written twice more, each time by an isolated session
+with the same setup and reply guard, given every existing acceptance file and
+the follow-up's reasons:
+
+- Session 3 (47 turns, 485 seconds, about $2.39 at API rates, plan-billed)
+  wrote both. bray-diagnosis met every exclusion and is kept. bray-impact was
+  rejected: 2 of its 5 dependency files were in the retired bray-impact, whose
+  answer had been partly hinted to the tool side, and 1 in the kept
+  bray-code-change. The custodian disclosed the overlap.
+- Session 4 (49 turns, 467 seconds, about $2.41) wrote bray-impact alone,
+  with no overlap with the retired bray-impact as a rule it could not relax.
+  It shares no path with the retired bray-impact or any current, retired or
+  rejected bray-impact. It shares two with the first rejected bray-diagnosis,
+  which never entered the pack.
+
+Both have base commits after 1 July 2026. Checks: the freeze on the M4 (the
+bray-diagnosis checker fails at base and passes with the change; bray-impact
+evidence and dependency paths are valid at base), one 0.29.0 packet each, and
+a final exclusion check of the five new tasks against the kept four and the
+retired four, all clean. The table above shows the final base commits; the
+rejected versions' hashes stay in `tasks/manifest.json`.
 
 ## Executor, reviewer and harness
 
@@ -743,8 +762,7 @@ Phase 2 is of that order. Phase 1 is one pair. No prices were looked up.
    passed 2026-11-05).
 7. ~~Replacement tasks from an isolated custodian, plus a separate
    qualification task~~ (run 2026-11-06; follow-up converted the kept
-   scopes and reviewed the problem list). Still to do, paid and small:
-   replace bray-impact and bray-diagnosis again.
+   scopes and reviewed the problem list; the bray pair was rewritten).
 8. The quality-measure pilot and the reviewer-independence design.
 9. Requalification (phase 1) on version 2 with the qualification task.
 10. Phase 2.

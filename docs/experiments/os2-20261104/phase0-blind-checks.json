@@ -344,5 +344,63 @@
         }
       ]
     }
+  },
+  "brayRewrite20261106": {
+    "ranAt": "2026-11-06",
+    "note": "Counts and pass/fail only; details stay private.",
+    "exclusions": "final pack: five new tasks against the kept four and the retired four, all clean (repository-qualified paths); new bray-impact shares no path with the retired bray-impact, any current or retired task or the second rejected bray-impact; it shares two with the first rejected bray-diagnosis, which never entered the pack",
+    "freeze": [
+      {
+        "id": "bray-diagnosis",
+        "class": "diagnosis",
+        "schemaErrors": 0,
+        "scopeValid": true,
+        "archiveSha256": "1b7f919d6bf2618ca4426c3de1b3169b1c7f7d5ff68278eb9809da632f750e72",
+        "evidenceValidAtBase": "3/3",
+        "dependencyPathsAtBase": "1/1",
+        "authorSetupExit": 0,
+        "failsAtBase": true,
+        "reinstalled": false,
+        "passesWithChange": true,
+        "checkerDiscriminates": true
+      },
+      {
+        "id": "bray-impact",
+        "class": "impact",
+        "schemaErrors": 0,
+        "scopeValid": true,
+        "archiveSha256": "911a0d4658d2c9e94a10dc5042aab06c8f0064432e1c541e09ff066b2962c36e",
+        "evidenceValidAtBase": "5/5",
+        "dependencyPathsAtBase": "6/6"
+      }
+    ],
+    "packets": [
+      {
+        "id": "bray-diagnosis",
+        "class": "diagnosis",
+        "schemaErrors": 0,
+        "scopeValid": true,
+        "ranges": 3,
+        "covered": 3,
+        "pastEnd": 0,
+        "packetBytes": 4952,
+        "failure": null,
+        "singles": null,
+        "sufficient": true
+      },
+      {
+        "id": "bray-impact",
+        "class": "impact",
+        "schemaErrors": 0,
+        "scopeValid": true,
+        "ranges": 5,
+        "covered": 5,
+        "pastEnd": 0,
+        "packetBytes": 13093,
+        "failure": null,
+        "singles": null,
+        "sufficient": true
+      }
+    ]
   }
 }

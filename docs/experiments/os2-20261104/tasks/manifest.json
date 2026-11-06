@@ -14,17 +14,17 @@
       "id": "bray-impact",
       "repository": "bray",
       "class": "impact",
-      "baseCommit": "cdc900c9e0f427e804b18a784775af6f5630b89c",
-      "taskSha256": "825b1bfa72afa5aa230cb6a9c5f57d5d5683dd51a16cc5725e0f2f7af1af7b5d",
-      "acceptanceSha256": "9a8f20bb70912b455d8b36d7b203730733dd6196e7186668aa890a5dd7ce1a4a"
+      "baseCommit": "754f1b75e2c8c8cb282346e9c1e2a4612957153f",
+      "taskSha256": "e618d64d2c386a922af80c1614a51bd63511bd0111f8e342cad100b61af98179",
+      "acceptanceSha256": "61fe54afed0adedc7adcb07cdca60b6678b62ab3f533cc78124db1bde48589b7"
     },
     {
       "id": "bray-diagnosis",
       "repository": "bray",
       "class": "diagnosis",
-      "baseCommit": "44beee9c94b204ae24b42fb2ca23b5264a5a5314",
-      "taskSha256": "e46e196502ff5ae24de0c1ee4058ac6d39a7286f0168553da8e51dfa4d521e8c",
-      "acceptanceSha256": "2c88f253eebef2dea4038f87817490d0a66f93d590c12d02c67aa7331c257eef"
+      "baseCommit": "4136501b34e22d32c02edf66444002914539a813",
+      "taskSha256": "f06586bd2624b0539406f99f280fb891ec8d86213535473bb74a04f9c0029503",
+      "acceptanceSha256": "28f2ccb1aaf240d8b796428770910aa8e50dbae784844543842c3d1f5d9d5ce1"
     },
     {
       "id": "bray-code-change",
@@ -139,5 +139,29 @@
       "h3-impact": "81cfcce27a1d76e0c01c60d27d4cca6ab190297a43b45ff069cb8bead30261ba"
     },
     "note": "scope converted to {\"allowedPaths\": [...]} by a hidden-side custodian; the old text is kept in scopeText; no other field changed (checked blind)"
+  },
+  "brayRewrite": {
+    "at": "2026-11-06",
+    "reason": "the follow-up review rejected the first bray replacements and their April 2026 base commits",
+    "rejectedFirst": {
+      "bray-impact": {
+        "baseCommit": "cdc900c9e0f427e804b18a784775af6f5630b89c",
+        "taskSha256": "825b1bfa72afa5aa230cb6a9c5f57d5d5683dd51a16cc5725e0f2f7af1af7b5d",
+        "acceptanceSha256": "9a8f20bb70912b455d8b36d7b203730733dd6196e7186668aa890a5dd7ce1a4a"
+      },
+      "bray-diagnosis": {
+        "baseCommit": "44beee9c94b204ae24b42fb2ca23b5264a5a5314",
+        "taskSha256": "e46e196502ff5ae24de0c1ee4058ac6d39a7286f0168553da8e51dfa4d521e8c",
+        "acceptanceSha256": "2c88f253eebef2dea4038f87817490d0a66f93d590c12d02c67aa7331c257eef"
+      }
+    },
+    "rejectedSecond": {
+      "bray-impact": {
+        "baseCommit": "a46eda90b9b5d3f060a8a0f59b821a7df7f13201",
+        "taskSha256": "49a296b836511bbc59b782bee37e6c1ebb4fe868cc2b04386086f443c282577c",
+        "acceptanceSha256": "010a0beaec380f2211ffcb195a9b04841e82f891388313565e16c1910bb3dde7"
+      },
+      "reason": "two of its dependency files were in the retired bray-impact, whose answer had been partly hinted to the tool side"
+    }
   }
 }
