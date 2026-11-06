@@ -136,11 +136,25 @@ The planner selects the smallest enclosing supported function, method,
 constructor, accessor, named arrow/function-expression owner, statement-level
 call with a direct function callback, named class, interface, type alias or
 enum. A field or signature line therefore selects its whole declaration, while a
-line inside a method still selects only the method; imports and other top-level
-statements are not planned. A callback call is a syntactic category,
+line inside a method still selects only the method. Other top-level statements
+are not planned. A callback call is a syntactic category,
 not a guarantee that it is a test: nested `it(...)` inside `describe(...)` selects
 the `it` call, but an anchor inside a smaller callback-bearing helper may select
 that helper. Anchor the outer declaration/call when its whole block is needed.
+
+A TS/JS plan also returns the header of each scope around a planned block, listed
+under `coverage.included` (kind `header`). A file's header is its leading imports,
+type, interface and enum declarations and constants, stopping at the first
+function, class or other statement. A constant whose initialiser contains a
+function with a statement body counts as code. A callback's header is its call
+line and the leading constants and `beforeEach`/`beforeAll`/`afterEach`/`afterAll`
+setup in its body, such as a `describe`'s setup before its first test. A header
+stops at the last whole statement within 160 lines. An anchor on a header line
+(an import, a constant) selects that header, unless a smaller block such as an
+interface or a setup hook contains it; the `describe` line itself still selects
+the whole call. In recorded Codex sessions on h3, the model followed nearly every
+plan with a `build` of the file's first 97 lines or the test setup. Headers are
+TS/JS only; Rust and Kotlin plans are unchanged.
 
 Syntax planning supports `.ts`, `.tsx`, `.js`, `.jsx`, `.mts`, `.cts`, `.mjs`
 and `.cjs` (Rust and Kotlin through the MCP server). It rejects malformed source,
@@ -148,9 +162,11 @@ ambiguous or unsupported anchors, excluded paths, and an oversized result rather
 than truncating a branch. A plan anchor in any other packet file type (Markdown,
 JSON, Python and the rest) selects the whole file, coverage kind `file`, up to
 16 KiB; a larger file is listed under `coverage.unresolved` for an exact `build`
-range. When whole files would push the packet over its size limit they are left
-out and listed the same way, so the code blocks are still answered; a plan that
-is oversized without them returns the requested files' outlines, as `build` does.
+range. When a plan would exceed its size limit, the added headers are left out
+first and listed under `coverage.headersLeftOut`, then whole files are left out
+and listed under `coverage.unresolved`, so the anchored code blocks are still
+answered; a plan that is oversized without them returns the requested files'
+outlines, as `build` does.
 Source, root, HEAD and relevant policy must agree between planning and assembly.
 Line anchors use the packet format's LF/CRLF convention; bare CR and Unicode
 line separators require the exact-range fallback. A selected block's boundary

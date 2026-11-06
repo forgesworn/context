@@ -25,6 +25,12 @@ const PLANNABLE_EXTENSIONS = new Set(['ts', 'tsx', 'js', 'jsx', 'mts', 'cts', 'm
 // A plan anchor in a file with no syntax planner (Markdown, JSON, Python...) selects
 // the whole file up to this size; larger files are reported for a build range.
 const MAX_WHOLE_FILE_PLAN_BYTES = 16 * 1024;
+// A TS/JS plan also returns the header of each scope around a planned block: the file's
+// leading imports, types and constants, and a test callback's setup. Recorded sessions
+// asked for these with a separate build after nearly every plan. Longer headers stop at
+// the last whole statement that fits.
+const MAX_HEADER_LINES = 160;
+const SETUP_HOOKS = new Set(['beforeEach', 'beforeAll', 'afterEach', 'afterAll', 'before', 'after']);
 const GENERATED_DIRECTORIES = new Set(['node_modules', 'dist', 'build', 'coverage', 'out', 'vendor', 'target']);
 
 function assert(ok, message) { if (!ok) throw new Error(`worker-packet: ${message}`); }
@@ -362,6 +368,57 @@ function plannerCandidates(source) {
   visit(source);
   return candidates;
 }
+/** Leading declarations of a scope: imports, types, constants and setup hooks, not code. */
+function isPreamble(statement) {
+  if (ts.isImportDeclaration(statement) || ts.isImportEqualsDeclaration(statement) || ts.isExportDeclaration(statement)) return true;
+  if (ts.isTypeAliasDeclaration(statement) || ts.isInterfaceDeclaration(statement) || ts.isEnumDeclaration(statement)) return true;
+  if (ts.isExpressionStatement(statement)) {
+    const expression = statement.expression;
+    if (ts.isStringLiteral(expression)) return true;
+    if (!ts.isCallExpression(expression)) return false;
+    const callee = ts.isPropertyAccessExpression(expression.expression) ? expression.expression.name : expression.expression;
+    return ts.isIdentifier(callee) && SETUP_HOOKS.has(callee.text);
+  }
+  // A constant, not code: no function with a statement body anywhere in its initialiser
+  // (a one-line arrow in a config object is allowed).
+  if (ts.isVariableStatement(statement)) return statement.declarationList.declarations.every((declaration) => !declaration.initializer || !hasBlockBody(declaration.initializer));
+  return false;
+}
+function hasBlockBody(node) {
+  if (ts.isFunctionLike(node) && node.body && ts.isBlock(node.body)) return true;
+  return ts.forEachChild(node, hasBlockBody) ?? false;
+}
+/** Header ranges for the file and for each callback body (a describe) with leading setup.
+ * `from` is the first line an anchor resolves through the header: a callback's opening
+ * line still selects the whole call. */
+function scopeHeaders(source) {
+  const headers = [];
+  const add = (statements, startLine, scope, scopeEndLine) => {
+    let endLine;
+    for (const statement of statements) {
+      if (!isPreamble(statement)) break;
+      const last = lineOf(source, Math.max(statement.getStart(source), statement.end - 1));
+      if (last - startLine + 1 > MAX_HEADER_LINES) break;
+      endLine = last;
+    }
+    if (endLine === undefined) return;
+    const from = scope === 'file' ? 1 : lineOf(source, statements[0].getStart(source, true));
+    headers.push({ kind: 'header', scope, startLine, endLine, from, scopeEndLine, start: source.getLineStarts()[startLine - 1], end: source.getLineStarts()[endLine] ?? source.end });
+  };
+  add(source.statements, 1, 'file', lineOf(source, source.end));
+  const visit = (node) => {
+    if (ts.isExpressionStatement(node) && ts.isCallExpression(node.expression)) {
+      for (const argument of node.expression.arguments) {
+        if ((ts.isArrowFunction(argument) || ts.isFunctionExpression(argument)) && argument.body && ts.isBlock(argument.body) && argument.body.statements.length) {
+          add(argument.body.statements, lineOf(source, node.getStart(source, true)), 'callback', lineOf(source, node.end - 1));
+        }
+      }
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(source);
+  return headers;
+}
 const OVERSIZED = /(source excerpts|packet) exceeds? \d+ bytes/;
 /** A file with no syntax planner as one candidate covering every line. */
 function wholeFileSource(text, byteLength, included = true) {
@@ -378,8 +435,13 @@ function resolveAnchor(source, path, line) {
   assert(!source.wholeFile?.oversized, `${path} has no syntax planner and exceeds ${MAX_WHOLE_FILE_PLAN_BYTES} bytes; request an exact range with mode build instead`);
   assert(!source.wholeFile?.leftOut, `${path} whole file left out of an oversized packet; request an exact range with mode build instead`);
   const containing = source.__packetCandidates.filter((candidate) => line >= candidate.startLine && line <= candidate.endLine);
-  assert(containing.length > 0, `no supported syntax block contains ${path}:${line}; request an exact range with mode build instead`);
   containing.sort((a, b) => (a.end - a.start) - (b.end - b.start) || a.start - b.start || compare(a.kind, b.kind));
+  // A line in a scope's header (an import, a constant, a describe's setup) selects that
+  // header unless a smaller block, such as a setup hook or an interface, contains it.
+  const header = (source.__packetHeaders ?? []).filter((entry) => line >= entry.from && line <= entry.endLine)
+    .sort((a, b) => (a.endLine - a.startLine) - (b.endLine - b.startLine))[0];
+  if (header && (!containing.length || header.endLine - header.startLine < containing[0].endLine - containing[0].startLine)) return header;
+  assert(containing.length > 0, `no supported syntax block contains ${path}:${line}; request an exact range with mode build instead`);
   const chosen = containing[0];
   const sameSpan = containing.filter((candidate) => candidate !== chosen && candidate.end - candidate.start === chosen.end - chosen.start);
   assert(sameSpan.length === 0, `ambiguous syntax block at ${path}:${line}`);
@@ -463,7 +525,7 @@ export async function planPacket({ root: rootInput, spec: specInput }) {
 /** `wholeFiles: false` leaves files with no syntax planner out (reported under
  * `unresolved`); the planner retries that way itself when a whole file would
  * push the packet over its size limit. */
-export async function planPacketInline({ root: rootInput, spec: specInput, wholeFiles = true }) {
+export async function planPacketInline({ root: rootInput, spec: specInput, wholeFiles = true, headers = true }) {
   const specBytes = Buffer.from(serialize(specInput), 'utf8');
   assert(specBytes.byteLength <= MAX_SPEC_BYTES, `spec exceeds ${MAX_SPEC_BYTES} bytes`);
   const plan = parsePlanSpec(strictText(specBytes, 'spec'));
@@ -501,6 +563,7 @@ export async function planPacketInline({ root: rootInput, spec: specInput, whole
       source = ts.createSourceFile(entry.path, text, ts.ScriptTarget.Latest, true, scriptKind(entry.path));
       assert(source.parseDiagnostics.length === 0, `source has parse errors: ${entry.path}`);
       source.__packetCandidates = plannerCandidates(source);
+      source.__packetHeaders = scopeHeaders(source);
     }
     files.set(entry.path, { source, sha256: hash(bytes) });
   }
@@ -527,13 +590,28 @@ export async function planPacketInline({ root: rootInput, spec: specInput, whole
     resolutions.push({ requestIndex, path: entry.path, line: entry.line, kind: selected.kind, startLine: selected.startLine, endLine: selected.endLine });
   }
   if (!resolutions.length && firstUnresolved) throw firstUnresolved;
-  const mergedSources = mergePlanned(resolutions);
+  // Headers of the scopes around each planned block; left out first when oversized,
+  // because the caller anchored everything else.
+  const added = [];
+  for (const entry of resolutions) {
+    for (const header of files.get(entry.path).source.__packetHeaders ?? []) {
+      if (entry.startLine < header.startLine || entry.endLine > header.scopeEndLine) continue;
+      const covered = (other) => other.path === entry.path && other.startLine <= header.startLine && other.endLine >= header.endLine;
+      if (resolutions.some(covered) || added.some(covered)) continue;
+      added.push({ path: entry.path, kind: 'header', startLine: header.startLine, endLine: header.endLine });
+    }
+  }
+  const included = headers ? added : [];
+  const mergedSources = mergePlanned([...resolutions, ...included]);
   const resolvedSpec = parseSpec(serialize({ ...plan, sources: mergedSources }));
   let packet;
   try { packet = await buildPacketFromSpec({ root, spec: resolvedSpec }); }
   catch (error) {
-    // A whole non-code file must not cost the code blocks: drop whole files and retry once.
-    if (wholeFiles && OVERSIZED.test(error.message) && resolutions.some((entry) => entry.kind === 'file')) return planPacketInline({ root: rootInput, spec: specInput, wholeFiles: false });
+    // Added headers go first, then whole non-code files, so the anchored code blocks fit.
+    if (OVERSIZED.test(error.message)) {
+      if (included.length) return planPacketInline({ root: rootInput, spec: specInput, wholeFiles, headers: false });
+      if (wholeFiles && resolutions.some((entry) => entry.kind === 'file')) return planPacketInline({ root: rootInput, spec: specInput, wholeFiles: false, headers: false });
+    }
     throw new Error(`worker-packet: planner could not build selected syntax blocks: ${error.message.replace(/^worker-packet: /, '')}`);
   }
   for (const source of packet.sources) assert(files.get(source.path)?.sha256 === source.sha256, `source changed during packet planning: ${source.path}`);
@@ -546,7 +624,9 @@ export async function planPacketInline({ root: rootInput, spec: specInput, whole
   const finalPolicy = await NavigationPolicy.load(root);
   const finalManifest = await validatePolicy(root, planningSpec, finalPolicy);
   assert(serialize(initialManifest) === serialize(finalManifest), 'navigation policy changed during packet planning');
-  const coverage = { version: 1, trust: 'unsigned', packetSha256: hash(Buffer.from(serialize(packet), 'utf8')), requestedSources: plan.sources, resolutions, ...(unresolved.length ? { unresolved } : {}), mergedSources, caveat: 'Selections are complete syntactic units, or whole files of types with no syntax planner. They provide no dependency closure, semantic sufficiency, or authority; the caller explicitly selects tests and dependencies.' };
+  const coverage = { version: 1, trust: 'unsigned', packetSha256: hash(Buffer.from(serialize(packet), 'utf8')), requestedSources: plan.sources, resolutions,
+    ...(included.length ? { included } : {}), ...(!headers && added.length ? { headersLeftOut: added } : {}),
+    ...(unresolved.length ? { unresolved } : {}), mergedSources, caveat: 'Selections are complete syntactic units, scope headers (leading imports, types, constants and test setup), or whole files of types with no syntax planner. They provide no dependency closure, semantic sufficiency, or authority; the caller explicitly selects tests and dependencies.' };
   return { packet, coverage };
 }
 

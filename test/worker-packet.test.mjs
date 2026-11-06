@@ -136,6 +136,53 @@ test('planner leaves whole files out rather than failing when they would oversiz
   assert.deepEqual(alone.packet.sources.map(({ path, startLine, endLine }) => [path, startLine, endLine]), [['AGENTS.md', 1, 300]]);
 });
 
+test('planner returns the file header and a test callback setup with the planned blocks', async () => {
+  const root = await fixture();
+  // Shaped like the files recorded sessions re-read after a plan: imports, types and
+  // constants before the first function; a describe whose setup precedes its tests.
+  await writeFile(join(root, 'src.ts'), [
+    "import { seal } from './seal';", "import type { Event } from './event';", '', 'type Data = Record<string, unknown>;', '',
+    'export interface Options {', '  name?: string;', '}', '', "export const DEFAULT_NAME = 'h3';", 'const handlers = {', '  run() {', '    return 1;', '  },', '};', '',
+    'export function use(event: Event) {', '  return seal(event);', '}', ''].join('\n'));
+  await writeFile(join(root, 'src.test.ts'), [
+    "import { use } from './src';", '', "describe('use', () => {", '  let count = 0;', '  const config = {', '    next: () => ++count,', '  };', '',
+    '  beforeEach(() => {', '    count = 0;', '  });', '', "  it('seals', () => {", '    expect(use(config)).toBe(1);', '  });', '});', ''].join('\n'));
+  const allowedFiles = ['src.ts', 'src.test.ts'];
+  const ranges = (result) => result.packet.sources.map(({ path, startLine, endLine }) => `${path}:${startLine}-${endLine}`);
+  const planned = await planPacket({ root, spec: await spec(root, planBase({ allowedFiles, sources: [{ path: 'src.ts', line: 18 }, { path: 'src.test.ts', line: 14 }] })) });
+  assert.deepEqual(planned.coverage.included, [
+    { path: 'src.ts', kind: 'header', startLine: 1, endLine: 10 },
+    { path: 'src.test.ts', kind: 'header', startLine: 1, endLine: 1 },
+    { path: 'src.test.ts', kind: 'header', startLine: 3, endLine: 11 },
+  ]);
+  // The handlers object holds methods, so it is code and ends the header.
+  assert.deepEqual(ranges(planned), ['src.test.ts:1-1', 'src.test.ts:3-11', 'src.test.ts:13-15', 'src.ts:1-10', 'src.ts:17-19']);
+  // An anchor in a header selects it; one in a setup hook or a type still selects that block;
+  // the describe line still selects the whole describe.
+  const anchored = await planPacket({ root, spec: await spec(root, planBase({ allowedFiles, sources: [
+    { path: 'src.ts', line: 1 }, { path: 'src.ts', line: 7 }, { path: 'src.test.ts', line: 4 }, { path: 'src.test.ts', line: 10 }, { path: 'src.test.ts', line: 3 }] })) });
+  assert.deepEqual(anchored.coverage.resolutions.map(({ path, kind, startLine, endLine }) => `${path}:${startLine}-${endLine} ${kind}`), [
+    'src.ts:1-10 header', 'src.ts:6-8 interface', 'src.test.ts:3-11 header', 'src.test.ts:9-11 callbackCall', 'src.test.ts:3-16 callbackCall']);
+  assert.deepEqual(anchored.coverage.included, [{ path: 'src.test.ts', kind: 'header', startLine: 1, endLine: 1 }]);
+  // A long header stops at the last whole statement within 160 lines.
+  await writeFile(join(root, 'long.ts'), Array.from({ length: 170 }, (_, i) => `export const L${i} = ${i};`).join('\n') + '\nexport function f() {\n  return 1;\n}\n');
+  const long = await planPacket({ root, spec: await spec(root, planBase({ allowedFiles: ['long.ts'], sources: [{ path: 'long.ts', line: 172 }] })) });
+  assert.deepEqual(long.coverage.included, [{ path: 'long.ts', kind: 'header', startLine: 1, endLine: 160 }]);
+});
+
+test('planner leaves added headers out before whole files, and reports them', async () => {
+  const root = await fixture();
+  const constants = Array.from({ length: 150 }, (_, i) => `export const C${i} = '${'z'.repeat(60)}';`).join('\n');
+  const body = Array.from({ length: 600 }, (_, i) => `  // ${String(i).padStart(4, '0')} ${'x'.repeat(50)}`).join('\n');
+  await writeFile(join(root, 'src.ts'), `${constants}\nexport function big() {\n${body}\n  return 1;\n}\n`);
+  await writeFile(join(root, 'AGENTS.md'), '# Rules\n');
+  const result = await planPacket({ root, spec: await spec(root, planBase({ allowedFiles: ['src.ts', 'AGENTS.md'], sources: [{ path: 'AGENTS.md', line: 1 }, { path: 'src.ts', line: 152 }] })) });
+  assert.deepEqual(result.packet.sources.map(({ path, startLine, endLine }) => [path, startLine, endLine]), [['AGENTS.md', 1, 1], ['src.ts', 151, 753]]);
+  assert.equal(result.coverage.included, undefined);
+  assert.deepEqual(result.coverage.headersLeftOut, [{ path: 'src.ts', kind: 'header', startLine: 1, endLine: 150 }]);
+  assert.equal(result.coverage.unresolved, undefined);
+});
+
 test('planner selects class, interface, type and enum declarations for lines outside any function', async () => {
   const root = await fixture();
   await writeFile(join(root, 'src.ts'), `import { a } from './a';\n/** Doc. */\nexport class Owner extends Base {\n  field = 1;\n  method() {\n    return a;\n  }\n}\ninterface Shape {\n  size: number;\n}\ntype Pair = {\n  left: string;\n};\nenum Mode {\n  On,\n}\n`);
@@ -145,7 +192,9 @@ test('planner selects class, interface, type and enum declarations for lines out
   assert.deepEqual(result.coverage.resolutions.map(({ kind, startLine, endLine }) => ({ kind, startLine, endLine })), [
     { kind: 'class', startLine: 2, endLine: 8 }, { kind: 'method', startLine: 5, endLine: 7 }, { kind: 'interface', startLine: 9, endLine: 11 }, { kind: 'type', startLine: 12, endLine: 14 }, { kind: 'enum', startLine: 15, endLine: 17 },
   ]);
-  await assert.rejects(planPacket({ root, spec: await spec(root, planBase({ sources: [{ path: 'src.ts', line: 1 }] })) }), /no supported/);
+  // An import line selects the file header (here the one import), not an error.
+  const header = await planPacket({ root, spec: await spec(root, planBase({ sources: [{ path: 'src.ts', line: 1 }] })) });
+  assert.deepEqual(header.coverage.resolutions.map(({ kind, startLine, endLine }) => ({ kind, startLine, endLine })), [{ kind: 'header', startLine: 1, endLine: 1 }]);
 });
 
 test('plan CLI writes the v1 packet and reports coverage', async () => {

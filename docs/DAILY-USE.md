@@ -51,6 +51,7 @@ coverage and reports observed usage rather than claiming savings.
    On a server exposing `repository_packet`, request a bounded packet; omit
    `expectedGeneration` to read current source, which refreshes a stale index
    first (0.28.0 and later). `plan` selects complete TS/JS, Rust and Kotlin syntax blocks
+   (TS/JS with their file's imports, types and constants, and a test's setup)
    and other files whole up to 16 KiB; `build` takes reviewed exact ranges. See the [inline MCP example](WORKER-PACKETS.md#request-a-packet-through-mcp).
    No shell helper is required by the consuming model.
    If more matches are needed, pass the returned `nextCursor` into the next

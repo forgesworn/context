@@ -114,8 +114,8 @@ do not silently scan the parent workspace.
 Navigation and extraction must have a tested capability manifest so their suffix
 support cannot silently diverge. The `.kts` and selected C++ gaps were fixed in
 0.3.2; that added source eligibility. Source packets now
-have syntax-aware planning for TS/JS, Rust and Kotlin; other files are planned whole up to
-16 KiB. Add complete-span planning for each new parser rather than silently truncating
+have syntax-aware planning for TS/JS, Rust and Kotlin (TS/JS plans also return scope
+headers); other files are planned whole up to 16 KiB. Add complete-span planning for each new parser rather than silently truncating
 another language's function.
 
 ## OS4 language and contract assignments
