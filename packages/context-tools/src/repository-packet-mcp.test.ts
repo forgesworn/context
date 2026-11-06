@@ -337,6 +337,27 @@ describe('repository packet MCP adapter', () => {
       expect(text(outside)).toMatch(/no supported syntax block contains beta\.ts:1; request an exact range with mode build instead/)
     } finally { await connection.close() }
   })
+
+  it('answers the plan anchors inside blocks and reports the others instead of failing the request', async () => {
+    const value = await root()
+    await writeFile(join(value, 'beta.ts'), "import { alpha } from './alpha'\nexport function beta() {\n  return alpha()\n}\n")
+    const connection = await connect(value)
+    try {
+      const refreshed = await connection.client.callTool({ name: 'repository_refresh', arguments: {} }) as { content: unknown }
+      const generation = (JSON.parse(text(refreshed)) as { generation: string }).generation
+      const sources = [{ path: 'beta.ts', line: 1 }, { path: 'beta.ts', line: 3 }, { path: 'alpha.ts', line: 2 }]
+      const mixed = await call(connection.client, { mode: 'plan', spec: { sources }, expectedGeneration: generation })
+      expect(mixed.isError, text(mixed)).not.toBe(true)
+      const body = JSON.parse(text(mixed)) as { packet: { sources: Array<{ path: string; startLine: number; endLine: number }> }; coverage: { resolutions: Array<{ path: string; line: number }>; unresolved: Array<{ path: string; line: number; requestIndex: number }> } }
+      expect(body.packet.sources.map((source) => `${source.path}:${source.startLine}-${source.endLine}`)).toEqual(['alpha.ts:1-3', 'beta.ts:2-4'])
+      expect(body.coverage.resolutions.map((entry) => `${entry.path}:${entry.line}`)).toEqual(['beta.ts:3', 'alpha.ts:2'])
+      expect(body.coverage.unresolved).toEqual([{ requestIndex: 0, path: 'beta.ts', line: 1, reason: 'no supported syntax block contains this line; request an exact range with mode build' }])
+      const plain = await connection.client.callTool({ name: 'repository_packet', arguments: { mode: 'plan', spec: { sources }, expectedGeneration: generation } }) as { isError?: boolean; content?: unknown }
+      expect(text(plain)).toContain('unresolved: beta.ts:1 (no supported syntax block contains these lines; request exact ranges with mode build)')
+      const all = await call(connection.client, { mode: 'plan', spec: { sources: [{ path: 'beta.ts', line: 1 }] }, expectedGeneration: generation })
+      expect(all.isError).toBe(true)
+    } finally { await connection.close() }
+  })
 })
 
 describe('repository packet compact rendering', () => {

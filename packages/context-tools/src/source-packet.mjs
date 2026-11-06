@@ -483,11 +483,24 @@ export async function planPacketInline({ root: rootInput, spec: specInput }) {
     }
     files.set(entry.path, { source, sha256: hash(bytes) });
   }
-  const resolutions = plan.sources.map((entry, requestIndex) => {
+  // An anchor outside every supported block (an import, a top-level test line) is
+  // reported, not fatal: the others are still answered. Only when none resolves does
+  // the request fail, with the first anchor's message.
+  const resolutions = [], unresolved = [];
+  let firstUnresolved;
+  for (const [requestIndex, entry] of plan.sources.entries()) {
     const file = files.get(entry.path);
-    const selected = resolveAnchor(file.source, entry.path, entry.line);
-    return { requestIndex, path: entry.path, line: entry.line, kind: selected.kind, startLine: selected.startLine, endLine: selected.endLine };
-  });
+    let selected;
+    try { selected = resolveAnchor(file.source, entry.path, entry.line); }
+    catch (error) {
+      if (!/no supported syntax block contains /.test(error.message)) throw error;
+      firstUnresolved ??= error;
+      unresolved.push({ requestIndex, path: entry.path, line: entry.line, reason: 'no supported syntax block contains this line; request an exact range with mode build' });
+      continue;
+    }
+    resolutions.push({ requestIndex, path: entry.path, line: entry.line, kind: selected.kind, startLine: selected.startLine, endLine: selected.endLine });
+  }
+  if (!resolutions.length && firstUnresolved) throw firstUnresolved;
   const mergedSources = mergePlanned(resolutions);
   const resolvedSpec = parseSpec(serialize({ ...plan, sources: mergedSources }));
   let packet;
@@ -503,7 +516,7 @@ export async function planPacketInline({ root: rootInput, spec: specInput }) {
   const finalPolicy = await NavigationPolicy.load(root);
   const finalManifest = await validatePolicy(root, planningSpec, finalPolicy);
   assert(serialize(initialManifest) === serialize(finalManifest), 'navigation policy changed during packet planning');
-  const coverage = { version: 1, trust: 'unsigned', packetSha256: hash(Buffer.from(serialize(packet), 'utf8')), requestedSources: plan.sources, resolutions, mergedSources, caveat: 'Selections are complete syntactic units only. They provide no dependency closure, semantic sufficiency, or authority; the caller explicitly selects tests and dependencies.' };
+  const coverage = { version: 1, trust: 'unsigned', packetSha256: hash(Buffer.from(serialize(packet), 'utf8')), requestedSources: plan.sources, resolutions, ...(unresolved.length ? { unresolved } : {}), mergedSources, caveat: 'Selections are complete syntactic units only. They provide no dependency closure, semantic sufficiency, or authority; the caller explicitly selects tests and dependencies.' };
   return { packet, coverage };
 }
 
