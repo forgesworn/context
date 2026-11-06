@@ -623,9 +623,7 @@
     "screen-pro-040-20260923"
   ],
   "openDecisions": [
-    "Owner review of version 2",
-    "Reviewer design detail (paid): model, agreement sample size and threshold",
-    "Quality-measure pilot on tasks outside phase 2 (paid)"
+    "Owner review of version 2"
   ],
   "revisedAt": "2026-11-05",
   "ownerDecisions": {
@@ -762,5 +760,72 @@
       "repinnedAt": "2026-11-05",
       "repinNote": "repinned from 0.28.0 (05bc501) after repository_search accepted expectedGeneration; not yet run on a model"
     }
-  ]
+  ],
+  "reviewerDesign": {
+    "decidedAt": "2026-11-06",
+    "primary": {
+      "family": "claude",
+      "model": "claude-opus-5-5",
+      "effort": "high",
+      "tools": "none (--tools \"\")",
+      "material": "inlined in the prompt; diff capped at 262144 bytes, truncation recorded",
+      "flags": "--setting-sources project, --disable-slash-commands, empty strict MCP config, --no-session-persistence, --json-schema; CLAUDE.md and auto-memory off",
+      "usage": "complete only for a successful result with integer usage fields"
+    },
+    "second": {
+      "family": "codex",
+      "model": "gpt-5.6-sol",
+      "effort": "high",
+      "profile": ":read-only permission profile in a staged root",
+      "sample": "every cell for plans of 12 cells or fewer; otherwise 6 per arm drawn with the plan seed"
+    },
+    "agreement": {
+      "measure": "raw agreement on accepted and on each rubric item",
+      "threshold": 0.8,
+      "consequence": "below the threshold, or any missing second review, the quality guard is unreliable and the run does not pass"
+    },
+    "costGate": "executor tokens only; reviewer tokens reported per family",
+    "providerFailures": "a cell with a non-zero executor exit and no model output may be rerun once (execute --rerun-provider-failures); the attempt is kept in repair-1/",
+    "buildOutputs": {
+      "bray": [
+        "site/tools-manifest.json"
+      ]
+    },
+    "toolchain": {
+      "path": "/Users/Shared/os2-toolchain-20261106",
+      "pnpm": [
+        "11.9.0",
+        "11.22.0",
+        "12.3.4"
+      ],
+      "node": "v24.21.0",
+      "use": "sessions, offline relink, checker and template install"
+    },
+    "leakClosed": "author and custodian Claude transcripts moved from ~/.claude/projects to the M4 holding (hash checked) and deleted; every hidden-side launch passes --no-session-persistence"
+  },
+  "pilot20261106": {
+    "script": "pilot.py",
+    "cells": "eight recorded cells of the retired h3-code-change (attempt 2, diag, diag027, diag028)",
+    "reviews": 16,
+    "acceptedBoth": 8,
+    "acceptedAgree": "8/8",
+    "rubricAgree": "40/40",
+    "checkerPassed": 8,
+    "dependencies": {
+      "missed": 0,
+      "recall": 1.0,
+      "precision": "0.6 to 0.75"
+    },
+    "claudeReviewTokens": "14028 to 17956",
+    "codexReviewTokens": "25240 to 47896",
+    "limits": "one task and every outcome accepted: agreement only seen on easy cases; misses zero everywhere"
+  },
+  "readiness20261106": {
+    "scripts": [
+      "readiness.py",
+      "checker-smoke.py"
+    ],
+    "readiness": "nine templates: h3 relink 0 (5/5), isolation 0 (9/9), ready 0 (9/9)",
+    "checkerSmoke": "five checker tasks fail at base and pass with the change on this Mac with the toolchain"
+  }
 }

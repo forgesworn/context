@@ -297,6 +297,26 @@ def fake_toolchain(base):
     return out
 
 
+class Toolchain(unittest.TestCase):
+    def test_every_pinned_pnpm_is_copied_and_a_missing_one_stops_the_build(self):
+        with tempfile.TemporaryDirectory() as d:
+            d = pathlib.Path(d).resolve()
+            prefix = d / 'node-prefix'; (prefix / 'bin').mkdir(parents=True)
+            (prefix / 'bin' / 'node').write_text('#!/bin/sh\necho v0\n'); (prefix / 'bin' / 'node').chmod(0o755)
+            for v in ('11.9.0', '12.3.4'):
+                c = d / 'cp' / 'v1' / 'pnpm' / v; c.mkdir(parents=True); (c / 'pnpm.mjs').write_text(v)
+            rg = d / 'rg'; rg.write_text(''); rg.chmod(0o755)
+            base = ['toolchain', '--node-prefix', str(prefix), '--corepack-home', str(d / 'cp'), '--rg', str(rg)]
+            self.assertEqual(h.main(base + ['--pnpm-version', '11.9.0', '12.3.4', '--out', str(d / 'shared' / 'tc')]), 0)
+            m = json.loads((d / 'shared' / 'tc' / 'manifest.json').read_text())
+            self.assertEqual(m['pnpmVersions'], ['11.9.0', '12.3.4'])
+            for v in ('11.9.0', '12.3.4'):
+                self.assertEqual((d / 'shared' / 'tc' / 'corepack' / 'v1' / 'pnpm' / v / 'pnpm.mjs').read_text(), v)
+            with self.assertRaises(SystemExit):
+                h.main(base + ['--pnpm-version', '11.9.0', '11.22.0', '--out', str(d / 'shared' / 'tc2')])
+            self.assertFalse((d / 'shared' / 'tc2').exists())
+
+
 class FakeHome:
     """Point the home directory and denied trees at a test sandbox."""
     def __init__(self, d):
@@ -329,12 +349,14 @@ class PlanDryRun(unittest.TestCase):
                     (tasks / f'{t}.json').write_text(json.dumps({'id': t, 'statement': f'Do {t}.'}))
                 (tasks / 'manifest.json').write_text(json.dumps({'tasks': TASKS}))
                 out = home / 'plan'
-                args = ['plan', '--tasks', str(tasks), '--codex', str(fake), '--node', '/bin/node', '--navigation-cli', '/c/cli.mjs',
+                args = ['plan', '--tasks', str(tasks), '--codex', str(fake), '--claude', str(fake), '--node', '/bin/node', '--navigation-cli', '/c/cli.mjs',
                         '--toolchain', str(toolchain), '--active-base', str(d / 'shared'), '--out', str(out)]
                 self.assertEqual(h.main(args), 0)
                 self.assertFalse(marker.exists())
                 plan = json.loads((out / 'schedule.json').read_text())
                 self.assertEqual(len(plan['cells']), 48)
+                self.assertEqual(len(plan['agreementSample']), 12)
+                self.assertEqual(plan['lock']['reviewer'], h.REVIEWER)
                 self.assertEqual(sorted(plan['lock']['taskSha256']), TASKS)
                 self.assertEqual(plan['seed'], h.SEED)
                 for cell in plan['cells']:
@@ -402,6 +424,123 @@ print(json.dumps({"type": "turn.completed", "usage": U}))
 """
 
 
+# A fake Claude reviewer: no tools, the review material inline on stdin, a JSON result.
+FAKE_CLAUDE = r"""#!/usr/bin/env python3
+import sys, json, os, re
+a = sys.argv
+assert a[a.index('--tools') + 1] == '' and '--no-session-persistence' in a and '--strict-mcp-config' in a, a
+assert os.environ.get('CLAUDE_CODE_DISABLE_CLAUDE_MDS') == '1'
+text = sys.stdin.read()
+assert 'executor.diff' in text and 'source/src.ts' in text, 'material not inlined'
+rubric = json.loads(re.search(r'===== rubric.json =====\n(.*?)(?=\n=====|\Z)', text, re.S).group(1))
+ok = not os.environ.get('OS2_FAKE_CLAUDE_REJECT')
+rep = {"accepted": ok, "findings": [{"id": r["id"], "passed": ok, "reason": "checked"} for r in rubric["rubric"]], "materialIssues": []}
+print(json.dumps({"type": "result", "subtype": "success", "is_error": False, "num_turns": 2, "total_cost_usd": 0.01,
+                  "result": json.dumps(rep), "structured_output": rep,
+                  "usage": {"input_tokens": 5, "cache_read_input_tokens": 7, "cache_creation_input_tokens": 3, "output_tokens": 2}}))
+"""
+
+
+class ChangeRecord(unittest.TestCase):
+    def test_answer_and_build_outputs_are_left_out_of_the_recorded_change(self):
+        self.assertEqual(h.change_pathspec('h3'), [':!answer.json'])
+        self.assertEqual(h.change_pathspec('bray'), [':!answer.json', ':!site/tools-manifest.json'])
+
+
+class ClaudeReviewer(unittest.TestCase):
+    def test_command_has_no_tools_no_instructions_no_mcp_and_no_saved_session(self):
+        argv = h.claude_command('/opt/claude')
+        self.assertEqual(argv[argv.index('--tools') + 1], '')
+        for flag in ('--no-session-persistence', '--strict-mcp-config', '--disable-slash-commands', '--json-schema'):
+            self.assertIn(flag, argv)
+        self.assertEqual(argv[argv.index('--model') + 1], h.REVIEWER['model'])
+        self.assertEqual(argv[argv.index('--setting-sources') + 1], 'project')
+
+    def test_usage_fails_closed(self):
+        good = {'type': 'result', 'subtype': 'success', 'is_error': False, 'num_turns': 1,
+                'usage': {'input_tokens': 5, 'cache_read_input_tokens': 7, 'cache_creation_input_tokens': 3, 'output_tokens': 2}}
+        u = h.claude_usage(json.dumps(good))
+        self.assertTrue(u['complete']); self.assertEqual(u['total'], 17); self.assertEqual(u['cached'], 7)
+        bad = [('not json', 0), (json.dumps({**good, 'subtype': 'error_max_turns'}), 0), (json.dumps({**good, 'is_error': True}), 0),
+               (json.dumps({**good, 'usage': {'input_tokens': 5}}), 0), (json.dumps(good), 1),
+               (json.dumps({**good, 'usage': {**good['usage'], 'output_tokens': True}}), 0)]
+        for text, code in bad:
+            u = h.claude_usage(text, code)
+            self.assertFalse(u['complete'], text[:60]); self.assertNotIn('total', u)
+
+    def test_report_prefers_structured_output_and_falls_back_to_result(self):
+        rep = {'accepted': True, 'findings': [], 'materialIssues': []}
+        self.assertEqual(h.claude_report(json.dumps({'structured_output': rep, 'result': 'x'})), rep)
+        self.assertEqual(h.claude_report(json.dumps({'result': json.dumps(rep)})), rep)
+        self.assertIsNone(h.claude_report('nope'))
+
+    def test_prompt_inlines_everything_and_caps_the_diff(self):
+        with tempfile.TemporaryDirectory() as d:
+            r = pathlib.Path(d)
+            for n in ('task.json', 'answer.json', 'checker.json', 'rubric.json'):
+                (r / n).write_text('{"n": "%s"}' % n)
+            (r / 'executor.diff').write_text('+x\n' * (h.REVIEW_DIFF_BYTES // 3 + 10))
+            (r / 'source' / 'a').mkdir(parents=True); (r / 'source' / 'a' / 'b.ts').write_text('1: code\n')
+            text, truncated = h.claude_review_prompt(r)
+            self.assertTrue(truncated)
+            self.assertIn('[diff truncated]', text)
+            self.assertIn('===== source/a/b.ts', text)
+            for n in ('task.json', 'answer.json', 'checker.json', 'rubric.json'):
+                self.assertIn(f'===== {n} =====', text)
+            (r / 'executor.diff').write_text('+small\n')
+            self.assertFalse(h.claude_review_prompt(r)[1])
+
+
+class Agreement(unittest.TestCase):
+    def test_sample_is_every_cell_in_a_small_plan_and_six_per_arm_otherwise(self):
+        small = [{'directory': f'cell-{i:03d}', 'arm': a} for i, a in enumerate(['plain', 'context'], 1)]
+        self.assertEqual(h.agreement_sample(small, 1), ['cell-001', 'cell-002'])
+        cells = h.schedule(TASKS, ('plain', 'context'), 3, seed=h.SEED)
+        for n, c in enumerate(cells, 1):
+            c['directory'] = f'cell-{n:03d}'
+        s = h.agreement_sample(cells, h.SEED)
+        self.assertEqual(len(s), 12)
+        self.assertEqual(s, h.agreement_sample(cells, h.SEED))
+        arm = {c['directory']: c['arm'] for c in cells}
+        self.assertEqual(sorted(arm[x] for x in s).count('plain'), 6)
+
+    def review(self, accepted, items):
+        return {'valid': True, 'accepted': accepted, 'report': {'findings': [{'id': i, 'passed': v} for i, v in items.items()]}}
+
+    def test_agreement_counts_and_reliability(self):
+        a = {f'c{i}': {'reviewer': self.review(True, {'R1': True}), 'secondReviewer': self.review(True, {'R1': True})} for i in range(5)}
+        r = h.reviewer_agreement(a, sorted(a))
+        self.assertTrue(r['reliable']); self.assertEqual((r['acceptedAgree'], r['rubricAgree']), (5, 5))
+        a['c0']['secondReviewer'] = self.review(False, {'R1': False}); a['c1']['secondReviewer'] = self.review(False, {'R1': True})
+        r = h.reviewer_agreement(a, sorted(a))
+        self.assertEqual(r['acceptedAgree'], 3); self.assertEqual(r['rubricAgree'], 4); self.assertFalse(r['reliable'])
+        a['c0']['secondReviewer'] = None; a['c1']['secondReviewer'] = self.review(True, {'R1': True})
+        self.assertFalse(h.reviewer_agreement(a, sorted(a))['reliable'])   # a missing second review is never reliable
+        self.assertFalse(h.reviewer_agreement(a, [])['reliable'])
+
+
+class ProviderFailure(unittest.TestCase):
+    def cell(self, d, code, events):
+        d.mkdir(); (d / 'executor.json').write_text(json.dumps({'exitCode': code})); (d / 'executor-events.jsonl').write_text(events)
+        (d / 'workspace').mkdir()
+        return d
+
+    def test_only_a_failure_with_no_model_output_is_set_aside_and_only_once(self):
+        with tempfile.TemporaryDirectory() as t:
+            t = pathlib.Path(t)
+            failed = self.cell(t / 'a', 1, '{"type":"thread.started"}\n')
+            self.assertTrue(h.set_aside_provider_failure(failed))
+            self.assertFalse((failed / 'executor.json').exists())
+            self.assertTrue((failed / 'repair-1' / 'executor.json').is_file())
+            self.assertTrue((failed / 'repair-1' / 'repair.json').is_file())
+            (failed / 'executor.json').write_text(json.dumps({'exitCode': 1})); (failed / 'executor-events.jsonl').write_text('')
+            self.assertFalse(h.set_aside_provider_failure(failed))   # never twice
+            spoke = self.cell(t / 'b', 1, '{"type":"item.completed"}\n')
+            self.assertFalse(h.set_aside_provider_failure(spoke))
+            fine = self.cell(t / 'c', 0, '')
+            self.assertFalse(h.set_aside_provider_failure(fine))
+
+
 class ExecutionPath(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
@@ -409,6 +548,7 @@ class ExecutionPath(unittest.TestCase):
         self.fake_home = FakeHome(d); self.home = self.fake_home.__enter__()
         self.toolchain = fake_toolchain(d)
         self.codex = d / 'codex'; self.codex.write_text(FAKE_CODEX); self.codex.chmod(0o755)
+        self.claude = d / 'claude'; self.claude.write_text(FAKE_CLAUDE); self.claude.chmod(0o755)
         self.auth = d / 'auth.json'; self.auth.write_text('{}')
         repo = self.repo = d / 'repos' / 'r'; repo.mkdir(parents=True)
         g = lambda *a: h.git(repo, *a).stdout.strip()
@@ -439,7 +579,7 @@ class ExecutionPath(unittest.TestCase):
     def tearDown(self):
         for live, saved in zip((h.RELINK, h.READY, h.INSTALL), self.saved):
             live.clear(); live.update(saved)
-        for k in ('OS2_FAKE_NO_DENY', 'OS2_FAKE_EXTRA'):
+        for k in ('OS2_FAKE_NO_DENY', 'OS2_FAKE_EXTRA', 'OS2_FAKE_CLAUDE_REJECT'):
             os.environ.pop(k, None)
         self.fake_home.__exit__()
         self.tmp.cleanup()
@@ -450,7 +590,7 @@ class ExecutionPath(unittest.TestCase):
         self.assertEqual(h.main(['prepare', '--tasks', str(self.tasks), '--archives', str(self.archives),
                                  '--archive-dir', str(self.archive_dir), '--templates', str(self.home / 'templates')]), 0)
         self.assertEqual(h.main(['plan', '--tasks', str(self.tasks), '--repetitions', '1', '--codex', str(self.codex),
-                                 '--node', node, '--navigation-cli', '/c/cli.mjs', '--toolchain', str(self.toolchain),
+                                 '--claude', str(self.claude), '--node', node, '--navigation-cli', '/c/cli.mjs', '--toolchain', str(self.toolchain),
                                  '--active-base', str(d / 'shared'), '--out', str(self.home / 'plan')]), 0)
         self.common = ['--plan', str(self.home / 'plan'), '--tasks', str(self.tasks), '--codex', str(self.codex),
                        '--auth-file', str(self.auth), '--toolchain', str(self.toolchain)]
@@ -465,7 +605,8 @@ class ExecutionPath(unittest.TestCase):
         return self.execute(forbid), self.common
 
     def assess(self, *extra):
-        return h.main(['assess', *self.common, '--acceptance', str(self.acc), '--repos', str(self.d / 'repos'), *extra])
+        return h.main(['assess', *self.common, '--acceptance', str(self.acc), '--repos', str(self.d / 'repos'),
+                       '--claude', str(self.claude), *extra])
 
     def test_prepare_rejects_a_changed_archive_and_a_failed_install(self):
         self.archives.write_text(json.dumps({'r-code-change': '0' * 64}))
@@ -554,17 +695,44 @@ class ExecutionPath(unittest.TestCase):
             self.assertEqual(a['scope'], {'passed': True, 'outside': []})
             self.assertEqual(a['dependencies']['total'], 0)
             self.assertTrue(a['reviewer']['valid'])
-            self.assertTrue(a['reviewer']['isolation'])
+            self.assertEqual(a['reviewer']['family'], 'claude')
+            self.assertTrue(a['reviewer']['usage']['complete'])
+            self.assertTrue(a['secondReviewer']['valid'])          # a two-cell plan reviews every cell twice
+            self.assertTrue(a['secondReviewer']['isolation'])
             self.assertTrue(a['accepted'])
             self.assertEqual(a['excerpts'], ['src.ts'])
-            self.assertEqual(a['totalTokens'], 220)
+            self.assertEqual(a['totalTokens'], 110)                 # executor only
+            self.assertEqual(a['reviewerTokens'], {'claude': 17, 'codex': 110})
+            self.assertFalse((cell / 'review' / 'source' / 'escape.txt').exists())
             self.assertFalse((cell / 'check').exists())
             self.assertTrue((cell / 'review' / 'rubric.json').is_file())
         self.assertEqual(sorted(p.name for p in (self.d / 'shared').iterdir()), ['os2-toolchain-test'])
         self.assertEqual(h.main(['analyse', '--plan', str(self.home / 'plan'), '--tasks', str(self.tasks)]), 0)
         report = json.loads((self.home / 'plan' / 'analysis.json').read_text())
         self.assertEqual(report['cost']['comparisons']['plain']['tokenRatio'], 1.0)
+        self.assertTrue(report['quality']['reliable'])
+        self.assertEqual(report['quality']['reviewerAgreement']['acceptedAgree'], 2)
+        self.assertEqual(report['reviewerTokens'], {'claude': 34, 'codex': 220})
         self.assertFalse(report['passed'])
+
+    def test_the_claude_verdict_decides_and_disagreement_makes_quality_unreliable(self):
+        os.environ['OS2_FAKE_CLAUDE_REJECT'] = '1'
+        self.run_all()
+        self.assess()
+        for cell in sorted((self.home / 'plan').glob('cell-*')):
+            a = json.loads((cell / 'assessment.json').read_text())
+            self.assertFalse(a['reviewer']['accepted']); self.assertTrue(a['secondReviewer']['accepted'])
+            self.assertFalse(a['accepted'])
+        h.main(['analyse', '--plan', str(self.home / 'plan'), '--tasks', str(self.tasks)])
+        report = json.loads((self.home / 'plan' / 'analysis.json').read_text())
+        self.assertFalse(report['quality']['reliable'])
+        self.assertFalse(report['passed'])
+
+    def test_assess_refuses_a_reviewer_that_differs_from_the_plan(self):
+        self.run_all()
+        other = self.d / 'claude2'; other.write_text(FAKE_CLAUDE + '\n# changed\n'); other.chmod(0o755)
+        with self.assertRaises(SystemExit):
+            h.main(['assess', *self.common, '--acceptance', str(self.acc), '--repos', str(self.d / 'repos'), '--claude', str(other)])
 
     def test_a_change_outside_scope_is_never_accepted(self):
         os.environ['OS2_FAKE_EXTRA'] = '1'

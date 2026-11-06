@@ -50,6 +50,12 @@ PROFILES = {'executor': ':workspace', 'reviewer': ':read-only'}
 DENY_READ = ('/private/tmp', '/private/var/folders')
 ACTIVE_BASE = pathlib.Path('/Users/Shared')
 SEED = 20261105
+# Protocol v2 reviewer (owner decision 2026-11-05): a different model family from the
+# executor, with a second blinded Codex review on a seeded sample to measure agreement.
+REVIEWER = {'family': 'claude', 'model': 'claude-opus-5-5', 'effort': 'high'}
+AGREEMENT_PER_ARM = 6        # phase 2: 12 of 48 cells, 6 per arm; plans of <= 12 cells review every cell twice
+AGREEMENT_THRESHOLD = 0.8    # raw agreement on `accepted`; below it the quality guard is unreliable, not passed
+REVIEW_DIFF_BYTES = 262_144  # executor.diff inlined in the Claude prompt is capped here; truncation is recorded
 
 # One retrieval instruction per arm, of similar length and force (protocol retrievalInstructionRule).
 INSTRUCTIONS = {
@@ -400,7 +406,20 @@ def lock_record(args, codex, tasks):
             'navigationCliSha256': sha_or_none(cli),
             'toolchain': str(args.toolchain), 'toolchainManifestSha256': sha256_file(pathlib.Path(args.toolchain) / 'manifest.json'),
             'taskSha256': {t['id']: sha256_file(path) for path, t in tasks},
-            'harnessSha256': sha256_file(HERE / 'harness.py'), 'metricsSha256': sha256_file(HERE / 'metrics.mjs')}
+            'harnessSha256': sha256_file(HERE / 'harness.py'), 'metricsSha256': sha256_file(HERE / 'metrics.mjs'),
+            'reviewer': REVIEWER, 'claude': str(args.claude), 'claudeSha256': sha_or_none(args.claude)}
+
+
+def agreement_sample(cells, seed, per_arm=AGREEMENT_PER_ARM):
+    """Cells that also get the second (Codex) review: every cell in a small plan,
+    otherwise `per_arm` per arm drawn with the plan seed."""
+    if len(cells) <= 2 * per_arm:
+        return sorted(c['directory'] for c in cells)
+    rng = random.Random(seed)
+    pick = []
+    for arm in sorted({c['arm'] for c in cells}):
+        pick += rng.sample(sorted(c['directory'] for c in cells if c['arm'] == arm), per_arm)
+    return sorted(pick)
 
 
 def active_root(plan_doc, cell_name, kind='cell'):
@@ -412,6 +431,7 @@ def plan(args):
     if not out.is_absolute() or out.exists():
         raise SystemExit('--out must be a new absolute directory')
     codex = resolve_codex(args.codex)
+    args.claude = resolve_codex(args.claude)
     arms = tuple(args.arms.split(','))
     tasks = load_tasks(args.tasks)
     base = pathlib.Path(args.active_base)
@@ -436,8 +456,11 @@ def plan(args):
         (d / 'executor-prompt.txt').write_text(executor_prompt(cell['arm'], by_id[cell['task']]), encoding='utf8')
         (d / 'executor-command.json').write_text(json.dumps(command(codex, 'executor', SETTINGS, workspace, d / 'executor-final.txt'), indent=2) + '\n', encoding='utf8')
         cell['directory'] = name
+    plan_doc['reviewer'] = REVIEWER
+    plan_doc['agreementSample'] = agreement_sample(cells, args.seed)
+    plan_doc['agreementThreshold'] = AGREEMENT_THRESHOLD
     (out / 'schedule.json').write_text(json.dumps(plan_doc, indent=2) + '\n', encoding='utf8')
-    print(json.dumps({'cells': len(cells), 'out': str(out)}))
+    print(json.dumps({'cells': len(cells), 'out': str(out), 'agreementSample': len(plan_doc['agreementSample'])}))
     return 0
 
 
@@ -465,7 +488,10 @@ INSTALL = {'bray': 'npm ci && npm run build', 'h3': 'pnpm install --frozen-lockf
 # outside the sandbox, and READY is then run under the session's own profile before
 # any model starts.
 RELINK = {'h3': 'pnpm install --frozen-lockfile --offline'}
-READY = {'h3': 'pnpm vitest --version'}
+# Tracked files a repository's own build regenerates; left out of the recorded change like
+# answer.json, so running the build is never a scope violation.
+BUILD_OUTPUTS = {'bray': ('site/tools-manifest.json',)}
+READY = {'h3': 'pnpm vitest --version', 'bray': './node_modules/.bin/vitest --version && node -e "require(\'./package.json\')"'}
 OFFLINE = ('(version 1)(allow default)(deny network-outbound)(allow network-outbound (remote ip "localhost:*"))'
            '(allow network-outbound (remote unix-socket))')
 SYSTEM_PREFIXES = ('/bin/', '/usr/', '/opt/homebrew/', '/Library/Developer/CommandLineTools/', '/dev/null', '/dev/stdin',
@@ -498,13 +524,23 @@ def git(cwd, *args, check=True):
                           cwd=cwd, env=env, text=True, capture_output=True, check=check)
 
 
-def shell(command, cwd, offline=False, timeout=1200):
+def tool_env(toolchain):
+    """Host environment with the copied toolchain first, so the relink and the checker
+    use the same node and pinned pnpm versions as the model (protocol v2)."""
+    if toolchain is None:
+        return None
+    tc = pathlib.Path(toolchain)
+    return {**os.environ, 'PATH': f'{tc}/bin:' + os.environ.get('PATH', '/usr/bin:/bin'), 'COREPACK_HOME': str(tc / 'corepack'),
+            'COREPACK_ENABLE_DOWNLOAD_PROMPT': '0'}
+
+
+def shell(command, cwd, offline=False, timeout=1200, env=None):
     argv = ['/bin/zsh', '-c', command]
     if offline:
         argv = ['sandbox-exec', '-p', OFFLINE] + argv
     started = time.monotonic()
     try:
-        p = subprocess.run(argv, cwd=cwd, text=True, capture_output=True, timeout=timeout)
+        p = subprocess.run(argv, cwd=cwd, text=True, capture_output=True, timeout=timeout, env=env)
         code, out = p.returncode, (p.stdout + p.stderr)
     except subprocess.TimeoutExpired as exc:
         code, out = 'timeout', str(exc)
@@ -527,24 +563,29 @@ def build_toolchain(args):
         raise SystemExit('--out must be a new absolute directory outside the home')
     out.mkdir(mode=0o755, parents=True)
     clone_tree(args.node_prefix, out / 'node')
-    pnpm = pathlib.Path(args.corepack_home) / 'v1' / 'pnpm' / args.pnpm_version
-    if not pnpm.is_dir():
-        raise SystemExit(f'pnpm {args.pnpm_version} is not in the corepack cache')
+    # Every pnpm version a task pins (packageManager or devEngines); corepack picks by the
+    # workspace's pin and cannot download inside the sandbox.
+    versions = args.pnpm_version if isinstance(args.pnpm_version, list) else [args.pnpm_version]
     (out / 'corepack' / 'v1' / 'pnpm').mkdir(parents=True)
-    clone_tree(pnpm, out / 'corepack' / 'v1' / 'pnpm' / args.pnpm_version)
+    for v in versions:
+        pnpm = pathlib.Path(args.corepack_home) / 'v1' / 'pnpm' / v
+        if not pnpm.is_dir():
+            shutil.rmtree(out, ignore_errors=True)
+            raise SystemExit(f'pnpm {v} is not in the corepack cache')
+        clone_tree(pnpm, out / 'corepack' / 'v1' / 'pnpm' / v)
     (out / 'bin').mkdir()
     for name in ('node', 'npm', 'npx', 'corepack'):
         (out / 'bin' / name).symlink_to(f'../node/bin/{name}')
     (out / 'bin' / 'pnpm').symlink_to('../node/lib/node_modules/corepack/dist/pnpm.js')
     shutil.copy2(pathlib.Path(args.rg).resolve(), out / 'bin' / 'rg')
-    manifest = {'pnpmVersion': args.pnpm_version, 'nodeVersion': subprocess.run([str(out / 'bin' / 'node'), '--version'],
+    manifest = {'pnpmVersion': versions[0], 'pnpmVersions': versions, 'nodeVersion': subprocess.run([str(out / 'bin' / 'node'), '--version'],
                 capture_output=True, text=True).stdout.strip(), 'digest': tree_digest(out)}
     write_json(out / 'manifest.json', manifest)
     print(json.dumps(manifest))
     return 0
 
 
-def prepare_template(task, archive, expected_sha, out, install=None):
+def prepare_template(task, archive, expected_sha, out, install=None, toolchain=None):
     """Extract the frozen archive, install dependencies, then commit everything so
     the executor's later diff shows only its own changes. A failed install removes
     the copy and stops."""
@@ -554,7 +595,7 @@ def prepare_template(task, archive, expected_sha, out, install=None):
     ws.mkdir(parents=True)
     with tarfile.open(archive) as tar:
         tar.extractall(ws, filter='data')
-    setup = shell(install or INSTALL[task['repository']], ws)
+    setup = shell(install or INSTALL[task['repository']], ws, env=tool_env(toolchain))
     if setup['exitCode'] != 0:
         shutil.rmtree(ws, ignore_errors=True)
         raise SystemExit(f'{task["id"]}: setup failed (exit {setup["exitCode"]}); template removed')
@@ -701,7 +742,7 @@ def make_root(root, inner):
     return root
 
 
-def ready_environment(codex, cell_dir, root, ws, repository, config_text):
+def ready_environment(codex, cell_dir, root, ws, repository, config_text, toolchain=None):
     """Relink the copied tree, prove isolation, then probe readiness under the
     session's profile. Raises before any model starts if any step fails, removing
     the staged root so the cell can be rerun."""
@@ -709,7 +750,7 @@ def ready_environment(codex, cell_dir, root, ws, repository, config_text):
     canary = cell_dir / CANARY
     canary.write_text('not for model sessions\n', encoding='utf8')
     if RELINK.get(repository):
-        env['relink'] = shell(RELINK[repository], ws, offline=True)
+        env['relink'] = shell(RELINK[repository], ws, offline=True, env=tool_env(toolchain))
     if env['relink'] is None or env['relink']['exitCode'] == 0:
         env['isolation'] = isolation_probe(codex, cell_dir / 'probe-home', ws, config_text, canary, root / 'tmp', loopback=True)
     if READY.get(repository) and env['isolation'] and env['isolation']['exitCode'] == 0:
@@ -721,6 +762,10 @@ def ready_environment(codex, cell_dir, root, ws, repository, config_text):
     return env
 
 
+def change_pathspec(repository):
+    return [':!answer.json', *(f':!{f}' for f in BUILD_OUTPUTS.get(repository, ()))]
+
+
 def run_executor(codex, plan_doc, cell_dir, arm, task, template, auth, node, navigation_cli, toolchain, timeout):
     root = make_root(active_root(plan_doc, cell_dir.name), 'workspace')
     ws = root / 'workspace'
@@ -730,7 +775,7 @@ def run_executor(codex, plan_doc, cell_dir, arm, task, template, auth, node, nav
     if config_text != (cell_dir / 'executor-config.toml').read_text(encoding='utf8'):
         shutil.rmtree(root, ignore_errors=True)
         raise SystemExit(f'{cell_dir.name}: executor config differs from the plan')
-    environment = ready_environment(codex, cell_dir, root, ws, task['repository'], config_text)
+    environment = ready_environment(codex, cell_dir, root, ws, task['repository'], config_text, toolchain)
     home = cell_dir / 'executor-home'
     home.mkdir(mode=0o700)
     (home / 'auth.json').symlink_to(auth)
@@ -752,7 +797,7 @@ def run_executor(codex, plan_doc, cell_dir, arm, task, template, auth, node, nav
     seconds = round(time.monotonic() - clock, 1)
     (cell_dir / 'executor-events.jsonl').write_text(out, encoding='utf8')
     (cell_dir / 'executor.stderr').write_text(err, encoding='utf8')
-    git(ws, 'add', '-A', '--', '.', ':!answer.json', check=False)  # the answer is not part of the change
+    git(ws, 'add', '-A', '--', '.', *change_pathspec(task['repository']), check=False)  # the answer is not part of the change
     diff = git(ws, 'diff', '--cached', '--binary', check=False).stdout
     (cell_dir / 'executor.diff').write_text(diff, encoding='utf8')
     changed = [f for f in git(ws, 'diff', '--cached', '--name-only', check=False).stdout.splitlines() if f]
@@ -833,6 +878,91 @@ def review_outcome(report, rubric_ids):
     return {'valid': valid, 'accepted': accepted}
 
 
+REVIEW_SCHEMA = {'type': 'object', 'additionalProperties': False, 'required': ['accepted', 'findings', 'materialIssues'],
+                 'properties': {'accepted': {'type': 'boolean'},
+                                'findings': {'type': 'array', 'items': {'type': 'object', 'additionalProperties': False,
+                                             'required': ['id', 'passed', 'reason'],
+                                             'properties': {'id': {'type': 'string'}, 'passed': {'type': 'boolean'}, 'reason': {'type': 'string'}}}},
+                                'materialIssues': {'type': 'array', 'items': {'type': 'string'}}}}
+CLAUDE_REVIEW_INTRO = ('Independently review one task outcome. Everything you may use is below: the task, the answer, the '
+                       'diff (if any), the checker result, the rubric and bounded source excerpts. Judge each rubric item against '
+                       'the cited source and the diff. Use every rubric id exactly once in findings. Accept only if every rubric '
+                       'item passes and there is no material issue. You have no tools; do not ask for more material.\n')
+
+
+def claude_review_prompt(review):
+    """The whole review, inlined: the Claude reviewer has no tools, so it can read
+    nothing else. Returns (prompt, diffTruncated)."""
+    parts, truncated = [CLAUDE_REVIEW_INTRO], False
+    for name in ('task.json', 'answer.json', 'executor.diff', 'checker.json', 'rubric.json'):
+        f = review / name
+        if not f.is_file():
+            continue
+        text = f.read_text(encoding='utf8', errors='replace')
+        if name == 'executor.diff' and len(text.encode('utf8')) > REVIEW_DIFF_BYTES:
+            text = text.encode('utf8')[:REVIEW_DIFF_BYTES].decode('utf8', errors='ignore') + '\n[diff truncated]\n'
+            truncated = True
+        parts.append(f'\n===== {name} =====\n{text}')
+    for f in sorted((review / 'source').rglob('*')) if (review / 'source').is_dir() else []:
+        if f.is_file():
+            parts.append(f'\n===== source/{f.relative_to(review / "source")} (line-numbered excerpt) =====\n'
+                         + f.read_text(encoding='utf8', errors='replace'))
+    return ''.join(parts), truncated
+
+
+def claude_command(claude, reviewer=REVIEWER):
+    """Headless Claude with no tools, no project or user instructions, no MCP and no
+    saved session. The prompt goes on stdin."""
+    return [str(claude), '-p', '--model', reviewer['model'], '--effort', reviewer['effort'], '--tools', '',
+            '--setting-sources', 'project', '--disable-slash-commands', '--strict-mcp-config', '--mcp-config', '{"mcpServers":{}}',
+            '--no-session-persistence', '--json-schema', json.dumps(REVIEW_SCHEMA, separators=(',', ':')), '--output-format', 'json']
+
+
+CLAUDE_ENV = {'CLAUDE_CODE_DISABLE_CLAUDE_MDS': '1', 'CLAUDE_CODE_DISABLE_AUTO_MEMORY': '1'}
+
+
+def claude_usage(text, exit_code=0):
+    """Usage from one `claude -p --output-format json` result. Complete only for a
+    successful result with integer usage fields; otherwise incomplete, never zero."""
+    reasons = []
+    try:
+        r = json.loads(text)
+    except (TypeError, ValueError):
+        r = None
+    if not isinstance(r, dict) or r.get('type') != 'result':
+        reasons.append('no result event')
+        r = {}
+    if exit_code != 0:
+        reasons.append(f'exit {exit_code}')
+    if r and (r.get('subtype') != 'success' or r.get('is_error') is not False):
+        reasons.append('result not a success')
+    u = r.get('usage') if isinstance(r.get('usage'), dict) else {}
+    keys = ('input_tokens', 'cache_read_input_tokens', 'cache_creation_input_tokens', 'output_tokens')
+    if r and not all(isinstance(u.get(k), int) and not isinstance(u.get(k), bool) and u.get(k) >= 0 for k in keys):
+        reasons.append('usage fields missing')
+    if reasons:
+        return {'complete': False, 'incompleteReasons': reasons, 'family': 'claude'}
+    return {'complete': True, 'incompleteReasons': [], 'family': 'claude', 'uncached': u['input_tokens'],
+            'cached': u['cache_read_input_tokens'], 'cacheWrite': u['cache_creation_input_tokens'], 'output': u['output_tokens'],
+            'total': sum(u[k] for k in keys), 'turns': r.get('num_turns'), 'apiRateEquivalentUSD': r.get('total_cost_usd')}
+
+
+def claude_report(text):
+    """The structured review from a Claude result, or None."""
+    try:
+        r = json.loads(text)
+    except (TypeError, ValueError):
+        return None
+    if not isinstance(r, dict):
+        return None
+    if isinstance(r.get('structured_output'), dict):
+        return r['structured_output']
+    try:
+        return json.loads(r.get('result') or '')
+    except (TypeError, ValueError):
+        return None
+
+
 def evidence_excerpts(ws, answer, dest):
     """Bounded excerpts of cited lines (plus context) from the frozen workspace. A
     path resolving outside the workspace, through any symlinked parent, is skipped."""
@@ -864,7 +994,7 @@ def evidence_excerpts(ws, answer, dest):
     return written
 
 
-def run_checker(cell_dir, task, acc, repo, strict_scope=True):
+def run_checker(cell_dir, task, acc, repo, strict_scope=True, toolchain=None):
     """Hidden checker, scope and dependency count for one cell, with no model."""
     ws = cell_dir / 'workspace'
     receipt = json.loads((cell_dir / 'executor.json').read_text(encoding='utf8'))
@@ -879,13 +1009,13 @@ def run_checker(cell_dir, task, acc, repo, strict_scope=True):
         shutil.rmtree(check_ws, ignore_errors=True)
         clone_tree(ws, check_ws)
         if RELINK.get(task['repository']):
-            checker['relinkExit'] = shell(RELINK[task['repository']], check_ws, offline=True)['exitCode']
+            checker['relinkExit'] = shell(RELINK[task['repository']], check_ws, offline=True, env=tool_env(toolchain))['exitCode']
         for rel in acc['checker']['testFiles']:
             content = git(repo, 'show', f"{acc['sourceChange']}:{rel}").stdout
             target = check_ws / rel
             target.parent.mkdir(parents=True, exist_ok=True)
             target.write_text(content, encoding='utf8')
-        result = shell(acc['checker']['command'], check_ws, offline=True, timeout=900)
+        result = shell(acc['checker']['command'], check_ws, offline=True, timeout=900, env=tool_env(toolchain))
         checker = {**checker, 'ran': True, 'passed': result['exitCode'] == 0, **result}
         shutil.rmtree(check_ws, ignore_errors=True)
     base_paths = set(git(repo, 'ls-tree', '-r', '--name-only', task['baseCommit']).stdout.splitlines())
@@ -894,18 +1024,8 @@ def run_checker(cell_dir, task, acc, repo, strict_scope=True):
     return receipt, answer, checker, deps, scope
 
 
-def assess_cell(codex, plan_doc, cell_dir, task, acc, repo, auth, toolchain, timeout):
-    receipt, answer, checker, deps, scope = run_checker(cell_dir, task, acc, repo)
-    ws = cell_dir / 'workspace'
-    root = make_root(active_root(plan_doc, cell_dir.name, 'review'), 'review')
-    review = root / 'review'
-    write_json(review / 'task.json', {k: task[k] for k in ('id', 'repository', 'class', 'statement', 'answerFormat')})
-    write_json(review / 'answer.json', answer if answer is not None else {'error': 'answer.json missing or invalid'})
-    if (cell_dir / 'executor.diff').read_text(encoding='utf8'):
-        shutil.copy2(cell_dir / 'executor.diff', review / 'executor.diff')
-    write_json(review / 'checker.json', {k: checker.get(k) for k in ('ran', 'passed', 'exitCode', 'tail')})
-    write_json(review / 'rubric.json', {k: acc.get(k) for k in ('rubric', 'requiredEvidence', 'scope', 'notes')})
-    excerpts = evidence_excerpts(ws, answer, review)
+def codex_review(codex, cell_dir, root, review, toolchain, auth, rubric_ids, timeout):
+    """Second, blinded review by Codex under the read-only profile (agreement sample)."""
     config_text = codex_config('reviewer', SETTINGS, root=root, toolchain=toolchain)
     home = cell_dir / 'reviewer-home'
     home.mkdir(mode=0o700)
@@ -930,23 +1050,88 @@ def assess_cell(codex, plan_doc, cell_dir, task, acc, repo, auth, toolchain, tim
         report = json.loads((cell_dir / 'review-final.json').read_text(encoding='utf8'))
     except (OSError, ValueError):
         report = None
-    verdict = review_outcome(report, [r['id'] for r in acc.get('rubric', [])])
     session = session_calls(home)
-    reviewer_usage = {k: v for k, v in usage(out, 0 if code == 0 else 1, session).items() if k != 'raw'}
-    accepted = bool(verdict['accepted'] and answer is not None and code == 0 and scope['passed']
+    return {'family': 'codex', 'exitCode': code, 'seconds': seconds,
+            'usage': {k: v for k, v in usage(out, 0 if code == 0 else 1, session).items() if k != 'raw'}, 'session': session,
+            'isolation': True, 'outsideReferences': outside_references(out, root), 'deniedAccesses': denied_reads(home),
+            'report': report, **review_outcome(report, rubric_ids)}
+
+
+def claude_review(claude, cell_dir, review, rubric_ids, timeout):
+    """Primary review by Claude with no tools; the material is inlined in the prompt."""
+    text, truncated = claude_review_prompt(review)
+    (cell_dir / 'claude-review-prompt.txt').write_text(text, encoding='utf8')
+    argv = claude_command(claude)
+    clock = time.monotonic()
+    try:
+        p = subprocess.run(argv, cwd=review, env={**os.environ, **CLAUDE_ENV}, input=text, capture_output=True, text=True, timeout=timeout)
+        code, out = p.returncode, p.stdout
+    except subprocess.TimeoutExpired as exc:
+        code, out = 'timeout', exc.stdout.decode() if isinstance(exc.stdout, bytes) else (exc.stdout or '')
+    seconds = round(time.monotonic() - clock, 1)
+    (cell_dir / 'claude-review.json').write_text(out, encoding='utf8')
+    report = claude_report(out)
+    return {'family': 'claude', 'model': REVIEWER['model'], 'effort': REVIEWER['effort'], 'exitCode': code, 'seconds': seconds,
+            'usage': claude_usage(out, 0 if code == 0 else 1), 'diffTruncated': truncated, 'promptBytes': len(text.encode('utf8')),
+            'report': report, **review_outcome(report, rubric_ids)}
+
+
+def assess_cell(codex, claude, plan_doc, cell_dir, task, acc, repo, auth, toolchain, timeout):
+    receipt, answer, checker, deps, scope = run_checker(cell_dir, task, acc, repo, toolchain=toolchain)
+    ws = cell_dir / 'workspace'
+    root = make_root(active_root(plan_doc, cell_dir.name, 'review'), 'review')
+    review = root / 'review'
+    write_json(review / 'task.json', {k: task[k] for k in ('id', 'repository', 'class', 'statement', 'answerFormat')})
+    write_json(review / 'answer.json', answer if answer is not None else {'error': 'answer.json missing or invalid'})
+    if (cell_dir / 'executor.diff').read_text(encoding='utf8'):
+        shutil.copy2(cell_dir / 'executor.diff', review / 'executor.diff')
+    write_json(review / 'checker.json', {k: checker.get(k) for k in ('ran', 'passed', 'exitCode', 'tail')})
+    write_json(review / 'rubric.json', {k: acc.get(k) for k in ('rubric', 'requiredEvidence', 'scope', 'notes')})
+    excerpts = evidence_excerpts(ws, answer, review)
+    rubric_ids = [r['id'] for r in acc.get('rubric', [])]
+    primary = claude_review(claude, cell_dir, review, rubric_ids, timeout)
+    second = None
+    if cell_dir.name in (plan_doc.get('agreementSample') or []):
+        second = codex_review(codex, cell_dir, root, review, toolchain, auth, rubric_ids, timeout)
+    accepted = bool(primary['accepted'] and answer is not None and primary['exitCode'] == 0 and scope['passed']
                     and (not checker['ran'] or checker['passed']))
+    # Gate on executor tokens only; reviewers are identical across arms and of two token families (protocol v2).
     result = {'checker': {k: checker.get(k) for k in ('ran', 'passed', 'exitCode', 'seconds', 'relinkExit')}, 'dependencies': deps,
-              'scope': scope, 'excerpts': excerpts,
-              'reviewer': {'exitCode': code, 'seconds': seconds, 'usage': reviewer_usage, 'session': session, 'isolation': probe['exitCode'] == 0,
-                           'outsideReferences': outside_references(out, root), 'deniedAccesses': denied_reads(home), **verdict},
+              'scope': scope, 'excerpts': excerpts, 'reviewer': primary, 'secondReviewer': second,
               'accepted': accepted,
-              'totalTokens': cell_total([receipt['usage'], reviewer_usage]),
-              'sensitivity': sensitivity([receipt['usage'], reviewer_usage]),
-              'reviewerSeconds': seconds}
+              'totalTokens': cell_total([receipt['usage']]),
+              'reviewerTokens': {'claude': primary['usage'].get('total') if primary['usage']['complete'] else None,
+                                 'codex': (second['usage'].get('total') if second and second['usage'].get('complete') else None)},
+              'sensitivity': sensitivity([receipt['usage']]),
+              'reviewerSeconds': primary['seconds'] + (second['seconds'] if second else 0)}
     shutil.move(str(review), str(cell_dir / 'review'))
     shutil.rmtree(root, ignore_errors=True)
     write_json(cell_dir / 'assessment.json', result)
     return result
+
+
+def reviewer_agreement(assessments, sample, threshold=AGREEMENT_THRESHOLD):
+    """Raw agreement between the two reviewers on `accepted` and on each rubric item.
+    Missing or invalid second reviews make it unreliable. Kappa on a dozen cells is
+    noise, so only counts are reported."""
+    pairs = [(a['reviewer'], a.get('secondReviewer')) for d, a in sorted(assessments.items()) if d in sample]
+    usable = [(p, s) for p, s in pairs if s and p.get('valid') and s.get('valid')]
+    agree = sum(p['accepted'] == s['accepted'] for p, s in usable)
+    items = agree_items = 0
+    for p, s in usable:
+        sf = {f['id']: f['passed'] for f in s['report']['findings']}
+        for f in p['report']['findings']:
+            items += 1; agree_items += sf.get(f['id']) == f['passed']
+    rate = agree / len(usable) if usable else None
+    reliable = len(usable) == len(sample) and len(sample) > 0 and rate is not None and rate >= threshold
+    return {'sample': len(sample), 'usable': len(usable), 'acceptedAgree': agree, 'acceptedRate': rate,
+            'rubricItems': items, 'rubricAgree': agree_items, 'threshold': threshold, 'reliable': reliable}
+
+
+def check_claude(plan_doc, claude):
+    lock = plan_doc.get('lock') or {}
+    if lock.get('claude') != str(claude) or lock.get('claudeSha256') != sha_or_none(claude) or plan_doc.get('reviewer') != REVIEWER:
+        raise SystemExit('refusing to assess: the Claude reviewer differs from the plan')
 
 
 def check_lock(plan_doc, args, codex):
@@ -976,6 +1161,32 @@ def checked_tasks(plan_doc, directory):
     return {i: t for i, (_, t) in tasks.items()}
 
 
+CELL_OUTPUTS = ('executor.json', 'executor-events.jsonl', 'executor.stderr', 'executor.diff', 'executor-final.txt',
+                'executor-home', 'probe-home', 'environment.json', 'workspace', CANARY)
+
+
+def provider_failure(cell_dir):
+    """A cell may be rerun once only if its executor exited non-zero and produced no
+    model output at all (no turn.completed and no completed item in the stream)."""
+    rec = json.loads((cell_dir / 'executor.json').read_text(encoding='utf8'))
+    events = (cell_dir / 'executor-events.jsonl').read_text(encoding='utf8') if (cell_dir / 'executor-events.jsonl').exists() else ''
+    output = any(t in events for t in ('"turn.completed"', '"item.completed"'))
+    return rec.get('exitCode') != 0 and not output and not (cell_dir / 'repair-1').exists()
+
+
+def set_aside_provider_failure(cell_dir):
+    """Keep the failed attempt in repair-1/ (recorded, never deleted) so execute reruns the cell."""
+    if not provider_failure(cell_dir):
+        return False
+    keep = cell_dir / 'repair-1'
+    keep.mkdir(mode=0o700)
+    for name in CELL_OUTPUTS:
+        if (cell_dir / name).exists():
+            shutil.move(str(cell_dir / name), str(keep / name))
+    write_json(keep / 'repair.json', {'at': utc(), 'rule': 'provider failure with no model output; one rerun allowed'})
+    return True
+
+
 def execute(args):
     for path in args.forbid:
         if pathlib.Path(path).exists():
@@ -988,6 +1199,8 @@ def execute(args):
         if args.only and cell['directory'] not in args.only:
             continue
         cell_dir = args.plan / cell['directory']
+        if args.rerun_provider_failures and (cell_dir / 'executor.json').exists():
+            set_aside_provider_failure(cell_dir)
         if (cell_dir / 'executor.json').exists():
             continue
         verify_template(tasks[cell['task']], args.templates)
@@ -1003,6 +1216,12 @@ def execute(args):
 def assess(args):
     codex = resolve_codex(args.codex)
     plan_doc = json.loads((args.plan / 'schedule.json').read_text(encoding='utf8'))
+    claude = None
+    if not args.checker_only:
+        claude = resolve_codex(args.claude) if args.claude else None
+        if claude is None:
+            raise SystemExit('assess needs --claude (the primary reviewer)')
+        check_claude(plan_doc, claude)
     tasks = checked_tasks(plan_doc, args.tasks)
     missing = [c['directory'] for c in plan_doc['cells'] if not (args.plan / c['directory'] / 'executor.json').exists()]
     if missing and not args.checker_only:
@@ -1016,14 +1235,15 @@ def assess(args):
         acc = json.loads((args.acceptance / f"{task['id']}.json").read_text(encoding='utf8'))
         if args.checker_only:
             # No reviewer: checker pass/fail, scope and dependency counts only, never the checker output.
-            _, answer, checker, deps, scope = run_checker(cell_dir, task, acc, args.repos / task['repository'], strict_scope=False)
+            _, answer, checker, deps, scope = run_checker(cell_dir, task, acc, args.repos / task['repository'], strict_scope=False,
+                                                          toolchain=args.toolchain)
             rec = {'cell': cell['directory'], 'answerPresent': answer is not None, 'checkerRan': checker['ran'],
                    'checkerPassed': checker.get('passed'), 'relinkExit': checker.get('relinkExit'), 'dependencies': deps,
                    'scope': scope}
             write_json(cell_dir / 'checker-only.json', rec)
             print(json.dumps(rec))
             continue
-        result = assess_cell(codex, plan_doc, cell_dir, task, acc, args.repos / task['repository'], args.auth_file,
+        result = assess_cell(codex, claude, plan_doc, cell_dir, task, acc, args.repos / task['repository'], args.auth_file,
                              args.toolchain, args.timeout)
         print(json.dumps({'cell': cell['directory'], 'accepted': result['accepted'], 'totalTokens': result['totalTokens'],
                           'dependencies': result['dependencies']}))
@@ -1045,7 +1265,14 @@ def analyse(args):
     comparators = [a for a in plan_doc['arms'] if a != 'context']
     cost = cost_gate(rows, comparators, plan_doc['repetitions'])
     quality = quality_guard(rows, comparators)
-    report = {'cost': cost, 'quality': quality, 'passed': cost['passed'] and quality['passed'],
+    assessments = {c['directory']: json.loads((args.plan / c['directory'] / 'assessment.json').read_text(encoding='utf8'))
+                   for c in plan_doc['cells']}
+    quality['reviewerAgreement'] = reviewer_agreement(assessments, plan_doc.get('agreementSample') or [],
+                                                      plan_doc.get('agreementThreshold', AGREEMENT_THRESHOLD))
+    quality['reliable'] = quality['reviewerAgreement']['reliable']
+    report = {'cost': cost, 'quality': quality, 'passed': cost['passed'] and quality['passed'] and quality['reliable'],
+              'tokensGated': 'executor only (protocol v2 reviewer design)',
+              'reviewerTokens': {fam: sum(a['reviewerTokens'][fam] or 0 for a in assessments.values()) for fam in ('claude', 'codex')},
               'firstPassAccepted': 'not measured (protocol v2)'}
     write_json(args.plan / 'analysis.json', report)
     print(json.dumps({'passed': report['passed'], 'cost': cost['passed'], 'quality': quality['passed']}))
@@ -1059,7 +1286,8 @@ def prepare(args):
         if (args.templates / task['id']).exists():
             verify_template(task, args.templates)
             continue
-        rec = prepare_template(task, args.archive_dir / f"{task['id']}.tar", archives[task['id']], args.templates)
+        rec = prepare_template(task, args.archive_dir / f"{task['id']}.tar", archives[task['id']], args.templates,
+                               toolchain=args.toolchain)
         print(json.dumps({'task': task['id'], 'setupExit': rec['setup']['exitCode'], 'seconds': rec['setup']['seconds']}))
     return 0
 
@@ -1077,6 +1305,8 @@ def main(argv=None):
         q.add_argument('--timeout', type=int, default=1800)
         q.add_argument('--only', nargs='*', default=None, help='cell directory names to run')
         if name == 'execute':
+            q.add_argument('--rerun-provider-failures', action='store_true',
+                           help='set aside cells whose executor failed with no model output (once each) and rerun them')
             q.add_argument('--templates', required=True, type=pathlib.Path)
             q.add_argument('--node', required=True, type=pathlib.Path)
             q.add_argument('--navigation-cli', required=True, type=pathlib.Path)
@@ -1085,15 +1315,17 @@ def main(argv=None):
             q.add_argument('--acceptance', required=True, type=pathlib.Path)
             q.add_argument('--repos', required=True, type=pathlib.Path)
             q.add_argument('--checker-only', action='store_true', help='run the hidden checker, scope and dependency count only; no reviewer, no model')
+            q.add_argument('--claude', type=pathlib.Path, help='absolute path of the Claude Code binary (primary reviewer)')
     q = sub.add_parser('prepare')
     q.add_argument('--tasks', required=True, type=pathlib.Path)
     q.add_argument('--archives', required=True, type=pathlib.Path, help='JSON map task id -> archive sha256')
     q.add_argument('--archive-dir', required=True, type=pathlib.Path)
     q.add_argument('--templates', required=True, type=pathlib.Path)
+    q.add_argument('--toolchain', type=pathlib.Path, help='install with the copied toolchain (the same node and pnpm as the sessions)')
     q = sub.add_parser('toolchain')
     q.add_argument('--node-prefix', required=True, type=pathlib.Path)
     q.add_argument('--corepack-home', required=True, type=pathlib.Path)
-    q.add_argument('--pnpm-version', required=True)
+    q.add_argument('--pnpm-version', required=True, nargs='+', help='every pnpm version a task pins')
     q.add_argument('--rg', required=True, type=pathlib.Path)
     q.add_argument('--out', required=True, type=pathlib.Path)
     q = sub.add_parser('analyse')
@@ -1105,6 +1337,7 @@ def main(argv=None):
     q.add_argument('--repetitions', type=int, default=3)
     q.add_argument('--seed', type=int, default=SEED)
     q.add_argument('--codex', required=True, type=pathlib.Path)
+    q.add_argument('--claude', required=True, type=pathlib.Path, help='absolute path of the Claude Code binary (primary reviewer)')
     q.add_argument('--node', required=True, type=pathlib.Path)
     q.add_argument('--navigation-cli', required=True, type=pathlib.Path)
     q.add_argument('--toolchain', required=True, type=pathlib.Path)

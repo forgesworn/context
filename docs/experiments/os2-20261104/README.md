@@ -230,15 +230,79 @@ a final exclusion check of the five new tasks against the kept four and the
 retired four, all clean. The table above shows the final base commits; the
 rejected versions' hashes stay in `tasks/manifest.json`.
 
+## Reviewer design, pilot and readiness (2026-11-06)
+
+Owner decision 2026-11-05: one reviewer from a different model family, and a
+second blinded review on a sample. Fixed before any requalification cell:
+
+- **Primary reviewer:** Claude Code (`claude -p`), `claude-opus-5-5`, effort
+  `high`, `--tools ""` (no tools; checked with one Haiku call that only the
+  structured-output tool remains), `--json-schema` for the verdict, project
+  settings only, CLAUDE.md and auto-memory off, an empty strict MCP config and
+  `--no-session-persistence`. Its verdict decides `accepted`, with the checker
+  and scope. Its usage is complete only for a successful result with integer
+  usage fields; anything else is incomplete, never zero. The Claude binary and
+  reviewer settings are in the plan's lock, and `assess` refuses a different
+  binary.
+- **Second reviewer:** the existing Codex reviewer path, unchanged, on every
+  cell of a plan of 12 cells or fewer (so both requalification cells), and in
+  phase 2 on 12 of 48 cells, 6 per arm, drawn with seed 20261105. Reported:
+  raw agreement on `accepted` and on each rubric item. With fewer than 80%
+  agreement on `accepted`, or any missing second review, the quality guard is
+  reported as unreliable and the run does not pass. Kappa on 12 cells is noise,
+  so only counts are reported.
+- **Cost gate change:** gated tokens are executor tokens only. Reviewers are
+  identical across arms and come from two tokenisers, so their sum would mean
+  nothing; reviewer tokens are reported per family.
+- **Provider failures:** a cell whose executor exited non-zero with no model
+  output at all (no `turn.completed` and no completed item) may be rerun once
+  with `execute --rerun-provider-failures`; the failed attempt is kept in
+  `repair-1/`. A cell with any model output is never rerun.
+- **Build outputs:** `site/tools-manifest.json`, which bray's own build
+  rewrites, is left out of the recorded change like `answer.json`, so running
+  the build is never a scope violation.
+- **Toolchain:** the h3 tasks pin three pnpm versions (11.9.0 for h3-impact
+  and h3-code-change, 11.22.0 for h3-qualification, 12.3.4 through
+  `devEngines` for h3-orientation and h3-diagnosis). The copied toolchain
+  carried only 11.9.0, so three of the five h3 tasks would have failed their
+  offline relink; only h3-code-change had ever run. A new toolchain,
+  `/Users/Shared/os2-toolchain-20261106`, carries all three, and the relink,
+  checker and template install now use it too, rather than the host's pnpm.
+- **Leak closed:** headless Claude sessions save transcripts under
+  `~/.claude/projects` unless told not to. The 4 Nov author's and the four
+  custodians' transcripts, which held hidden answers, were moved to the M4
+  holding (hash checked) and deleted here. Every hidden-side launch now passes
+  `--no-session-persistence`.
+
+**Pilot** ([`pilot.py`](pilot.py), on the eight recorded cells of the retired
+h3-code-change from attempt 2 and the three diagnostic pairs; 16 reviews):
+both reviewers accepted all eight and agreed on all 40 rubric items. The
+checker passed on all eight. Dependency recall was 1.0 on every cell with no
+misses; precision was 0.6 to 0.75 (one or two extra changed files). Claude
+reviews used 14,000 to 18,000 tokens and 15 to 34 seconds; Codex reviews
+25,000 to 48,000 tokens. Limits: one task, every outcome accepted, so
+agreement has only been seen on easy cases and the miss count was zero
+everywhere.
+
+**Readiness** ([`readiness.py`](readiness.py), model-free): all nine new
+templates (prepared on this Mac with the new toolchain) staged as `execute`
+would: the five h3 copies relink offline, all nine pass the isolation probe
+with loopback, and all pass the readiness probe (bray's probe is new).
+**Checker smoke** ([`checker-smoke.py`](checker-smoke.py), blind, booleans
+only): on this Mac with the toolchain, all five checker tasks fail on the base
+copy and pass with the merged change applied.
+
 ## Executor, reviewer and harness
 
 - Executor: Codex CLI, `gpt-5.6-sol`, reasoning effort `high`. Both arms run in
   separate fresh sessions, each with its own `CODEX_HOME` (session logs kept for per-call accounting). This is the Codex cohort; a Claude cohort
   is separate work with its own fixed model and effort.
-- Reviewer: a fresh `gpt-5.6-sol`/high session under a read-only permission
-  profile, in its own staged root. It sees only the answer or diff, the checker
-  result, the private rubric and bounded excerpts of the cited lines.
-  Same-model review remains a known limit (see Version 2 changes).
+- Reviewer (from 2026-11-06, see Reviewer design): Claude Code headless,
+  `claude-opus-5-5` at effort `high`, with no tools at all. The answer, diff
+  (capped at 256 KiB, truncation recorded), checker result, private rubric and
+  bounded excerpts of the cited lines are inlined in its prompt, so it can read
+  nothing else. A second, blinded `gpt-5.6-sol`/high review under the
+  read-only permission profile runs on a seeded sample, to measure agreement.
 - Harness: [`harness.py`](harness.py), derived from
   [`d5-20260921-v3/run-pair.py`](../d5-20260921-v3/run-pair.py), which stays
   locked and unchanged. It keeps `codex exec --json` and per-arm `CODEX_HOME`.
@@ -693,8 +757,9 @@ failed on one stochastic rejection.
 
 ## Cost gate
 
-The primary outcome is **reported processed tokens**: executor plus reviewer
-input and output from the Codex `--json` stream, cached input included. The
+The primary outcome is **reported processed tokens**: executor input and
+output from the Codex `--json` stream, cached input included (reviewer tokens
+are reported per family, not gated; see Reviewer design). The
 statistic is the **sum over tasks of per-task median** processed tokens. Every
 task needs exactly the planned repetitions per arm, all complete.
 
@@ -763,7 +828,8 @@ Phase 2 is of that order. Phase 1 is one pair. No prices were looked up.
 7. ~~Replacement tasks from an isolated custodian, plus a separate
    qualification task~~ (run 2026-11-06; follow-up converted the kept
    scopes and reviewed the problem list; the bray pair was rewritten).
-8. The quality-measure pilot and the reviewer-independence design.
+8. ~~The quality-measure pilot and the reviewer-independence design~~
+   (2026-11-06; see Reviewer design, pilot and readiness).
 9. Requalification (phase 1) on version 2 with the qualification task.
 10. Phase 2.
 
