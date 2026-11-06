@@ -317,7 +317,8 @@ shell command:
 `plan` instead accepts source anchors such as `{"path":"src/example.ts","line":4}`
 and selects complete supported TS/JS syntax blocks. Use reviewed exact ranges
 for other supported languages. The complete response must fit the requested
-budget, up to 65,536 bytes; oversized selections fail instead of truncating code.
+budget, up to 65,536 bytes. Code is never truncated: an oversized `build` serves
+the sources that fit whole and outlines the rest, and fails only when none fits.
 Packets are unsigned evidence, not permissions or proof of task completeness.
 See [source packets](WORKER-PACKETS.md) for the complete contract.
 

@@ -70,8 +70,12 @@ The configured root must be a Git repository with a committed HEAD. Internal
 
 The response contains the packet, navigation generation/revision/policy and,
 for planning, coverage metadata. The complete response must fit `maxBytes`
-(default/maximum 65,536 bytes), including metadata. Oversized selections fail
-without truncation. `expectedGeneration` is optional from 0.28.0: omitted, a
+(default/maximum 65,536 bytes), including metadata. A source is never cut. From
+0.30.0, an oversized `build` serves every requested source that fits whole (in
+packet order) and reports the rest under `trimmed`, with their declaration
+outlines, as a successful result; the text form starts with a `trimmed:` line.
+When no requested source fits on its own, the call fails with outlines only, as
+before. `expectedGeneration` is optional from 0.28.0: omitted, a
 stale or unknown index is refreshed first and the packet reports `refreshed`;
 given, unavailable, stale or unknown navigation and a mismatched generation are
 rejected. Freshness is checked again before returning. This is bounded freshness checking, not an
