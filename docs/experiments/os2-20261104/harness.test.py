@@ -415,6 +415,7 @@ if '--skip-git-repo-check' not in a:
         "evidence": [{"path": "src.ts", "startLine": 1, "endLine": 1, "claim": "c"}, {"path": "../escape.txt", "startLine": 1, "endLine": 1, "claim": "x"}]}))
     print(json.dumps({"type": "item.completed", "item": {"type": "command_execution", "command": "/bin/zsh -lc 'cat /etc/hosts && cat src.ts'", "exit_code": 0, "status": "completed"}}))
 else:
+    assert os.path.samestat(os.fstat(0), os.stat('/dev/null')), 'reviewer stdin must be /dev/null'
     rubric = json.loads((cwd / 'rubric.json').read_text())
     excerpt = (cwd / 'source' / 'src.ts').read_text()
     assert excerpt.startswith('1: export const v'), excerpt

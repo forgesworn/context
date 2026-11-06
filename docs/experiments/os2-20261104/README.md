@@ -738,6 +738,44 @@ test-file lines); one batched request of 30 anchors failed on a single one.
 That is a Context defect to fix: a plan request should answer the anchors it
 can and report the rest.
 
+#### Three pairs on 0.32.0 (2026-11-06)
+
+0.32.0 (PR #76) answers the plan anchors that resolve and reports the rest.
+The same variant was then run for three pairs on h3-qualification (seed
+20261105), both reviewers on all six cells.
+
+| Pair | Context tokens | Plain tokens | Ratio | Context calls | Plain calls |
+| --- | --- | --- | --- | --- | --- |
+| 1 | 735,711 | 670,305 | 1.10 | 19 | 16 |
+| 2 | 1,027,948 | 462,299 | 2.22 | 21 | 13 |
+| 3 | 1,171,881 | 730,433 | 1.60 | 25 | 18 |
+| Median | 1,027,948 | 670,305 | **1.53** | 21 | 16 |
+
+All six cells were accepted by the checker and both reviewers; the
+second review is detailed below. Every executor exited 0 with
+complete usage, no outside references and no denied reads. MCP errors: 2 of
+29 and 1 of 24 calls on the failing cells (a `plan` on AGENTS.md, which the
+planner does not support; a `plan` whose only anchor was an import line,
+which correctly stays an error; a bare `session.ts` path, ENOENT).
+
+The variant does not close the gap. Context read less than plain (1.0 to 1.3
+thousand packet lines against 2.3 to 7.4 thousand shell lines, and similar or
+fewer bytes) but made more model calls, and each call carries the transcript
+again: fixed per-call input was 209k to 274k against 141k to 196k, and
+carried reasoning 110k to 215k against 44k to 77k. The cost follows the
+number of model calls, not the bytes read.
+
+Codex second reviewer: accepted all six, agreeing with Claude on `accepted`
+(6 of 6) and on every rubric item (30 of 30); 37k to 50k tokens a review.
+
+The first second-review attempt timed out on all six cells without sending a
+request: the reviewer's prompt is an argument, and `codex exec` appends a
+piped stdin to it and waits for end of input. The harness now gives the
+Codex reviewer and the sandbox probe `/dev/null` as stdin, and the fake Codex
+in the tests refuses any other stdin. [`rerun-second-reviewer.py`](rerun-second-reviewer.py)
+reran only that reviewer from the saved review material and kept the failed
+attempt as `repair-codex-1/` in each cell.
+
 ### Independent protocol review (paid, needs approval)
 
 A fresh Sol/high session reviews the frozen protocol, harness diff and phase 1

@@ -712,7 +712,8 @@ def sandbox_probe(codex, home, cwd, command_text, config_text, timeout=300):
     argv = [str(codex), 'sandbox', '/bin/zsh', '-lc', command_text]
     started = time.monotonic()
     try:
-        p = subprocess.run(argv, cwd=cwd, env={**os.environ, 'CODEX_HOME': str(home)}, text=True, capture_output=True, timeout=timeout)
+        p = subprocess.run(argv, cwd=cwd, env={**os.environ, 'CODEX_HOME': str(home)}, stdin=subprocess.DEVNULL,
+                           text=True, capture_output=True, timeout=timeout)
         code, out = p.returncode, p.stdout + p.stderr
     except subprocess.TimeoutExpired as exc:
         code, out = 'timeout', str(exc)
@@ -1040,7 +1041,9 @@ def codex_review(codex, cell_dir, root, review, toolchain, auth, rubric_ids, tim
     argv = command(codex, 'reviewer', SETTINGS, review, cell_dir / 'review-final.json', REVIEW_PROMPT)
     clock = time.monotonic()
     try:
-        p = subprocess.run(argv, cwd=review, env={**os.environ, 'CODEX_HOME': str(home)}, capture_output=True, text=True, timeout=timeout)
+        # The prompt is an argument; codex exec appends piped stdin to it and waits for EOF.
+        p = subprocess.run(argv, cwd=review, env={**os.environ, 'CODEX_HOME': str(home)}, stdin=subprocess.DEVNULL,
+                           capture_output=True, text=True, timeout=timeout)
         code, out = p.returncode, p.stdout
     except subprocess.TimeoutExpired as exc:
         code, out = 'timeout', exc.stdout.decode() if isinstance(exc.stdout, bytes) else (exc.stdout or '')
