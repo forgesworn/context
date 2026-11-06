@@ -64,7 +64,8 @@ past the end of the file, it reads to the last line; overlapping or adjacent
 ranges in one file are merged. The packet records the ranges actually read. A range starting past the end is still rejected with
 the file's line count. A plan anchor outside every supported block is listed
 under `coverage.unresolved` with a pointer to `mode: "build"`, and the other
-anchors are still answered; a plan request fails only when no anchor resolves. The CLI keeps the strict spec. The server accepts an inline spec;
+anchors are still answered; a plan request fails only when no anchor resolves.
+A missing source path fails with the indexed paths ending in its file name. The CLI keeps the strict spec. The server accepts an inline spec;
 it cannot accept a different root, spec-file path, output path or shell command.
 The configured root must be a Git repository with a committed HEAD. Internal
 `git rev-parse` calls read provenance; the tool does not execute acceptance checks.
@@ -141,10 +142,15 @@ not a guarantee that it is a test: nested `it(...)` inside `describe(...)` selec
 the `it` call, but an anchor inside a smaller callback-bearing helper may select
 that helper. Anchor the outer declaration/call when its whole block is needed.
 
-Planning supports `.ts`, `.tsx`, `.js`, `.jsx`, `.mts`, `.cts`, `.mjs` and `.cjs`.
-It rejects malformed source, ambiguous or unsupported anchors, excluded paths,
-and an oversized result rather than truncating a branch. Interfaces, plain data,
-Markdown and other languages still use reviewed exact ranges with `build`.
+Syntax planning supports `.ts`, `.tsx`, `.js`, `.jsx`, `.mts`, `.cts`, `.mjs`
+and `.cjs` (Rust and Kotlin through the MCP server). It rejects malformed source,
+ambiguous or unsupported anchors, excluded paths, and an oversized result rather
+than truncating a branch. A plan anchor in any other packet file type (Markdown,
+JSON, Python and the rest) selects the whole file, coverage kind `file`, up to
+16 KiB; a larger file is listed under `coverage.unresolved` for an exact `build`
+range. When whole files would push the packet over its size limit they are left
+out and listed the same way, so the code blocks are still answered; a plan that
+is oversized without them returns the requested files' outlines, as `build` does.
 Source, root, HEAD and relevant policy must agree between planning and assembly.
 Line anchors use the packet format's LF/CRLF convention; bare CR and Unicode
 line separators require the exact-range fallback. A selected block's boundary

@@ -1048,6 +1048,17 @@ export class RepositoryNavigation {
     return { generation: gen.id, revision: gen.revision, files };
   }
 
+  /** Indexed paths equal to or ending in `/` + the requested path, for a request
+   * that named a file which does not exist (a bare `session.ts`). Index only: no
+   * filesystem scan. Sorted, at most `limit`. */
+  pathCandidates(requested: string, limit = 8): { paths: string[]; more: number } {
+    const gen = this.generation
+    if (!gen || !requested) return { paths: [], more: 0 }
+    const suffix = '/' + requested.replace(/^\.?\/+/, '')
+    const matches = gen.files.map((file) => file.path).filter((path) => path === suffix.slice(1) || path.endsWith(suffix)).sort()
+    return { paths: matches.slice(0, limit), more: Math.max(0, matches.length - limit) }
+  }
+
   /** Bounded current source for the derived unsigned graph. Selection uses
    * the existing policy/index, never another scanner or another checkout. */
   async graphFiles(pathPrefix?: string, signal?: AbortSignal) {

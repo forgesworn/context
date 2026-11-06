@@ -395,7 +395,7 @@ export function createRepositoryNavigationServer(root: string, options: Reposito
     'repository_packet',
     {
       description:
-        'Exact source: build path/startLine/endLine (no endLine: EOF); plan path/line for TS/JS/Rust/Kotlin. packetId for checkpoint save. 64 KiB default; oversize: what fits whole + outlines.',
+        'Exact source: build path/startLine/endLine (no endLine: EOF); plan path/line: enclosing block or small file. packetId for checkpoints. 64 KiB default; oversize: what fits whole + outlines.',
       inputSchema: packetInputSchema,
       annotations: { readOnlyHint: true, openWorldHint: false },
     },
@@ -421,10 +421,10 @@ export function createRepositoryNavigationServer(root: string, options: Reposito
           const before = await currentPacketNavigation(navigation, input.expectedGeneration, extra.signal)
           throwIfAborted(extra.signal)
           const maxBytes = input.maxBytes ?? DEFAULT_PACKET_MAX_BYTES
-          const attempt = async (spec: typeof parsedSpec, trimmed?: PacketResponse['trimmed']) => {
+          const attempt = async (spec: typeof parsedSpec, trimmed?: PacketResponse['trimmed'], wholeFiles = true) => {
             const result = input.mode === 'build'
               ? { packet: await buildPacketInline({ root, spec, clampToEnd: true }) }
-              : await planPacketInline({ root, spec })
+              : await planPacketInline({ root, spec, wholeFiles })
             throwIfAborted(extra.signal)
             const after = await currentPacketNavigation(navigation, before.generation, extra.signal)
             const response: PacketResponse = {
@@ -452,18 +452,28 @@ export function createRepositoryNavigationServer(root: string, options: Reposito
           try {
             built = await attempt(parsedSpec)
           } catch (error) {
-            if (input.mode !== 'build' || !OVERSIZE.test(error instanceof Error ? error.message : '')) throw error
-            const fitted = await fitSources(parsedSpec as BuildSpec, error, maxBytes, (spec, trimmed) => attempt(spec as typeof parsedSpec, trimmed),
-              (path) => outlineSource({ root, path }) as Promise<SourceOutline>)
-            if (!fitted) {
+            if (!OVERSIZE.test(error instanceof Error ? error.message : '')) throw error
+            const outlineError = async (cause: unknown) => {
               // Recorded sessions paged an oversized file in fixed chunks and then read it
               // again; an outline lets the caller request the one block it needs.
               const paths = [...new Set(input.spec.sources.map((source) => source.path))]
               const outlines = await Promise.all(paths.map((path) => outlineSource({ root, path }).catch(() => undefined)))
-              if (outlines.some((outline) => outline === undefined)) throw error
-              return { content: [{ type: 'text' as const, text: renderOutline(formatError(error), outlines as SourceOutline[]) }], isError: true }
+              if (outlines.some((outline) => outline === undefined)) throw cause
+              return { content: [{ type: 'text' as const, text: renderOutline(formatError(cause), outlines as SourceOutline[]) }], isError: true }
             }
-            built = fitted
+            if (input.mode === 'plan') {
+              // Whole non-code files go first; the code blocks are answered if they fit alone.
+              try { built = await attempt(parsedSpec, undefined, false) }
+              catch (inner) {
+                if (!OVERSIZE.test(inner instanceof Error ? inner.message : '')) throw inner
+                return await outlineError(inner)
+              }
+            } else {
+              const fitted = await fitSources(parsedSpec as BuildSpec, error, maxBytes, (spec, trimmed) => attempt(spec as typeof parsedSpec, trimmed),
+                (path) => outlineSource({ root, path }) as Promise<SourceOutline>)
+              if (!fitted) return await outlineError(error)
+              built = fitted
+            }
           }
           const { response, encoded } = built
           packetReferences.put(response.packetId!, response.navigation.generation, response.packet)
@@ -476,7 +486,7 @@ export function createRepositoryNavigationServer(root: string, options: Reposito
           finished()
         }
       } catch (error) {
-        return { content: [{ type: 'text' as const, text: formatError(error) }], isError: true }
+        return { content: [{ type: 'text' as const, text: withPathCandidates(formatError(error), navigation) }], isError: true }
       }
     },
   )
@@ -652,9 +662,9 @@ export function renderPacket(response: PacketResponse, options: { fullCaveat?: b
   if (response.coverage) {
     out.push(`resolved: ${response.coverage.resolutions.map((entry) => `${entry.path}:${entry.line} -> ${entry.startLine}-${entry.endLine} (${entry.kind})`).join('; ')}`)
     out.push(`merged: ${response.coverage.mergedSources.map((entry) => `${entry.path}:${entry.startLine}-${entry.endLine}`).join(', ')}`)
-    if (response.coverage.unresolved?.length) {
-      out.push(`unresolved: ${response.coverage.unresolved.map((entry) => `${entry.path}:${entry.line}`).join(', ')} (no supported syntax block contains these lines; request exact ranges with mode build)`)
-    }
+    const byReason = new Map<string, string[]>()
+    for (const entry of response.coverage.unresolved ?? []) byReason.set(entry.reason, [...(byReason.get(entry.reason) ?? []), `${entry.path}:${entry.line}`])
+    for (const [reason, anchors] of byReason) out.push(`unresolved: ${anchors.join(', ')} (${reason})`)
     out.push(`coverage: ${response.coverage.caveat}`)
   }
   for (const outline of response.trimmed?.outlines ?? []) out.push(...renderOutline('', [outline]).split('\n').slice(1))
@@ -665,6 +675,17 @@ export function renderPacket(response: PacketResponse, options: { fullCaveat?: b
 
 function displayRoot(root: string): string {
   try { return realpathSync(root) } catch { return resolvePath(root) }
+}
+
+/** A packet source that does not exist gets the indexed paths ending in its name,
+ * so the next request can name the file instead of searching for it. */
+export function withPathCandidates(message: string, navigation: Pick<RepositoryNavigation, 'pathCandidates'>): string {
+  const missing = /cannot inspect source (\S+): ENOENT/.exec(message)
+  if (!missing) return message
+  const name = missing[1].slice(missing[1].lastIndexOf('/') + 1)
+  const { paths, more } = navigation.pathCandidates(name)
+  if (!paths.length) return `${message}; no indexed path ends in ${name}`
+  return `${message}; indexed paths ending in ${name}: ${paths.join(', ')}${more ? ` (+${more} more)` : ''}`
 }
 
 function formatError(error: unknown): string {

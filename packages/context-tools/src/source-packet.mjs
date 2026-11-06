@@ -22,6 +22,9 @@ const MAX_TOTAL_BYTES = 8 * 1024 * 1024;
 // configuration or scripts.
 const SOURCE_EXTENSIONS = new Set(['ts', 'tsx', 'js', 'jsx', 'mts', 'cts', 'mjs', 'cjs', 'py', 'rs', 'go', 'java', 'kt', 'kts', 'swift', 'c', 'cc', 'cpp', 'cxx', 'h', 'hh', 'hpp', 'hxx', 'cs', 'rb', 'php', 'dart', 'md', 'json', 'jsonc', 'toml', 'yaml', 'yml', 'html', 'htm', 'css', 'scss', 'svelte', 'sh', 'bash', 'zsh']);
 const PLANNABLE_EXTENSIONS = new Set(['ts', 'tsx', 'js', 'jsx', 'mts', 'cts', 'mjs', 'cjs', 'rs', 'kt', 'kts']);
+// A plan anchor in a file with no syntax planner (Markdown, JSON, Python...) selects
+// the whole file up to this size; larger files are reported for a build range.
+const MAX_WHOLE_FILE_PLAN_BYTES = 16 * 1024;
 const GENERATED_DIRECTORIES = new Set(['node_modules', 'dist', 'build', 'coverage', 'out', 'vendor', 'target']);
 
 function assert(ok, message) { if (!ok) throw new Error(`worker-packet: ${message}`); }
@@ -317,7 +320,7 @@ function parsePlanSpec(text) {
     assert(source && typeof source === 'object' && !Array.isArray(source), 'source must be an object');
     assert(Object.keys(source).sort(compare).join(',') === 'line,path', 'planner source has unknown or missing fields');
     const path = validRelativePath(source.path, 'source path');
-    scriptKind(path);
+    assert(SOURCE_EXTENSIONS.has(path.slice(path.lastIndexOf('.') + 1).toLowerCase()), `source extension is unsupported: ${path}`);
     assert(Number.isSafeInteger(source.line) && source.line >= 1, `invalid anchor line for ${path}`);
     paths.add(path);
   }
@@ -359,9 +362,21 @@ function plannerCandidates(source) {
   visit(source);
   return candidates;
 }
+const OVERSIZED = /(source excerpts|packet) exceeds? \d+ bytes/;
+/** A file with no syntax planner as one candidate covering every line. */
+function wholeFileSource(text, byteLength, included = true) {
+  const starts = [0];
+  for (let i = 0; i < text.length; i++) if (text[i] === '\n') starts.push(i + 1);
+  const lines = text.endsWith('\n') ? starts.length - 1 : starts.length;
+  const candidates = byteLength <= MAX_WHOLE_FILE_PLAN_BYTES && lines > 0 ? [{ kind: 'file', start: 0, end: text.length, startLine: 1, endLine: lines }] : [];
+  return { text, end: text.length, getLineStarts: () => starts, wholeFile: { lines, oversized: byteLength > MAX_WHOLE_FILE_PLAN_BYTES, leftOut: !included },
+    getLineAndCharacterOfPosition: (pos) => ({ line: text.slice(0, pos).split('\n').length - 1 }), __packetCandidates: candidates };
+}
 function resolveAnchor(source, path, line) {
-  const lastLine = source.getLineAndCharacterOfPosition(source.end).line + 1;
+  const lastLine = source.wholeFile ? Math.max(1, source.wholeFile.lines) : source.getLineAndCharacterOfPosition(source.end).line + 1;
   assert(line <= lastLine, `anchor line exceeds source length: ${path} has ${lastLine} lines`);
+  assert(!source.wholeFile?.oversized, `${path} has no syntax planner and exceeds ${MAX_WHOLE_FILE_PLAN_BYTES} bytes; request an exact range with mode build instead`);
+  assert(!source.wholeFile?.leftOut, `${path} whole file left out of an oversized packet; request an exact range with mode build instead`);
   const containing = source.__packetCandidates.filter((candidate) => line >= candidate.startLine && line <= candidate.endLine);
   assert(containing.length > 0, `no supported syntax block contains ${path}:${line}; request an exact range with mode build instead`);
   containing.sort((a, b) => (a.end - a.start) - (b.end - b.start) || a.start - b.start || compare(a.kind, b.kind));
@@ -445,7 +460,10 @@ export async function planPacket({ root: rootInput, spec: specInput }) {
   return planPacketInline({ root: rootInput, spec: parsePlanSpec(strictText(planBytes, 'spec')) });
 }
 
-export async function planPacketInline({ root: rootInput, spec: specInput }) {
+/** `wholeFiles: false` leaves files with no syntax planner out (reported under
+ * `unresolved`); the planner retries that way itself when a whole file would
+ * push the packet over its size limit. */
+export async function planPacketInline({ root: rootInput, spec: specInput, wholeFiles = true }) {
   const specBytes = Buffer.from(serialize(specInput), 'utf8');
   assert(specBytes.byteLength <= MAX_SPEC_BYTES, `spec exceeds ${MAX_SPEC_BYTES} bytes`);
   const plan = parsePlanSpec(strictText(specBytes, 'spec'));
@@ -468,7 +486,10 @@ export async function planPacketInline({ root: rootInput, spec: specInput }) {
     const text = strictText(bytes, `source ${entry.path}`);
     assert(!/\r(?!\n)|[\u2028\u2029]/.test(text), `planner source has line separators unsupported by v1 packet lines: ${entry.path}`);
     let source;
-    if (syntaxLanguage(entry.path)) {
+    const ext = entry.path.slice(entry.path.lastIndexOf('.') + 1).toLowerCase();
+    if (!PLANNABLE_EXTENSIONS.has(ext)) {
+      source = wholeFileSource(text, bytes.byteLength, wholeFiles);
+    } else if (syntaxLanguage(entry.path)) {
       const syntax = await parseLanguageSyntax(entry.path, text);
       assert(!syntax.hasErrors, `source has parse errors: ${entry.path}`);
       const starts = [0];
@@ -493,9 +514,14 @@ export async function planPacketInline({ root: rootInput, spec: specInput }) {
     let selected;
     try { selected = resolveAnchor(file.source, entry.path, entry.line); }
     catch (error) {
-      if (!/no supported syntax block contains /.test(error.message)) throw error;
+      const tooLarge = /has no syntax planner and exceeds /.test(error.message);
+      const leftOut = /whole file left out of an oversized packet/.test(error.message);
+      if (!tooLarge && !leftOut && !/no supported syntax block contains /.test(error.message)) throw error;
       firstUnresolved ??= error;
-      unresolved.push({ requestIndex, path: entry.path, line: entry.line, reason: 'no supported syntax block contains this line; request an exact range with mode build' });
+      unresolved.push({ requestIndex, path: entry.path, line: entry.line, reason: tooLarge
+        ? `no syntax planner for this file type and it exceeds ${MAX_WHOLE_FILE_PLAN_BYTES} bytes; request an exact range with mode build`
+        : leftOut ? 'whole file left out because the packet would exceed its size limit; request an exact range with mode build'
+          : 'no supported syntax block contains this line; request an exact range with mode build' });
       continue;
     }
     resolutions.push({ requestIndex, path: entry.path, line: entry.line, kind: selected.kind, startLine: selected.startLine, endLine: selected.endLine });
@@ -505,7 +531,11 @@ export async function planPacketInline({ root: rootInput, spec: specInput }) {
   const resolvedSpec = parseSpec(serialize({ ...plan, sources: mergedSources }));
   let packet;
   try { packet = await buildPacketFromSpec({ root, spec: resolvedSpec }); }
-  catch (error) { throw new Error(`worker-packet: planner could not build selected syntax blocks: ${error.message.replace(/^worker-packet: /, '')}`); }
+  catch (error) {
+    // A whole non-code file must not cost the code blocks: drop whole files and retry once.
+    if (wholeFiles && OVERSIZED.test(error.message) && resolutions.some((entry) => entry.kind === 'file')) return planPacketInline({ root: rootInput, spec: specInput, wholeFiles: false });
+    throw new Error(`worker-packet: planner could not build selected syntax blocks: ${error.message.replace(/^worker-packet: /, '')}`);
+  }
   for (const source of packet.sources) assert(files.get(source.path)?.sha256 === source.sha256, `source changed during packet planning: ${source.path}`);
   assert(packet.gitHEAD === head, 'git HEAD changed during packet planning');
   assert(packet.rootIdentity.dev === rootInfo.identity.dev && packet.rootIdentity.ino === rootInfo.identity.ino, 'explicit root changed during packet planning');
@@ -516,7 +546,7 @@ export async function planPacketInline({ root: rootInput, spec: specInput }) {
   const finalPolicy = await NavigationPolicy.load(root);
   const finalManifest = await validatePolicy(root, planningSpec, finalPolicy);
   assert(serialize(initialManifest) === serialize(finalManifest), 'navigation policy changed during packet planning');
-  const coverage = { version: 1, trust: 'unsigned', packetSha256: hash(Buffer.from(serialize(packet), 'utf8')), requestedSources: plan.sources, resolutions, ...(unresolved.length ? { unresolved } : {}), mergedSources, caveat: 'Selections are complete syntactic units only. They provide no dependency closure, semantic sufficiency, or authority; the caller explicitly selects tests and dependencies.' };
+  const coverage = { version: 1, trust: 'unsigned', packetSha256: hash(Buffer.from(serialize(packet), 'utf8')), requestedSources: plan.sources, resolutions, ...(unresolved.length ? { unresolved } : {}), mergedSources, caveat: 'Selections are complete syntactic units, or whole files of types with no syntax planner. They provide no dependency closure, semantic sufficiency, or authority; the caller explicitly selects tests and dependencies.' };
   return { packet, coverage };
 }
 

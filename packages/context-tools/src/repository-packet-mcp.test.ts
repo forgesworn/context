@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { execFile } from 'node:child_process'
 import { createHash } from 'node:crypto'
-import { mkdtemp, realpath, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, realpath, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { promisify } from 'node:util'
@@ -75,13 +75,9 @@ describe('repository packet MCP adapter', () => {
       expect(packet.sources[0]).toMatchObject({ path: file, sha256: digest, startLine: 2, endLine: 2, text: '2: class EvidenceMarker {}' })
       expect(packet.allowedFiles[0]).toMatchObject({ path: file, state: 'present', sha256: digest })
       const planned = await call(connection.client, { mode: 'plan', expectedGeneration: generation, spec: fixtureSpec([{ path: file, line: 2 }]) })
-      if (file.endsWith('.kts')) {
-        expect(planned.isError).not.toBe(true)
-        expect(JSON.parse(text(planned)).packet.sources[0]).toMatchObject({ path: file, startLine: 2, endLine: 2 })
-      } else {
-        expect(planned.isError).toBe(true)
-        expect(text(planned)).toMatch(/planner source extension is unsupported/)
-      }
+      expect(planned.isError).not.toBe(true)
+      // Kotlin script has a syntax planner; the C-family files have none and come back whole.
+      expect(JSON.parse(text(planned)).packet.sources[0]).toMatchObject(file.endsWith('.kts') ? { path: file, startLine: 2, endLine: 2 } : { path: file, startLine: 1, endLine: 2 })
 
       const changed = '// fixture\nclass UpdatedEvidenceMarker {}\n'
       await writeFile(join(value, file), changed)
@@ -113,7 +109,7 @@ describe('repository packet MCP adapter', () => {
     } finally { await connection.close() }
   })
 
-  it('indexes Dart lexically: search and build packets return it, plan packets reject it', async () => {
+  it('indexes Dart lexically: search, build and plan packets return it (plan whole, no syntax planner)', async () => {
     const value = await root()
     await writeFile(join(value, 'sample.dart'), 'class DartMarker {}\n')
     const connection = await connect(value)
@@ -128,8 +124,54 @@ describe('repository packet MCP adapter', () => {
       expect(built.isError).not.toBe(true)
       expect(JSON.parse(text(built)).packet.sources[0].text).toBe('1: class DartMarker {}')
       const planned = await call(connection.client, { mode: 'plan', expectedGeneration, spec: fixtureSpec([{ path: 'sample.dart', line: 1 }]) })
-      expect(planned.isError).toBe(true)
-      expect(text(planned)).toMatch(/planner source extension is unsupported/)
+      expect(planned.isError).not.toBe(true)
+      expect(JSON.parse(text(planned)).packet.sources[0]).toMatchObject({ path: 'sample.dart', startLine: 1, endLine: 1, text: '1: class DartMarker {}' })
+      expect(JSON.parse(text(planned)).coverage.resolutions[0].kind).toBe('file')
+    } finally { await connection.close() }
+  })
+
+  it('answers the code blocks of an oversized plan without its whole non-code files, or outlines when nothing fits', async () => {
+    const value = await root()
+    const body = Array.from({ length: 600 }, (_, i) => `  // ${String(i).padStart(4, '0')} ${'x'.repeat(50)}`).join('\n')
+    await writeFile(join(value, 'big.ts'), `export function big() {\n${body}\n  return 1\n}\n`)
+    await writeFile(join(value, 'huge.ts'), `export function huge() {\n${body}\n${body}\n  return 1\n}\n`)
+    await writeFile(join(value, 'AGENTS.md'), Array.from({ length: 300 }, (_, i) => `rule ${i} ${'y'.repeat(30)}`).join('\n') + '\n')
+    const connection = await connect(value)
+    try {
+      const refreshed = await connection.client.callTool({ name: 'repository_refresh', arguments: {} })
+      const expectedGeneration = JSON.parse(text(refreshed)).generation
+      const planned = await connection.client.callTool({ name: 'repository_packet', arguments: { mode: 'plan', expectedGeneration, spec: { sources: [{ path: 'AGENTS.md', line: 1 }, { path: 'big.ts', line: 2 }] } } }) as { isError?: boolean; content?: unknown }
+      expect(planned.isError, text(planned).slice(0, 300)).not.toBe(true)
+      expect(text(planned)).toContain('source big.ts:1-603')
+      expect(text(planned)).not.toContain('source AGENTS.md')
+      expect(text(planned)).toContain('unresolved: AGENTS.md:1 (whole file left out because the packet would exceed its size limit; request an exact range with mode build)')
+      const outlined = await connection.client.callTool({ name: 'repository_packet', arguments: { mode: 'plan', expectedGeneration, spec: { sources: [{ path: 'huge.ts', line: 2 }] } } }) as { isError?: boolean; content?: unknown }
+      expect(outlined.isError).toBe(true)
+      expect(text(outlined)).toMatch(/exceed.*Nothing was fetched/s)
+      expect(text(outlined)).toContain('outline huge.ts')
+    } finally { await connection.close() }
+  })
+
+  it('names the indexed paths ending in a missing source file, in build and plan mode', async () => {
+    const value = await root()
+    await mkdir(join(value, 'src/utils/internal'), { recursive: true })
+    await writeFile(join(value, 'src/utils/session.ts'), 'export function a() {\n  return 1\n}\n')
+    await writeFile(join(value, 'src/utils/internal/session.ts'), 'export function b() {\n  return 2\n}\n')
+    const connection = await connect(value)
+    try {
+      const refreshed = await connection.client.callTool({ name: 'repository_refresh', arguments: {} })
+      const expectedGeneration = JSON.parse(text(refreshed)).generation
+      const files = ['src/utils/session.ts', 'src/utils/internal/session.ts']
+      for (const request of [
+        { mode: 'plan', spec: { ...spec([{ path: 'session.ts', line: 1 }]), allowedFiles: files } },
+        { mode: 'build', spec: { ...spec([{ path: 'src/session.ts', startLine: 1, endLine: 2 }]), allowedFiles: files } },
+      ]) {
+        const result = await call(connection.client, { ...request, expectedGeneration })
+        expect(result.isError).toBe(true)
+        expect(text(result)).toMatch(/ENOENT; indexed paths ending in session\.ts: src\/utils\/internal\/session\.ts, src\/utils\/session\.ts$/)
+      }
+      const none = await call(connection.client, { mode: 'plan', expectedGeneration, spec: { ...spec([{ path: 'absent.ts', line: 1 }]), allowedFiles: files } })
+      expect(text(none)).toMatch(/ENOENT; no indexed path ends in absent\.ts$/)
     } finally { await connection.close() }
   })
 
@@ -353,9 +395,26 @@ describe('repository packet MCP adapter', () => {
       expect(body.coverage.resolutions.map((entry) => `${entry.path}:${entry.line}`)).toEqual(['beta.ts:3', 'alpha.ts:2'])
       expect(body.coverage.unresolved).toEqual([{ requestIndex: 0, path: 'beta.ts', line: 1, reason: 'no supported syntax block contains this line; request an exact range with mode build' }])
       const plain = await connection.client.callTool({ name: 'repository_packet', arguments: { mode: 'plan', spec: { sources }, expectedGeneration: generation } }) as { isError?: boolean; content?: unknown }
-      expect(text(plain)).toContain('unresolved: beta.ts:1 (no supported syntax block contains these lines; request exact ranges with mode build)')
+      expect(text(plain)).toContain('unresolved: beta.ts:1 (no supported syntax block contains this line; request an exact range with mode build)')
       const all = await call(connection.client, { mode: 'plan', spec: { sources: [{ path: 'beta.ts', line: 1 }] }, expectedGeneration: generation })
       expect(all.isError).toBe(true)
+    } finally { await connection.close() }
+  })
+
+  it('plans a small non-code file whole next to code blocks and names an oversized one with its own reason', async () => {
+    const value = await root()
+    await writeFile(join(value, 'AGENTS.md'), '# Rules\n\nRun the tests.\n')
+    await writeFile(join(value, 'big.json'), JSON.stringify({ rows: 'x'.repeat(17 * 1024) }) + '\n')
+    const connection = await connect(value)
+    try {
+      const refreshed = await connection.client.callTool({ name: 'repository_refresh', arguments: {} })
+      const expectedGeneration = JSON.parse(text(refreshed)).generation
+      const sources = [{ path: 'AGENTS.md', line: 3 }, { path: 'alpha.ts', line: 2 }, { path: 'big.json', line: 1 }]
+      const planned = await connection.client.callTool({ name: 'repository_packet', arguments: { mode: 'plan', spec: { sources }, expectedGeneration } }) as { isError?: boolean; content?: unknown }
+      expect(planned.isError, text(planned)).not.toBe(true)
+      expect(text(planned)).toContain('source AGENTS.md:1-3')
+      expect(text(planned)).toContain('resolved: AGENTS.md:3 -> 1-3 (file); alpha.ts:2 -> 1-3 (function)')
+      expect(text(planned)).toContain('unresolved: big.json:1 (no syntax planner for this file type and it exceeds 16384 bytes; request an exact range with mode build)')
     } finally { await connection.close() }
   })
 })
