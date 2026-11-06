@@ -37,6 +37,10 @@ export function schemaErrors(task, acc) {
   return errors
 }
 
+/** Protocol v2 scope: {"allowedPaths": [non-empty glob, ...]}. */
+export const scopeValid = acc => !!acc && typeof acc.scope === 'object' && acc.scope !== null && !Array.isArray(acc.scope) &&
+  Array.isArray(acc.scope.allowedPaths) && acc.scope.allowedPaths.every(g => typeof g === 'string' && g.length > 0)
+
 /** Is every required range inside some returned source range? Ranges past end of
  * file count as covered up to the file's last line, reported separately. */
 export function coverage(required, returned, fileLines = {}) {
@@ -74,7 +78,7 @@ function freeze({ tasks, accDir, repos, out }) {
   mkdirSync(join(out, 'archives'), { recursive: true }); mkdirSync(join(out, 'work'), { recursive: true })
   for (const { task, acc, schema } of load(tasks, accDir)) {
     const repo = join(repos, task.repository)
-    const row = { id: task.id, class: task.class, schemaErrors: schema.length }
+    const row = { id: task.id, class: task.class, schemaErrors: schema.length, scopeValid: scopeValid(acc) }
     const d = { id: task.id, schema }
     detail.push(d); summary.push(row)
     const archive = join(out, 'archives', `${task.id}.tar`)
@@ -140,7 +144,7 @@ async function packets({ tasks, accDir, repos, out, node, cli, maxBytes }) {
   const summary = [], detail = []
   mkdirSync(join(out, 'work'), { recursive: true })
   for (const { task, acc, schema } of load(tasks, accDir)) {
-    const row = { id: task.id, class: task.class, schemaErrors: schema.length }
+    const row = { id: task.id, class: task.class, schemaErrors: schema.length, scopeValid: scopeValid(acc) }
     summary.push(row)
     if (schema.length) continue
     const repo = join(repos, task.repository)

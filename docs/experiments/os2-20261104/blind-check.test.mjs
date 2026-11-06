@@ -5,7 +5,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { coverage, schemaErrors } from './blind-check.mjs'
+import { coverage, schemaErrors, scopeValid } from './blind-check.mjs'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const CLI = process.env.OS2_CONTEXT_CLI
@@ -18,6 +18,13 @@ test('schema errors name the broken fields only', () => {
   assert.deepEqual(schemaErrors(task, { ...ok, checker: { command: ' ', testFiles: [] } }), ['checker.command', 'checker.testFiles'])
   assert.deepEqual(schemaErrors({ id: 't', class: 'orientation' }, { ...ok, sourceChange: null, checker: {} }), [])
   assert.equal(schemaErrors(task, null).length, 6)
+})
+
+test('scope must be the version 2 allowedPaths shape', () => {
+  assert.equal(scopeValid({ scope: { allowedPaths: ['src/*', 'test/a.ts'] } }), true)
+  assert.equal(scopeValid({ scope: { allowedPaths: [] } }), true)
+  for (const bad of [{ scope: 'src only' }, { scope: { allowedPaths: [''] } }, { scope: { allowedPaths: 'src/*' } }, { scope: null }, {}, null])
+    assert.equal(scopeValid(bad), false, JSON.stringify(bad))
 })
 
 test('coverage needs a returned range containing each required range, capped at end of file', () => {
