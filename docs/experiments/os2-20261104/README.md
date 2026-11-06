@@ -706,6 +706,38 @@ Findings:
   blocks for a line) was never used. About three quarters of packet lines were
   not near anything the agent later cited or changed.
 
+### Diagnostic: Context instruction variant (2026-11-06)
+
+Outside the protocol. [`diag-instruction.py`](diag-instruction.py) runs the
+unchanged harness (lock hashes intact) with only the Context instruction
+replaced: put related searches, explores and packet sources in one script, and
+for TS/JS prefer `plan` with line anchors over wide `build` ranges (309
+characters against plain's 184). Plain unchanged. h3-qualification, Context
+0.31.0, one pair, both reviewers.
+
+| | Context (variant) | Context (0.31.0 requalification) | Plain (this pair) | Plain (0.31.0 requalification) |
+| --- | --- | --- | --- | --- |
+| Executor tokens | 1,052,766 | 1,009,865 | 1,118,833 | 568,547 |
+| Model calls | 19 | 23 | 23 | 16 |
+| MCP calls (errors) | 44 (3) | 13 (0) | - | - |
+| Navigation + packet KB | 81 + 89 | 14 + 90 | - | - |
+| Packet lines (near a cited or changed line) | 834 (42%) | 1,739 (24%) | - | - |
+
+The ratio this pair is 0.94, but Context's own total barely moved (1.01M to
+1.05M) while plain doubled (569k to 1.12M): the ratio change is plain's
+run-to-run variance, not the instruction. What the instruction did change:
+fewer model calls (19 against 23), `plan` for most packets, half the packet
+lines with more of them near what was used, and much more navigation output
+(many batched searches and explores). Both arms were accepted; on plain the
+Codex second reviewer rejected where Claude accepted, the first disagreement
+recorded.
+
+The three MCP errors were all `plan` requests failing as a whole because one
+anchor was outside any supported syntax block (an import on line 1, top-level
+test-file lines); one batched request of 30 anchors failed on a single one.
+That is a Context defect to fix: a plan request should answer the anchors it
+can and report the rest.
+
 ### Independent protocol review (paid, needs approval)
 
 A fresh Sol/high session reviews the frozen protocol, harness diff and phase 1
