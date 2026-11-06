@@ -1,5 +1,5 @@
 // Replay the recorded pre-edit plan requests from OS2 Context cells through the
-// released planner (0.32.0) and the PR 2 planner, against h3 at the task base.
+// two builds of the planner (OLD and NEW source-packet.mjs), against h3 at the task base.
 // Model-free. Reports errors, returned line ranges and whether each later
 // build request's lines were already in an earlier plan response.
 //   node plan-replay.mjs ROOT OLD_SOURCE_PACKET NEW_SOURCE_PACKET CELL.jsonl...
