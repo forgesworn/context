@@ -1,0 +1,406 @@
+{
+  "ranAt": "2026-11-04",
+  "script": "blind-check.mjs",
+  "note": "Counts and pass/fail only; details stay private.",
+  "freeze": {
+    "host": "M4, clean install at each base commit, tests with outbound network denied",
+    "tasks": [
+      {
+        "id": "bray-code-change",
+        "class": "code-change",
+        "schemaErrors": 0,
+        "archiveSha256": "0c2eb4074f06485279c459c6d3e251d0d7f842cbbb909ef1e532c3598ad9609a",
+        "evidenceValidAtBase": "4/4",
+        "dependencyPathsAtBase": "3/3",
+        "authorSetupExit": 0,
+        "failsAtBase": true,
+        "reinstalled": false,
+        "passesWithChange": true,
+        "checkerDiscriminates": true
+      },
+      {
+        "id": "bray-diagnosis",
+        "class": "diagnosis",
+        "schemaErrors": 0,
+        "archiveSha256": "d96a5b347dfdf7ad3d39d9c5c08089c02663077b9021d642b1b2d97b2f9977a4",
+        "evidenceValidAtBase": "1/1",
+        "dependencyPathsAtBase": "1/1",
+        "authorSetupExit": 0,
+        "failsAtBase": true,
+        "reinstalled": false,
+        "passesWithChange": true,
+        "checkerDiscriminates": true
+      },
+      {
+        "id": "bray-impact",
+        "class": "impact",
+        "schemaErrors": 0,
+        "archiveSha256": "f857a195c2f5d5916ff440f333861c7e43ef5ee04e6550466ce8e9633e6fb0bf",
+        "evidenceValidAtBase": "9/9",
+        "dependencyPathsAtBase": "10/10"
+      },
+      {
+        "id": "bray-orientation",
+        "class": "orientation",
+        "schemaErrors": 0,
+        "archiveSha256": "c58c5388d935ce1811fe594381762db312d82927a68b12eebac54137b9d57f81",
+        "evidenceValidAtBase": "10/10",
+        "dependencyPathsAtBase": "5/5"
+      },
+      {
+        "id": "h3-code-change",
+        "class": "code-change",
+        "schemaErrors": 0,
+        "archiveSha256": "39421ead7b38ed1f9019ce2316c0d3fd024cd9ccdd95065b2dd2d8ef2f0c58d4",
+        "evidenceValidAtBase": "4/4",
+        "dependencyPathsAtBase": "3/3",
+        "authorSetupExit": 0,
+        "failsAtBase": true,
+        "reinstalled": false,
+        "passesWithChange": true,
+        "checkerDiscriminates": true
+      },
+      {
+        "id": "h3-diagnosis",
+        "class": "diagnosis",
+        "schemaErrors": 0,
+        "archiveSha256": "55d7e37f2a1b8388cc6bc32753b20a306ab4427d861097fce7e9aa8c9d5161e7",
+        "evidenceValidAtBase": "3/3",
+        "dependencyPathsAtBase": "1/1",
+        "authorSetupExit": 0,
+        "failsAtBase": true,
+        "reinstalled": false,
+        "passesWithChange": true,
+        "checkerDiscriminates": true
+      },
+      {
+        "id": "h3-impact",
+        "class": "impact",
+        "schemaErrors": 0,
+        "archiveSha256": "d272041ed3db5c73507c67707e208d3d0a9c24952857a99f5f7ac0abec5a2440",
+        "evidenceValidAtBase": "6/6",
+        "dependencyPathsAtBase": "5/5"
+      },
+      {
+        "id": "h3-orientation",
+        "class": "orientation",
+        "schemaErrors": 0,
+        "archiveSha256": "273a52bba9990ffae6da92327340b94a40cf20b50038c8d4e9c2e39efc5351be",
+        "evidenceValidAtBase": "13/13",
+        "dependencyPathsAtBase": "6/6"
+      }
+    ]
+  },
+  "packets": {
+    "host": "owner Mac, Context 0.26.0 connect, one build packet per task, maxBytes 65536, JSON format",
+    "tasks": [
+      {
+        "id": "bray-code-change",
+        "class": "code-change",
+        "schemaErrors": 0,
+        "ranges": 4,
+        "covered": 4,
+        "pastEnd": 0,
+        "packetBytes": 9228,
+        "failure": null,
+        "singles": null,
+        "sufficient": true
+      },
+      {
+        "id": "bray-diagnosis",
+        "class": "diagnosis",
+        "schemaErrors": 0,
+        "ranges": 1,
+        "covered": 1,
+        "pastEnd": 0,
+        "packetBytes": 4211,
+        "failure": null,
+        "singles": null,
+        "sufficient": true
+      },
+      {
+        "id": "bray-impact",
+        "class": "impact",
+        "schemaErrors": 0,
+        "ranges": 9,
+        "covered": 9,
+        "pastEnd": 0,
+        "packetBytes": 28370,
+        "failure": null,
+        "singles": null,
+        "sufficient": true
+      },
+      {
+        "id": "bray-orientation",
+        "class": "orientation",
+        "schemaErrors": 0,
+        "ranges": 10,
+        "covered": 10,
+        "pastEnd": 0,
+        "packetBytes": 27192,
+        "failure": null,
+        "singles": null,
+        "sufficient": true
+      },
+      {
+        "id": "h3-code-change",
+        "class": "code-change",
+        "schemaErrors": 0,
+        "ranges": 4,
+        "covered": 4,
+        "pastEnd": 0,
+        "packetBytes": 5332,
+        "failure": null,
+        "singles": null,
+        "sufficient": true
+      },
+      {
+        "id": "h3-diagnosis",
+        "class": "diagnosis",
+        "schemaErrors": 0,
+        "ranges": 3,
+        "covered": 3,
+        "pastEnd": 0,
+        "packetBytes": 7160,
+        "failure": null,
+        "singles": null,
+        "sufficient": true
+      },
+      {
+        "id": "h3-impact",
+        "class": "impact",
+        "schemaErrors": 0,
+        "ranges": 6,
+        "covered": 6,
+        "pastEnd": 0,
+        "packetBytes": 7556,
+        "failure": null,
+        "singles": null,
+        "sufficient": true
+      },
+      {
+        "id": "h3-orientation",
+        "class": "orientation",
+        "schemaErrors": 0,
+        "ranges": 13,
+        "covered": 13,
+        "pastEnd": 0,
+        "packetBytes": 36131,
+        "failure": null,
+        "singles": null,
+        "sufficient": true
+      }
+    ]
+  },
+  "replacement20261106": {
+    "ranAt": "2026-11-06",
+    "scripts": [
+      "exclusion-check.py",
+      "blind-check.mjs"
+    ],
+    "note": "Counts and pass/fail only; details stay private.",
+    "exclusions": {
+      "newTasks": 5,
+      "allClean": true,
+      "note": "no reused sourceChange or baseCommit; no new path in any existing dependency set or kept required evidence (repository-qualified); no dependency path shared between new tasks; scope in the v2 shape"
+    },
+    "freeze": {
+      "host": "M4, clean install at each base commit, tests with outbound network denied except localhost",
+      "tasks": [
+        {
+          "id": "bray-diagnosis",
+          "class": "diagnosis",
+          "schemaErrors": 0,
+          "scopeValid": true,
+          "archiveSha256": "46a1f10f39f678a14954c8e4342bdd865bf9ef5b32fdece8e14769d087fb2e25",
+          "evidenceValidAtBase": "2/2",
+          "dependencyPathsAtBase": "2/2",
+          "authorSetupExit": 0,
+          "failsAtBase": true,
+          "reinstalled": false,
+          "passesWithChange": true,
+          "checkerDiscriminates": true
+        },
+        {
+          "id": "bray-impact",
+          "class": "impact",
+          "schemaErrors": 0,
+          "scopeValid": true,
+          "archiveSha256": "b82fefa16bb20c8b28df795c272cc095aaa95adc10e9708d28597d68e0a04858",
+          "evidenceValidAtBase": "9/9",
+          "dependencyPathsAtBase": "16/16"
+        },
+        {
+          "id": "h3-code-change",
+          "class": "code-change",
+          "schemaErrors": 0,
+          "scopeValid": true,
+          "archiveSha256": "258beccee06dd217611a296031a32ef3c640d9c8acef7417df71f2d5c4bf1d2a",
+          "evidenceValidAtBase": "3/3",
+          "dependencyPathsAtBase": "1/1",
+          "authorSetupExit": 0,
+          "failsAtBase": true,
+          "reinstalled": false,
+          "passesWithChange": true,
+          "checkerDiscriminates": true
+        },
+        {
+          "id": "h3-diagnosis",
+          "class": "diagnosis",
+          "schemaErrors": 0,
+          "scopeValid": true,
+          "archiveSha256": "2fe97378fd1fc761459c7281437abc8f83c08aa79bf9356a8c85417b3aeb0850",
+          "evidenceValidAtBase": "2/2",
+          "dependencyPathsAtBase": "1/1",
+          "authorSetupExit": 0,
+          "failsAtBase": true,
+          "reinstalled": false,
+          "passesWithChange": true,
+          "checkerDiscriminates": true
+        },
+        {
+          "id": "h3-qualification",
+          "class": "code-change",
+          "schemaErrors": 0,
+          "scopeValid": true,
+          "archiveSha256": "6f6e34e2f6254a9b90b0e5c1c0edeb6f2f736805066cb0c9e999639627d77e9c",
+          "evidenceValidAtBase": "5/5",
+          "dependencyPathsAtBase": "3/3",
+          "authorSetupExit": 0,
+          "failsAtBase": true,
+          "reinstalled": false,
+          "passesWithChange": true,
+          "checkerDiscriminates": true
+        }
+      ]
+    },
+    "packets": {
+      "context": "0.29.0 (6cd0ce2) connect, one build packet per task, 64 KiB budget",
+      "tasks": [
+        {
+          "id": "bray-diagnosis",
+          "class": "diagnosis",
+          "schemaErrors": 0,
+          "scopeValid": true,
+          "ranges": 2,
+          "covered": 2,
+          "pastEnd": 0,
+          "packetBytes": 7651,
+          "failure": null,
+          "singles": null,
+          "sufficient": true
+        },
+        {
+          "id": "bray-impact",
+          "class": "impact",
+          "schemaErrors": 0,
+          "scopeValid": true,
+          "ranges": 9,
+          "covered": 9,
+          "pastEnd": 0,
+          "packetBytes": 36627,
+          "failure": null,
+          "singles": null,
+          "sufficient": true
+        },
+        {
+          "id": "h3-code-change",
+          "class": "code-change",
+          "schemaErrors": 0,
+          "scopeValid": true,
+          "ranges": 3,
+          "covered": 3,
+          "pastEnd": 0,
+          "packetBytes": 5807,
+          "failure": null,
+          "singles": null,
+          "sufficient": true
+        },
+        {
+          "id": "h3-diagnosis",
+          "class": "diagnosis",
+          "schemaErrors": 0,
+          "scopeValid": true,
+          "ranges": 2,
+          "covered": 2,
+          "pastEnd": 0,
+          "packetBytes": 5254,
+          "failure": null,
+          "singles": null,
+          "sufficient": true
+        },
+        {
+          "id": "h3-qualification",
+          "class": "code-change",
+          "schemaErrors": 0,
+          "scopeValid": true,
+          "ranges": 5,
+          "covered": 5,
+          "pastEnd": 0,
+          "packetBytes": 12304,
+          "failure": null,
+          "singles": null,
+          "sufficient": true
+        }
+      ]
+    }
+  },
+  "brayRewrite20261106": {
+    "ranAt": "2026-11-06",
+    "note": "Counts and pass/fail only; details stay private.",
+    "exclusions": "final pack: five new tasks against the kept four and the retired four, all clean (repository-qualified paths); new bray-impact shares no path with the retired bray-impact, any current or retired task or the second rejected bray-impact; it shares two with the first rejected bray-diagnosis, which never entered the pack",
+    "freeze": [
+      {
+        "id": "bray-diagnosis",
+        "class": "diagnosis",
+        "schemaErrors": 0,
+        "scopeValid": true,
+        "archiveSha256": "1b7f919d6bf2618ca4426c3de1b3169b1c7f7d5ff68278eb9809da632f750e72",
+        "evidenceValidAtBase": "3/3",
+        "dependencyPathsAtBase": "1/1",
+        "authorSetupExit": 0,
+        "failsAtBase": true,
+        "reinstalled": false,
+        "passesWithChange": true,
+        "checkerDiscriminates": true
+      },
+      {
+        "id": "bray-impact",
+        "class": "impact",
+        "schemaErrors": 0,
+        "scopeValid": true,
+        "archiveSha256": "911a0d4658d2c9e94a10dc5042aab06c8f0064432e1c541e09ff066b2962c36e",
+        "evidenceValidAtBase": "5/5",
+        "dependencyPathsAtBase": "6/6"
+      }
+    ],
+    "packets": [
+      {
+        "id": "bray-diagnosis",
+        "class": "diagnosis",
+        "schemaErrors": 0,
+        "scopeValid": true,
+        "ranges": 3,
+        "covered": 3,
+        "pastEnd": 0,
+        "packetBytes": 4952,
+        "failure": null,
+        "singles": null,
+        "sufficient": true
+      },
+      {
+        "id": "bray-impact",
+        "class": "impact",
+        "schemaErrors": 0,
+        "scopeValid": true,
+        "ranges": 5,
+        "covered": 5,
+        "pastEnd": 0,
+        "packetBytes": 13093,
+        "failure": null,
+        "singles": null,
+        "sufficient": true
+      }
+    ]
+  }
+}

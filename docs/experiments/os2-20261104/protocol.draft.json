@@ -1,0 +1,977 @@
+{
+  "version": 2,
+  "status": "draft-v2-unlocked",
+  "experimentId": "os2-codex-sol-high-context-0.26.0",
+  "draftedAt": "2026-11-04",
+  "lockedAt": null,
+  "lockRule": "Set lockedAt and the hashes below only after owner approval, a passed phase 1 and an accepted independent protocol review, and before any phase 2 cell. Any change after lock is a new version; earlier versions and their results are retained.",
+  "purpose": "OS2: whether Context gives better accepted outcomes at lower complete model token cost than a competent ordinary workflow (and optionally Graphify) with the same frontier model in every arm.",
+  "buildUnderTest": {
+    "version": "0.31.0",
+    "commit": "69d5f03f6b6df48aecac1a8d19d96fb3701c4ea4",
+    "artifacts": {
+      "forgesworn-context-0.31.0.tgz": "54765e5b616076bd594413de60fb573973dc2fbbb4a963aa0a61006c21fda040",
+      "forgesworn-context-tools-0.31.0.tgz": "3c9a261d9df8b840d56bbc126517d58e505464039b5c0100d11156978d357676"
+    },
+    "repinRule": "A fix found later ships as its own release; this block is repinned and the protocol requalified before lock."
+  },
+  "taskPack": {
+    "status": "authored and frozen 2026-11-04; four tasks replaced and frozen 2026-11-06 (archives hashed; checkers verified from clean installs)",
+    "shape": "Eight tasks: four on bray and four on h3; per repository one orientation, impact, diagnosis and code-change task.",
+    "repositories": {
+      "forgesworn": {
+        "name": "forgesworn/bray",
+        "licence": "MIT",
+        "headChecked": "8d6713d8d68b3cecfc42630642ab4fada67968a6",
+        "install": "npm ci && npm run build",
+        "test": "vitest run",
+        "taskCommits": "per task, at freeze"
+      },
+      "external": {
+        "name": "h3js/h3",
+        "licence": "MIT",
+        "headChecked": "f0e17808ac2439b6434bb10609a961067f4d555b",
+        "install": "pnpm install --frozen-lockfile (pnpm 12.3.4 via packageManager)",
+        "test": "vitest --run (not the package test script, which adds lint and typecheck)",
+        "taskCommits": "per task, at freeze"
+      }
+    },
+    "excluded": "The eight d5-20260921 tasks are not reused: both repositories are ForgeSworn and the 0.4.0 fixes were found on that set.",
+    "hiddenAcceptance": "Required evidence, dependency set, checker and scope rules per task. Mined tasks take them from the merged change; the blind Claude session writes the rest and vets all. Hashes recorded here at lock; unread by the tool side, including the owner, until results are recorded.",
+    "hiddenAcceptanceSha256": {
+      "bray-orientation": "4180087923ef2ed393f56b7733f3021bc36688eee55b511f1e73053e54586f47",
+      "bray-impact": "61fe54afed0adedc7adcb07cdca60b6678b62ab3f533cc78124db1bde48589b7",
+      "bray-diagnosis": "28f2ccb1aaf240d8b796428770910aa8e50dbae784844543842c3d1f5d9d5ce1",
+      "bray-code-change": "8bad9d70781445492383b5a76cc91ff9f31e55879ac056da137823597e0d13dc",
+      "h3-orientation": "0d4ce81f11ad9eb22385ca4a40352f5886558e127c6e9b26611b17d30d26472e",
+      "h3-impact": "994ccdc36cfd45b5571ac27859a21166f95a5fedf0d64b75d051a174564ca20a",
+      "h3-diagnosis": "35b88bef3e2c5d5b1e0d1a7b3b60a519aad122abf0d11bd0a3320bf3b033032c",
+      "h3-code-change": "308cc5d80826f7051868557cc948df45596ac4cb58b68a519b476d965874d779"
+    },
+    "source": {
+      "impactAndCodeChange": "Merged first-parent changes selected by history-candidates.mjs, which prints counts only. The pool is rebuildable from public history; the blind author's picks and the private acceptance files are what stay hidden.",
+      "candidateCounts": {
+        "since": "2025-01-01",
+        "bray": {
+          "scanned": 512,
+          "eligible": 79,
+          "since20260701": 14
+        },
+        "h3": {
+          "scanned": 732,
+          "eligible": 99,
+          "since20260701": 43
+        }
+      },
+      "preference": "Most recent eligible changes first, to reduce memorisation.",
+      "orientationAndDiagnosis": "Written by the blind Claude session, which also vets mined tasks."
+    },
+    "offlineCheck": {
+      "host": "M4, macOS sandbox-exec denying outbound network except localhost and Unix sockets; profile verified to block outbound HTTPS and allow loopback first",
+      "bray": "119 files, 1852 tests passed",
+      "h3": "72 files passed, 1 skipped; 3112 tests passed, 69 skipped",
+      "note": "Rechecked for each task commit at freeze."
+    },
+    "tasks": "tasks/*.json (public statements); tasks/manifest.json (hashes)",
+    "author": {
+      "session": "Claude Code 2.1.318 headless, claude-opus-5-5, plan-billed",
+      "isolation": "CLAUDE_CODE_DISABLE_CLAUDE_MDS=1, CLAUDE_CODE_DISABLE_AUTO_MEMORY=1, --setting-sources project, --disable-slash-commands, empty strict MCP config, web/agent tools disallowed; sandbox via --settings denying all outbound domains and writes outside its folder; git remotes removed from the repository copies",
+      "checks": "A test session reported no user or project instructions; the brief's first step confirmed outbound HTTPS denied (403 from the sandbox proxy) and a write outside its folder refused",
+      "attempts": "Two Opus attempts stopped at that first step because network was open (project settings ignored in an untrusted folder); three one-turn Haiku probes found the working network setting; one Opus and two earlier Opus test turns checked instruction loading",
+      "run": {
+        "turns": 70,
+        "seconds": 626,
+        "inputTokens": 136,
+        "cacheReadInputTokens": 8148952,
+        "cacheCreationInputTokens": 203440,
+        "outputTokens": 50328,
+        "thinkingTokens": 14178,
+        "apiRateEquivalentUSD": 4.26
+      },
+      "leak": "The author's final reply, despite the brief, gave partial hints about the hidden answers for bray-impact and bray-diagnosis and said the two h3 code tasks touch one shared source file. The tool side has seen those hints; the protocol review decides whether to replace those tasks.",
+      "openPoints": [
+        "Checkers were verified against HEAD node_modules, not clean installs at each base commit",
+        "Orientation rubric line ranges were read by hand; reviewers allow small offsets"
+      ]
+    },
+    "archives": {
+      "bray-code-change": "0c2eb4074f06485279c459c6d3e251d0d7f842cbbb909ef1e532c3598ad9609a",
+      "bray-diagnosis": "1b7f919d6bf2618ca4426c3de1b3169b1c7f7d5ff68278eb9809da632f750e72",
+      "bray-impact": "911a0d4658d2c9e94a10dc5042aab06c8f0064432e1c541e09ff066b2962c36e",
+      "bray-orientation": "c58c5388d935ce1811fe594381762db312d82927a68b12eebac54137b9d57f81",
+      "h3-code-change": "258beccee06dd217611a296031a32ef3c640d9c8acef7417df71f2d5c4bf1d2a",
+      "h3-diagnosis": "2fe97378fd1fc761459c7281437abc8f83c08aa79bf9356a8c85417b3aeb0850",
+      "h3-impact": "d272041ed3db5c73507c67707e208d3d0a9c24952857a99f5f7ac0abec5a2440",
+      "h3-orientation": "273a52bba9990ffae6da92327340b94a40cf20b50038c8d4e9c2e39efc5351be"
+    },
+    "knownLimit": "same model family as the executor and one review per outcome until the different-family reviewer and agreement sample are built (paid design step); results are limited to this eight-task pack",
+    "qualificationTask": {
+      "id": "h3-qualification",
+      "class": "code-change",
+      "statement": "tasks-qualification/h3-qualification.json",
+      "acceptanceSha256": "3aacc1d09e098c2edb2b23f73fbc34e28483db5bcc17c8ad3215dddb385c7dca",
+      "archiveSha256": "6f6e34e2f6254a9b90b0e5c1c0edeb6f2f736805066cb0c9e999639627d77e9c",
+      "use": "requalification only; never a phase 2 cell"
+    },
+    "replacement": {
+      "at": "2026-11-06",
+      "replaced": [
+        "bray-impact",
+        "bray-diagnosis",
+        "h3-diagnosis",
+        "h3-code-change"
+      ],
+      "kept": [
+        "bray-orientation",
+        "bray-code-change",
+        "h3-orientation",
+        "h3-impact"
+      ],
+      "retiredAcceptanceSha256": {
+        "bray-impact": "add0d44847a09daec309ef52418527fc6f80af0467f68a3d03d453dd7a21a6e6",
+        "bray-diagnosis": "a2ae70e50255eaf374bf204728407a987ccb1d4c080000b285b2d2aa735df640",
+        "h3-diagnosis": "6a5ea3f5076c89390e4f8df72bf5b64e68dc4d951dc353c8f6694f524cfec81f",
+        "h3-code-change": "49ce8377eac7d544a1eb3f9d99210d1f150ffabb87ced62b6c7a83cbd4c49135"
+      },
+      "retiredArchives": {
+        "bray-impact": "f857a195c2f5d5916ff440f333861c7e43ef5ee04e6550466ce8e9633e6fb0bf",
+        "bray-diagnosis": "d96a5b347dfdf7ad3d39d9c5c08089c02663077b9021d642b1b2d97b2f9977a4",
+        "h3-diagnosis": "55d7e37f2a1b8388cc6bc32753b20a306ab4427d861097fce7e9aa8c9d5161e7",
+        "h3-code-change": "39421ead7b38ed1f9019ce2316c0d3fd024cd9ccdd95065b2dd2d8ef2f0c58d4"
+      },
+      "custodian": {
+        "session": "Claude Code 2.1.318 headless, claude-opus-5-5, plan-billed",
+        "isolation": "as the 4 Nov author: CLAUDE_CODE_DISABLE_CLAUDE_MDS=1, auto-memory off, project settings only, slash commands off, empty strict MCP config, web and agent tools disallowed, --settings sandbox denying every domain and writes outside its folder; git remotes removed; existing acceptance files supplied in its folder for the overlap rules",
+        "step0": "outbound HTTPS refused (403 from the sandbox proxy) and a write outside its folder refused",
+        "reply": "fixed JSON shape (ids, classes, commits, hashes, exclusionsMet, rejected count) checked by a guard script that prints nothing else; valid; every hash matched its file",
+        "run": {
+          "turns": 54,
+          "seconds": 628,
+          "inputTokens": 106,
+          "cacheReadInputTokens": 3749365,
+          "cacheCreationInputTokens": 132488,
+          "outputTokens": 41319,
+          "apiRateEquivalentUSD": 2.64
+        },
+        "rejectedCandidates": 173
+      },
+      "checks": "exclusion-check.py all clean (first run gave a false positive across repositories; fixed to repository-qualified paths); blind-check freeze: all four checker tasks fail at base and pass with the change, no reinstall; packets: every task sufficient in one 0.29.0 packet",
+      "openPoints": []
+    },
+    "followUp": {
+      "at": "2026-11-06",
+      "session": "Claude Code 2.1.318 headless, claude-opus-5-5, plan-billed, same isolation; step 0 refused outbound HTTPS (403) and a write outside its folder",
+      "run": {
+        "turns": 35,
+        "seconds": 293,
+        "inputTokens": 70,
+        "cacheReadInputTokens": 2260911,
+        "cacheCreationInputTokens": 111429,
+        "outputTokens": 24173,
+        "apiRateEquivalentUSD": 1.83
+      },
+      "scopes": "kept four converted to {\"allowedPaths\": [...]} (old text in scopeText; blind check: scope valid, scopeText equals the old scope, every other field unchanged)",
+      "problemReview": {
+        "reviewed": 10,
+        "edited": [],
+        "replace": [
+          "bray-impact",
+          "bray-diagnosis"
+        ],
+        "brayAgeAcceptable": false
+      },
+      "reply": "fixed JSON shape checked by a guard script; valid; every hash matched its file; reasons in a private review file, unread"
+    },
+    "brayRewrite": {
+      "at": "2026-11-06",
+      "session3": {
+        "wrote": [
+          "bray-impact",
+          "bray-diagnosis"
+        ],
+        "isolation": "same isolation and reply guard as the first custodian; step 0 refused outbound HTTPS (403) and a write outside its folder",
+        "run": {
+          "turns": 47,
+          "seconds": 485,
+          "inputTokens": 94,
+          "cacheReadInputTokens": 3408383,
+          "cacheCreationInputTokens": 119638,
+          "outputTokens": 37509,
+          "apiRateEquivalentUSD": 2.39
+        },
+        "rejectedCandidates": 54,
+        "reply": {
+          "exclusionsMet": false,
+          "baseDateRuleMet": true
+        },
+        "outcome": "bray-diagnosis kept (all exclusions clean); bray-impact rejected: 2 of its 5 dependency files were in the retired bray-impact and 1 in the kept bray-code-change (disclosed by the custodian as relaxed)"
+      },
+      "session4": {
+        "wrote": [
+          "bray-impact"
+        ],
+        "isolation": "same isolation and reply guard as the first custodian; step 0 refused outbound HTTPS (403) and a write outside its folder",
+        "run": {
+          "turns": 49,
+          "seconds": 467,
+          "inputTokens": 96,
+          "cacheReadInputTokens": 3563842,
+          "cacheCreationInputTokens": 130845,
+          "outputTokens": 32646,
+          "apiRateEquivalentUSD": 2.41
+        },
+        "rejectedCandidates": 100,
+        "reply": {
+          "otherExclusionsMet": false,
+          "baseDateRuleMet": true
+        },
+        "rule": "no overlap with the retired bray-impact, not relaxable",
+        "outcome": "kept: no shared path with the retired bray-impact or any current, retired or second-rejected task; shares two paths with the first rejected bray-diagnosis, which never entered the pack"
+      },
+      "bases": {
+        "bray-impact": "754f1b75 (2026-07-27)",
+        "bray-diagnosis": "4136501b (2026-09-24)"
+      },
+      "checks": "freeze on the M4 (bray-diagnosis checker fails at base, passes with the change, no reinstall; bray-impact evidence and dependency paths valid at base); packets sufficient with 0.29.0; final pack exclusion check clean"
+    }
+  },
+  "executor": {
+    "client": "codex-cli",
+    "clientVersion": "0.166.0 (binary sha256 39acf979729dd290f9a24ee38b2914e036c91b65952872e28ae2a6b88a7db7c1); pin at lock",
+    "model": "gpt-5.6-sol",
+    "effort": "high",
+    "sandbox": "Codex 0.166 permission profile extending :workspace (no --sandbox flag, which overrides it): deny read of the home directory, /private/tmp and /private/var/folders; write only the staged root (workspace, tmp, home) under /Users/Shared; read the copied toolchain; tool environment inherit=none with PATH, HOME, TMPDIR and COREPACK_HOME set",
+    "session": "fresh, per-cell CODEX_HOME, session log kept for per-call usage (not --ephemeral, from 2026-11-05)",
+    "invocation": "absolute binary path with explicit flags, no shell, no inherited aliases",
+    "maxTurns": null,
+    "harness": "harness.py v2 (derived from d5-20260921-v3/run-pair.py, which is unchanged); Context arm enables all seven retrieval tools via `navigate <staged workspace>`"
+  },
+  "reviewer": {
+    "client": "codex-cli",
+    "model": "gpt-5.6-sol",
+    "effort": "high",
+    "sandbox": "permission profile extending :read-only with the same denies, in its own staged root holding only the review bundle",
+    "blind": "no arm name, no cell directory, no other arms or sessions readable (enforced by the profile, proven by a canary probe)",
+    "receives": "answer or diff, checker result, private rubric, excerpts of cited lines (20 lines of context, at most 400 lines per file, 256 KiB in total)",
+    "knownLimit": "same model family as the executor and one review per outcome; reviewer independence is an open paid item"
+  },
+  "arms": {
+    "plain": "Built-in shell, read and edit; no MCP server.",
+    "context": "As plain, plus the pinned 0.31.0 repository MCP server bound to the arm's staged root; fresh server per arm. Instruction: search or explore, then read exact implementation and tests with repository_packet (no forced status or refresh).",
+    "graphify": {
+      "description": "As plain, plus a graph prebuilt with `graphify update <workspace>` (no model).",
+      "package": "graphifyy",
+      "packageVersion": "0.9.65",
+      "status": "later round, not in this run",
+      "note": "harness.py schedule() requires plain and context in every arm set; a Graphify round needs all three arms or a schedule change at its lock"
+    }
+  },
+  "retrievalInstructionRule": "Each arm's prompt begins with one retrieval instruction of similar length and force.",
+  "repetitions": 3,
+  "armOrderRule": "Repetition r of task i uses the arm list rotated left by (i + r - 1) mod n; the (task, repetition) blocks then run in a random order seeded with 20261105. Implemented in harness.py schedule().",
+  "phases": {
+    "phase0": {
+      "paid": false,
+      "steps": [
+        "Packet sufficiency (done, blind): all 8 tasks covered by one bounded build packet each, 4,211 to 36,131 bytes in JSON form; see phase0-blind-checks.json.",
+        "Transcript metrics: metrics.mjs (done); checked on the write-probe stream.",
+        "Harness: harness.py plan, prepare, execute and assess with 25 fixture tests (done). Execute refuses while forbidden paths exist; outside-workspace references are flagged.",
+        "Offline tests for both repositories (done).",
+        "History candidates (done; counts only).",
+        "Freeze (done, blind): 8 archives hashed; the 4 checker tasks fail at base and pass with the change from clean installs; all required evidence ranges valid at base."
+      ]
+    },
+    "writeProbe": {
+      "paid": true,
+      "approval": "required",
+      "purpose": "Recheck the v2 read-only sandbox defect on the pinned Codex version.",
+      "status": "passed",
+      "ranAt": "2026-11-04",
+      "script": "write-probe.py",
+      "results": {
+        "executor": {
+          "sandbox": "workspace-write",
+          "wroteFile": true,
+          "mcpCalls": [
+            "repository_status",
+            "repository_refresh",
+            "repository_packet"
+          ],
+          "seconds": 32,
+          "usage": {
+            "input": 86960,
+            "cached": 81152,
+            "cacheWrite": 0,
+            "output": 578,
+            "reasoning": 200
+          }
+        },
+        "reviewer": {
+          "sandbox": "read-only",
+          "writeRefused": true,
+          "seconds": 38.6,
+          "usage": {
+            "input": 41856,
+            "cached": 39424,
+            "cacheWrite": 0,
+            "output": 279,
+            "reasoning": 67
+          }
+        },
+        "metrics": {
+          "packets": 1,
+          "packetCoveredFiles": 1,
+          "readsAfterPacket": 1,
+          "toolResults": 5,
+          "toolErrors": 0,
+          "unclassifiedSegments": 0,
+          "note": "the cat re-read was prescribed by the probe"
+        },
+        "usageShape": "one turn.completed per exec aggregating all model calls; fields input_tokens, cached_input_tokens, cache_write_input_tokens, output_tokens, reasoning_output_tokens"
+      },
+      "privateRecord": ".cache/z1p-delivery/os2-write-probe-20261104 under the home directory"
+    },
+    "phase1": {
+      "paid": true,
+      "approval": "required",
+      "cells": "one impact or code-change task, plain and context, one repetition, one reviewer each",
+      "passIf": {
+        "contextAccepted": true,
+        "readsAfterPacketMax": 0.25,
+        "contextToolErrorRateMax": 0.05
+      },
+      "onFailure": "Record; fix the observed cause as its own release; rerun phase 1 under a new draft revision. Phase 2 is not run.",
+      "attempts": [
+        {
+          "attempt": 1,
+          "ranAt": "2026-11-04",
+          "status": "invalid-runner-defect",
+          "task": "h3-code-change",
+          "host": "this Mac",
+          "codex": "0.166.0",
+          "context": "0.26.0",
+          "settings": "gpt-5.6-sol/high",
+          "order": [
+            "context (cell-001)",
+            "plain (cell-002)"
+          ],
+          "readExposure": "blind workspace and author transcript moved to the M4 during execute (tar sha256 matched both ends), restored for assess",
+          "sessionsSpent": 4,
+          "defect": "Cells are copies of the template at a new path. pnpm 11 treats the copy as stale and reinstalls before every `pnpm <bin>`; inside the workspace-write sandbox it cannot write the global store, fails offline and purges node_modules. Neither executor could run tests (each tried twice); the hidden checker exited 127 in both cells; both reviewers saw a failed checker and rejected.",
+          "observationsNotAComparison": {
+            "context": {
+              "seconds": 398.5,
+              "total": 2125752,
+              "uncached": 70596,
+              "output": 15220,
+              "packets": 12,
+              "readsAfterPacket": 0,
+              "toolErrorRate": 0.023,
+              "changedFiles": 5,
+              "reviewerTotal": 72679
+            },
+            "plain": {
+              "seconds": 288.7,
+              "total": 924423,
+              "uncached": 43789,
+              "output": 11386,
+              "changedFiles": 4,
+              "reviewerTotal": 71092
+            },
+            "checkerOnlyAfterRelink": {
+              "context": "passed",
+              "plain": "passed"
+            },
+            "dependencies": {
+              "context": {
+                "missed": 0,
+                "incorrect": 0
+              },
+              "plain": {
+                "missed": 0,
+                "incorrect": 0
+              }
+            }
+          },
+          "fix": "harness: offline relink of every copy (RELINK), readiness probe under `codex sandbox` workspace-write before any model starts (READY) with refusal on failure, intactAfterRun recorded, checker clone relinked, assess --checker-only. Verified: without relink the probe fails under Codex sandbox, with it it passes; 28 harness tests.",
+          "forProtocolReview": [
+            "outsideReferences flagged glob patterns such as */vitest.mjs (fixed)",
+            "/tmp is exempt from outsideReferences: cell-001 moved a stray .pnpm-store to /private/tmp unflagged (removed afterwards); /tmp is shared across cells",
+            "the reviewer runs inside the cell directory, whose parent holds executor-config.toml and executor-prompt.txt, which name the arm; reviewer outsideReferences were 0 in both cells"
+          ]
+        },
+        {
+          "attempt": 2,
+          "ranAt": "2026-11-05",
+          "status": "passed",
+          "task": "h3-code-change",
+          "host": "this Mac",
+          "order": [
+            "context (cell-001)",
+            "plain (cell-002)"
+          ],
+          "readExposure": "blind workspace, author transcript and attempt 1 outputs moved to the M4 during execute (hashes matched), restored for assess",
+          "sessionsSpent": 4,
+          "environment": {
+            "relinkSeconds": 1.9,
+            "readySeconds": 2.1,
+            "intactAfterRun": {
+              "context": true,
+              "plain": true
+            },
+            "testsRan": {
+              "context": true,
+              "plain": true
+            }
+          },
+          "passIf": {
+            "contextAccepted": true,
+            "readsAfterPacket": 0,
+            "contextToolErrorRate": 0
+          },
+          "cells": {
+            "context": {
+              "accepted": true,
+              "checkerPassed": true,
+              "missed": 0,
+              "incorrect": 0,
+              "executorSeconds": 249.4,
+              "executorTotal": 1211829,
+              "uncached": 54059,
+              "cached": 1147008,
+              "output": 10762,
+              "packets": 3,
+              "commands": 9,
+              "reviewerTotal": 96619,
+              "reviewerSeconds": 55.4,
+              "cellTotal": 1308448,
+              "outsideReferences": 0
+            },
+            "plain": {
+              "accepted": true,
+              "checkerPassed": true,
+              "missed": 0,
+              "incorrect": 0,
+              "executorSeconds": 234.7,
+              "executorTotal": 927795,
+              "uncached": 42279,
+              "cached": 875776,
+              "output": 9740,
+              "commands": 18,
+              "reviewerTotal": 67611,
+              "reviewerSeconds": 31.4,
+              "cellTotal": 995406,
+              "outsideReferences": 0
+            }
+          },
+          "observation": "One pair is not a gate test. On this pair the Context cell used 1.31x the plain cell total and its reviewer took longer; the cost gate needs at most 0.80x and no higher reviewer seconds. Attempt 1 (invalid environment) showed the same direction at 2.3x.",
+          "codex": "0.166.0",
+          "context": "0.26.0",
+          "settings": "gpt-5.6-sol/high",
+          "executorGap": {
+            "total": 284034,
+            "cachedInput": 271232,
+            "uncachedInput": 11780,
+            "output": 1022,
+            "note": "95% of the executor gap is cached input"
+          },
+          "reviewerInputs": {
+            "context": {
+              "evidenceFiles": 5,
+              "sourceBytes": 38960,
+              "diffBytes": 6651
+            },
+            "plain": {
+              "evidenceFiles": 5,
+              "sourceBytes": 38889,
+              "diffBytes": 6534
+            },
+            "note": "reviewers received near-identical material, so evidence volume does not explain the reviewer-seconds difference"
+          }
+        }
+      ],
+      "status": "passed",
+      "passIfV2": {
+        "contextAccepted": true,
+        "readsAfterPacketValid": true,
+        "readsAfterPacketMax": 0.25,
+        "contextMcpErrorRateMax": 0.05,
+        "isolationProbesPassed": true,
+        "usageComplete": true,
+        "task": "a separate qualification task that phase 2 never uses"
+      }
+    },
+    "protocolReview": {
+      "paid": true,
+      "approval": "required",
+      "reviewer": "fresh gpt-5.6-sol/high",
+      "countedAs": "setup",
+      "status": "run",
+      "ranAt": "2026-11-05",
+      "script": "protocol-review.py",
+      "report": "protocol-review.md",
+      "session": {
+        "model": "gpt-5.6-sol",
+        "effort": "high",
+        "sandbox": "read-only",
+        "seconds": 602.2,
+        "exitCode": 0,
+        "usage": {
+          "input": 1515275,
+          "cached": 1400576,
+          "uncached": 114699,
+          "output": 28541,
+          "reasoning": 15369,
+          "cacheWrite": 0,
+          "total": 1543816
+        },
+        "outsideReferences": "all 10 were arithmetic in analysis commands, not paths"
+      },
+      "readExposure": "hidden material, author transcript and both phase 1 attempt folders on the M4 during the session (hashes matched both ways); bundle built from an allowlist that excludes reviewer rubric copies, verdict reasons and reviewer streams",
+      "verdict": {
+        "readyToLock": false,
+        "blocking": [
+          "read isolation and reviewer blinding are not enforced",
+          "declared quality and scope gates are not implemented correctly",
+          "complete cost and usage assumptions A1-A4 are not validated",
+          "leaked and phase-1-exposed tasks remain in the confirmatory pack",
+          "the primary metric does not measure plan headroom",
+          "the reviewer design and reviewer-seconds gate are not reliable",
+          "the harness lacks the declared final quality, bootstrap, and gate analysis"
+        ],
+        "recommended": [
+          "increase independent task information or narrow the claim",
+          "run a controlled MCP overhead probe",
+          "reduce the always-advertised tool surface and model-call count",
+          "randomize or block execution order",
+          "report nonmodel Context costs and executor time separately"
+        ],
+        "phase2Recommendation": "revise-then-run",
+        "confidence": "high"
+      },
+      "correction": "Finding 8.8 (pnpm 12.3.4 vs 11.9.0) conflates commits: 12.3.4 is pinned at h3 f0e17808 (offline check), 11.9.0 at h3-code-change base 3eb3a57.",
+      "correction2026-11-05": "Section 1 of the review (and the attempt 2 summary) attributed the gap to tool descriptions carried per call. Probe: a one-call session used 10,565 input tokens for plain, Context-7-tools and Context-3-tools alike; Codex 0.166 runs tools in a JS exec sandbox (code mode) and the model sees only what scripts print. Phase 1 ran --ephemeral, so the per-call gap is unmeasured."
+    },
+    "phase2": {
+      "paid": true,
+      "approval": "required, separate",
+      "cells": "8 tasks x 3 repetitions x 2 arms, plus one reviewer per cell"
+    },
+    "blindAuthor": {
+      "paid": true,
+      "approval": "required",
+      "session": "fresh Claude session without the Context docs, skill or these prompts",
+      "countedAs": "setup",
+      "launch": "claude --bare excludes CLAUDE.md, hooks and memory but needs an API key (metered cash); a plan-billed launch that keeps global instructions out is an owner choice",
+      "status": "run 2026-11-04"
+    },
+    "isolationProbe": {
+      "ranAt": "2026-11-05",
+      "paid": true,
+      "sessions": 1,
+      "settings": "gpt-5.6-sol/low",
+      "result": "passed",
+      "tokens": {
+        "input": 43579,
+        "cached": 32000,
+        "output": 307,
+        "total": 43886
+      },
+      "seconds": 20.8,
+      "note": "first verdict failed because the denied command was missing from the --json stream; recomputed from the session log without a second session"
+    }
+  },
+  "metrics": {
+    "readsAfterPacket": "Distinct packet-covered files later read directly (cat, nl, head, tail, sed -n ranges, awk NR ranges) with a range overlapping one already returned by a packet, divided by distinct packet-covered files; no range means whole file; reads before the covering packet do not count. Implemented in metrics.mjs. v2: invalid (null) when any shell segment is unclassified, a successful packet has no parseable ranges or the stream has malformed lines.",
+    "toolErrorRate": "Superseded in v2 by mcpErrorRate (MCP calls only) and shellErrorRate (command executions only); file changes are in neither.",
+    "missedOrIncorrectDependencies": "Impact and code-change tasks only, for every outcome. Code change: covered paths are files actually changed. Impact: paths named in mustChange, deduplicated; named paths absent at base are incorrect; paths outside the set are reported as precision. Never shown to executor or reviewer.",
+    "firstPassAccepted": "Not measured in v2 (no first self-check event is captured).",
+    "totalTokens": "Reported processed tokens: executor plus reviewer input plus output, cached input included. Sensitivity reported for uncached + output + w x cached, w in {0, 0.1, 1}, frozen before any v2 cell.",
+    "reviewerSeconds": "Reported only (v2).",
+    "searchesAfterPacket": "rg, grep, git grep and find after the first packet; reported separately, outside the threshold.",
+    "unclassifiedSegments": "Command segments the classifier does not recognise; reported.",
+    "usageAssumptions": "Checked per stream, failing closed: A1 cached <= input; A2 reasoning <= output; A3 exactly one turn.completed whose input and output equal the per-call session log sums; A4 cache_write_input_tokens == 0; exit status 0; no malformed lines."
+  },
+  "qualityGate": {
+    "primary": "missedOrIncorrectDependencies on impact and code-change tasks",
+    "rule": "Per comparator: Context has no fewer accepted outcomes in total, and on no impact or code-change task a higher per-task median dependency total. Lower on at least two such tasks is reported as better, not required.",
+    "inconclusive": "All counted medians zero in both arms; a replacement class after seeing results is a new protocol.",
+    "structuredAcceptance": "Checker passed (code-change and diagnosis), every changed file inside scope.allowedPaths, and blind reviewer accepted.",
+    "implementation": "harness.py quality_guard(), dependency_count(), scope_check()",
+    "v1Rule": "Lower on at least two tasks and higher on none, with no Context outcome rejected."
+  },
+  "costGate": {
+    "statistic": "Sum over tasks of per-task median reported processed tokens; exactly the planned repetitions per task and arm",
+    "rule": "Per comparator: ratio at most 0.80 and the upper end of its 90% task-bootstrap interval below 1.0.",
+    "bootstrap": "Tasks resampled with replacement, 10,000 draws, seed 20261105, percentile interval.",
+    "reportedOnly": "Geometric mean of per-task ratios with its interval; token components; sensitivity weights; reviewer seconds; executor wall time and local preparation.",
+    "incomplete": "Any usage check failure marks a cell incomplete, never zero; an incomplete cell in a compared arm fails the gate.",
+    "money": "ChatGPT plan allowance; neither plan headroom nor cash is measured or claimed.",
+    "excluded": "Indexing, CPU, storage and tool development.",
+    "implementation": "harness.py cost_gate(), bootstrap_ratio(), analyse",
+    "v1Rule": "Context at least 20% below each comparator (point estimate), and sum of per-task median reviewerSeconds no higher."
+  },
+  "notPooledWith": [
+    "d5-20260921",
+    "d5-20260921-v2",
+    "d5-20260921-v3",
+    "graphify-20260922",
+    "graphify-20260922-v2",
+    "graphify-20260922-v3-coverage",
+    "graphify-20260922-s5-deepseek",
+    "repeated-pro-20260923",
+    "screen-pro-040-20260923"
+  ],
+  "openDecisions": [
+    "Owner review of version 2"
+  ],
+  "revisedAt": "2026-11-05",
+  "ownerDecisions": {
+    "recordedAt": "2026-11-04",
+    "repositories": "bray (ForgeSworn) and h3js/h3 (outside); each task pinned at its own commit",
+    "arms": "plain and context; graphify is a later round with its own approval, run only if the pair passes",
+    "hiddenSets": "impact and code-change tasks taken from merged history (diff gives the dependency set, its tests give the checker); orientation, diagnosis and vetting by a fresh Claude session started without the global instructions that load the Context skill",
+    "billing": "Codex reports \"Logged in using ChatGPT\": plan allowance, not metered; report tokens and headroom, no cash claim",
+    "qualityMeasure": "missedOrIncorrectDependencies",
+    "protocolReviewResponse": "revise then run (2026-11-05)",
+    "decidedAt20261105": {
+      "loopback": "allow loopback only for executors (network proxy with no domains, allow_local_binding); reviewers keep no network",
+      "taskCount": "keep eight tasks; any result is limited to this pack",
+      "reviewer": "one reviewer from a different model family from the executor, plus a second blinded review on a sample to measure agreement"
+    }
+  },
+  "repetitionsCells": "8 tasks x 2 arms x 3 repetitions = 48 executor cells, each with a reviewer",
+  "execution": {
+    "stages": "toolchain, plan (records input hashes), prepare (fail-closed setup), execute (staged and probed per cell), assess (after every executor), analyse",
+    "readExposure": "Enforced by the permission profile: model tool calls cannot read the home directory (plans, sibling cells, acceptance files, the author transcript, Codex and Claude state), /private/tmp or per-user temp. Before any model starts, a probe under the cell's profile must fail to read a canary in the cell directory and write its staged root. --forbid remains as defence in depth. outsideReferences and deniedAccesses are audit fields.",
+    "liveCheck": "Passed 2026-11-05: one gpt-5.6-sol/low codex exec session under the executor profile; the canary read was denied (Operation not permitted, text never shown), workspace read and write succeeded, 43,886 tokens, 20.8 s. Codex 0.166 omits sandbox-denied commands from the --json stream; denials are counted from the session log.",
+    "cellNames": "opaque cell-NNN; the reviewer no longer runs inside the cell directory",
+    "host": "this Mac; one staged root under /Users/Shared at a time (execute refuses if another exists)",
+    "loopback": "Executors: [permissions.os2.network] enabled = true, allow_local_binding = true, no domains, and features.network_proxy = true. codex sandbox check 2026-11-05 (no model): localhost round trip passed; outside HTTPS refused by the proxy (403); direct TCP to 1.1.1.1, the LAN gateway and the M4 failed; home unreadable. Without network_proxy the same section opened the internet. The pre-start probe exits 99 on any reachable outside host and 98 if an executor lacks loopback. Not yet checked: h3 socket tests and a codex exec session under this profile."
+  },
+  "protocolReviewBrief": [
+    "Whether cached input should count fully toward the token gate: it is 95% of the phase 1 executor gap",
+    "outsideReferences exempts /tmp, which is shared by cells",
+    "the reviewer runs where the parent directory names the arm",
+    "whether to replace the tasks touched by the author's leak",
+    "whether reviewer seconds at n=1 per task is a usable gate input"
+  ],
+  "overheadProbe": {
+    "ranAt": "2026-11-05",
+    "sessions": 7,
+    "approxTokens": 143000,
+    "model": "gpt-5.6-sol/high",
+    "oneCallInputTokens": {
+      "plain": 10565,
+      "context7": 10564,
+      "context3": 10565
+    },
+    "toolListBytes": 5777,
+    "finding": "MCP tools are not declared in the prompt; nested calls run in the exec sandbox; model-visible content is the script output",
+    "harnessChange": "drop --ephemeral; record per-call usage and script traffic from the session log",
+    "diagnosticPair": {
+      "ranAt": "2026-11-05",
+      "task": "h3-code-change (used; diagnostic only)",
+      "sessions": 2,
+      "context": {
+        "calls": 35,
+        "total": 2043898,
+        "carried": 1652406,
+        "retrievalCarried": 1416007,
+        "statusRefreshCallInput": 243996,
+        "searchExploreAdded": 23939,
+        "searchExploreCarried": 722515,
+        "packetAdded": 24119,
+        "packetCarried": 567863
+      },
+      "plain": {
+        "calls": 26,
+        "total": 1172732,
+        "carried": 882450,
+        "retrievalCarried": 676059
+      },
+      "tool": "session-breakdown.py"
+    },
+    "diagnosticPair027": {
+      "ranAt": "2026-11-05",
+      "context": "0.27.0 (f871d03)",
+      "sessions": 2,
+      "context027": {
+        "calls": 27,
+        "total": 1106828,
+        "carried": 805606,
+        "searchExploreAdded": 13852,
+        "searchExploreCarried": 305834,
+        "packetAdded": 19085,
+        "packetCarried": 331168,
+        "formatsRequested": "text only",
+        "checkerPassed": true
+      },
+      "plain": {
+        "calls": 29,
+        "total": 1432286,
+        "carried": 1105533,
+        "checkerPassed": true
+      },
+      "note": "one pair per version; plain varied 22% between runs, so the 0.77 ratio is not a gate result"
+    },
+    "diagnosticPair028": {
+      "ranAt": "2026-11-05",
+      "context": "0.28.0 (05bc501)",
+      "sessions": 2,
+      "context028": {
+        "calls": 36,
+        "total": 1788775,
+        "uncached": 50624,
+        "carried": 1388732,
+        "packetCalls": 7,
+        "packetAdded": 26823,
+        "packetCarried": 719405,
+        "searchExploreAdded": 9803,
+        "searchExploreCarried": 309566,
+        "statusRefreshCalls": 5,
+        "statusRefreshCarried": 48470,
+        "autoRefreshes": 1,
+        "explicitRefreshesAfterEdit": 1,
+        "checkerPassed": true
+      },
+      "plain": {
+        "calls": 26,
+        "total": 1211387,
+        "uncached": 61297,
+        "carried": 919605,
+        "checkerPassed": true,
+        "outsideReferences": "2 false positives (route strings /s and /o)"
+      },
+      "note": "the context-arm prompt still asks for status and refresh, so those calls remained; Context varied 1.11M-2.04M across three runs, more than any release effect"
+    }
+  },
+  "versionHistory": [
+    {
+      "version": 1,
+      "status": "qualified in phase 1 (attempt 2), then reviewed: revise then run",
+      "build": "0.26.0 (8cbb616)"
+    },
+    {
+      "version": 2,
+      "revisedAt": "2026-11-05",
+      "basis": "protocol-review.md ranked changes 1-5, 9, 13 and 14 (free); paid items 6-8, 10 and 12 remain open",
+      "build": "0.29.0 (6cd0ce2)",
+      "repinnedAt": "2026-11-05",
+      "repinNote": "repinned from 0.28.0 (05bc501) after repository_search accepted expectedGeneration; not yet run on a model"
+    },
+    {
+      "version": 2,
+      "revision": "r2",
+      "revisedAt": "2026-11-06",
+      "build": "0.30.0 (697f8d7)",
+      "basis": "requalification on 0.29.0 failed on the MCP error gate (one oversized packet request); the fix shipped as its own release (PR #74, v0.30.0); harness and gates unchanged"
+    },
+    {
+      "version": 2,
+      "revision": "r3",
+      "revisedAt": "2026-11-06",
+      "build": "0.31.0 (69d5f03)",
+      "basis": "phase 2 paused on the owner decision after the cost attribution; compact JSON packets shipped as their own release (PR #75); harness and gates unchanged; requalification reruns"
+    }
+  ],
+  "reviewerDesign": {
+    "decidedAt": "2026-11-06",
+    "primary": {
+      "family": "claude",
+      "model": "claude-opus-5-5",
+      "effort": "high",
+      "tools": "none (--tools \"\")",
+      "material": "inlined in the prompt; diff capped at 262144 bytes, truncation recorded",
+      "flags": "--setting-sources project, --disable-slash-commands, empty strict MCP config, --no-session-persistence, --json-schema; CLAUDE.md and auto-memory off",
+      "usage": "complete only for a successful result with integer usage fields"
+    },
+    "second": {
+      "family": "codex",
+      "model": "gpt-5.6-sol",
+      "effort": "high",
+      "profile": ":read-only permission profile in a staged root",
+      "sample": "every cell for plans of 12 cells or fewer; otherwise 6 per arm drawn with the plan seed"
+    },
+    "agreement": {
+      "measure": "raw agreement on accepted and on each rubric item",
+      "threshold": 0.8,
+      "consequence": "below the threshold, or any missing second review, the quality guard is unreliable and the run does not pass"
+    },
+    "costGate": "executor tokens only; reviewer tokens reported per family",
+    "providerFailures": "a cell with a non-zero executor exit and no model output may be rerun once (execute --rerun-provider-failures); the attempt is kept in repair-1/",
+    "buildOutputs": {
+      "bray": [
+        "site/tools-manifest.json"
+      ]
+    },
+    "toolchain": {
+      "path": "/Users/Shared/os2-toolchain-20261106",
+      "pnpm": [
+        "11.9.0",
+        "11.22.0",
+        "12.3.4"
+      ],
+      "node": "v24.21.0",
+      "use": "sessions, offline relink, checker and template install"
+    },
+    "leakClosed": "author and custodian Claude transcripts moved from ~/.claude/projects to the M4 holding (hash checked) and deleted; every hidden-side launch passes --no-session-persistence"
+  },
+  "pilot20261106": {
+    "script": "pilot.py",
+    "cells": "eight recorded cells of the retired h3-code-change (attempt 2, diag, diag027, diag028)",
+    "reviews": 16,
+    "acceptedBoth": 8,
+    "acceptedAgree": "8/8",
+    "rubricAgree": "40/40",
+    "checkerPassed": 8,
+    "dependencies": {
+      "missed": 0,
+      "recall": 1.0,
+      "precision": "0.6 to 0.75"
+    },
+    "claudeReviewTokens": "14028 to 17956",
+    "codexReviewTokens": "25240 to 47896",
+    "limits": "one task and every outcome accepted: agreement only seen on easy cases; misses zero everywhere"
+  },
+  "readiness20261106": {
+    "scripts": [
+      "readiness.py",
+      "checker-smoke.py"
+    ],
+    "readiness": "nine templates: h3 relink 0 (5/5), isolation 0 (9/9), ready 0 (9/9)",
+    "checkerSmoke": "five checker tasks fail at base and pass with the change on this Mac with the toolchain"
+  },
+  "requalification20261106": {
+    "task": "h3-qualification",
+    "build": "0.29.0 (6cd0ce2)",
+    "toolchain": "/Users/Shared/os2-toolchain-20261106",
+    "gates": {
+      "contextAccepted": true,
+      "readsAfterPacketValid": true,
+      "readsAfterPacketAtMost025": true,
+      "mcpErrorRateAtMost5pc": false,
+      "isolationProbesPassed": true,
+      "usageComplete": true
+    },
+    "passed": false,
+    "cause": "one repository_packet build request for two whole files (254 and 437 lines) exceeded the 64 KiB packet limit; the tool fetched nothing and returned outlines; the agent then requested smaller ranges",
+    "observed": {
+      "mcpCalls": 13,
+      "mcpErrors": 1,
+      "readsAfterPacket": 0,
+      "plainAccepted": true,
+      "reviewersAgree": "2/2",
+      "executorTokens": {
+        "context": 756790,
+        "plain": 601004
+      },
+      "executorSeconds": {
+        "context": 262.1,
+        "plain": 229.0
+      },
+      "claudeReviewTokens": [
+        18371,
+        17420
+      ],
+      "codexReviewTokens": [
+        53180,
+        37682
+      ],
+      "dependencies": {
+        "context": {
+          "missed": 0,
+          "recall": 1.0,
+          "precision": 0.33
+        },
+        "plain": {
+          "missed": 0,
+          "recall": 1.0,
+          "precision": 0.5
+        }
+      }
+    },
+    "consequence": "phase 2 not run; the cause is fixed as its own Context release and requalification reruns under a new draft revision"
+  },
+  "requalification20261106r2": {
+    "task": "h3-qualification",
+    "build": "0.30.0 (697f8d7)",
+    "gates": {
+      "contextAccepted": true,
+      "readsAfterPacketValid": true,
+      "readsAfterPacketAtMost025": true,
+      "mcpErrorRateAtMost5pc": true,
+      "isolationProbesPassed": true,
+      "usageComplete": true
+    },
+    "passed": true,
+    "observed": {
+      "readsAfterPacket": 0,
+      "mcpErrorRate": 0,
+      "mcpCalls": 18,
+      "plainAccepted": true,
+      "executorTokens": {
+        "context": 1600113,
+        "plain": 1070517
+      },
+      "reviewersAgree": {
+        "context": true,
+        "plain": true
+      }
+    },
+    "detail": {
+      "context": {
+        "claudeTokens": 19721,
+        "codexTokens": 38017,
+        "seconds": 326.9,
+        "dependencies": {
+          "missed": 0,
+          "recall": 1.0,
+          "precision": 0.3333333333333333
+        }
+      },
+      "plain": {
+        "claudeTokens": 16493,
+        "codexTokens": 37559,
+        "seconds": 265.7,
+        "dependencies": {
+          "missed": 0,
+          "recall": 1.0,
+          "precision": 0.3333333333333333
+        }
+      }
+    }
+  },
+  "requalification20261106r3": {
+    "task": "h3-qualification",
+    "build": "0.31.0 (69d5f03)",
+    "gates": {
+      "contextAccepted": true,
+      "readsAfterPacketValid": true,
+      "readsAfterPacketAtMost025": true,
+      "mcpErrorRateAtMost5pc": true,
+      "isolationProbesPassed": true,
+      "usageComplete": true
+    },
+    "passed": true,
+    "observed": {
+      "readsAfterPacket": 0,
+      "mcpErrorRate": 0,
+      "mcpCalls": 13,
+      "plainAccepted": true,
+      "executorTokens": {
+        "context": 1009865,
+        "plain": 568547
+      },
+      "reviewersAgree": {
+        "context": true,
+        "plain": true
+      }
+    },
+    "calls": {
+      "context": 23,
+      "plain": 16
+    },
+    "note": "text form used for every Context call, so compact JSON did not apply"
+  }
+}
