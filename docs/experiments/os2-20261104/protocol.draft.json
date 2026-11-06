@@ -7,11 +7,11 @@
   "lockRule": "Set lockedAt and the hashes below only after owner approval, a passed phase 1 and an accepted independent protocol review, and before any phase 2 cell. Any change after lock is a new version; earlier versions and their results are retained.",
   "purpose": "OS2: whether Context gives better accepted outcomes at lower complete model token cost than a competent ordinary workflow (and optionally Graphify) with the same frontier model in every arm.",
   "buildUnderTest": {
-    "version": "0.30.0",
-    "commit": "697f8d7c6d585bb76b5774d56cbd40a8ce13594b",
+    "version": "0.31.0",
+    "commit": "69d5f03f6b6df48aecac1a8d19d96fb3701c4ea4",
     "artifacts": {
-      "forgesworn-context-0.30.0.tgz": "7f3de3539aab25fa08a8d97983174d1e2cd763d0111f5bde9ad0377b3072832c",
-      "forgesworn-context-tools-0.30.0.tgz": "2e356cae75ecf1777abe2f81c9363ef7ad133b59e851b000f76fd337cfad30f6"
+      "forgesworn-context-0.31.0.tgz": "54765e5b616076bd594413de60fb573973dc2fbbb4a963aa0a61006c21fda040",
+      "forgesworn-context-tools-0.31.0.tgz": "3c9a261d9df8b840d56bbc126517d58e505464039b5c0100d11156978d357676"
     },
     "repinRule": "A fix found later ships as its own release; this block is repinned and the protocol requalified before lock."
   },
@@ -257,7 +257,7 @@
   },
   "arms": {
     "plain": "Built-in shell, read and edit; no MCP server.",
-    "context": "As plain, plus the pinned 0.30.0 repository MCP server bound to the arm's staged root; fresh server per arm. Instruction: search or explore, then read exact implementation and tests with repository_packet (no forced status or refresh).",
+    "context": "As plain, plus the pinned 0.31.0 repository MCP server bound to the arm's staged root; fresh server per arm. Instruction: search or explore, then read exact implementation and tests with repository_packet (no forced status or refresh).",
     "graphify": {
       "description": "As plain, plus a graph prebuilt with `graphify update <workspace>` (no model).",
       "package": "graphifyy",
@@ -766,6 +766,13 @@
       "revisedAt": "2026-11-06",
       "build": "0.30.0 (697f8d7)",
       "basis": "requalification on 0.29.0 failed on the MCP error gate (one oversized packet request); the fix shipped as its own release (PR #74, v0.30.0); harness and gates unchanged"
+    },
+    {
+      "version": 2,
+      "revision": "r3",
+      "revisedAt": "2026-11-06",
+      "build": "0.31.0 (69d5f03)",
+      "basis": "phase 2 paused on the owner decision after the cost attribution; compact JSON packets shipped as their own release (PR #75); harness and gates unchanged; requalification reruns"
     }
   ],
   "reviewerDesign": {

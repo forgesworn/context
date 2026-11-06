@@ -1,4 +1,4 @@
-# OS2 protocol draft v2: Codex Sol/high, Context 0.30.0
+# OS2 protocol draft v2: Codex Sol/high, Context 0.31.0
 
 Status: **draft v2 for owner review, not locked.** Version 1 qualified in phase
 1 and was then reviewed; the review said revise before phase 2. Version 2
@@ -128,14 +128,16 @@ repairs and failed attempts.
 
 ## Build under test
 
-Context 0.30.0, commit `697f8d7c6d585bb76b5774d56cbd40a8ce13594b`, installed
+Context 0.31.0, commit `69d5f03f6b6df48aecac1a8d19d96fb3701c4ea4`, installed
 from the public release assets:
 
-- `forgesworn-context-0.30.0.tgz`
-  sha256 `7f3de3539aab25fa08a8d97983174d1e2cd763d0111f5bde9ad0377b3072832c`
-- `forgesworn-context-tools-0.30.0.tgz`
-  sha256 `2e356cae75ecf1777abe2f81c9363ef7ad133b59e851b000f76fd337cfad30f6`
+- `forgesworn-context-0.31.0.tgz`
+  sha256 `54765e5b616076bd594413de60fb573973dc2fbbb4a963aa0a61006c21fda040`
+- `forgesworn-context-tools-0.31.0.tgz`
+  sha256 `3c9a261d9df8b840d56bbc126517d58e505464039b5c0100d11156978d357676`
 
+0.31.0 (PR #75) sends JSON packet sources as one numbered text block instead
+of per-line objects, after the cost attribution below; it changes nothing else.
 Version 1 ran 0.26.0 (`8cbb616`); the diagnostic pairs ran 0.27.0 and 0.28.0;
 the first version 2 requalification ran 0.29.0 (`6cd0ce2`) and failed on the
 MCP error gate. 0.30.0 is the fix for that failure: an oversized
@@ -330,7 +332,7 @@ copy and pass with the merged change applied.
 | Arm | Tools | Notes |
 | --- | --- | --- |
 | plain | Codex built-in shell, read and edit; no MCP | Retrieval instruction of similar length and force to the other arms |
-| context | Same, plus the pinned 0.30.0 repository MCP server bound to the arm's staged root | Fresh server per arm; the first call builds the index, and later calls without a generation refresh it when stale |
+| context | Same, plus the pinned 0.31.0 repository MCP server bound to the arm's staged root | Fresh server per arm; the first call builds the index, and later calls without a generation refresh it when stale |
 | graphify (later round) | Same as plain, plus a graph prebuilt with `graphify update` (no model) from `graphifyy` 0.9.65 | Not in this run; see below |
 
 This run uses two arms: 8 × 2 × 3 = 48 executor cells, each with a reviewer
