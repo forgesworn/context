@@ -618,6 +618,41 @@ Dependency recall was 1.0 in both cells (precision 0.33 each). Claude reviews
 used 19,721 and 16,493 tokens; Codex reviews 38,017 and
 37,559.
 
+### Where the Context arm's tokens go (2026-11-06, no model)
+
+Phase 2 was paused on the owner's decision after both requalification pairs
+had Context above plain (1.26 and 1.49). [`cost-attribution.py`](cost-attribution.py)
+splits each recorded session's input into the fixed per-call part (the first
+call's input, paid again on every call) and what each step added, charged once
+per later call that carries it. Five pairs (three diagnostic pairs on the
+retired h3-code-change, both requalification runs):
+
+| Pair | Calls (Context / plain) | Input tokens (Context / plain) | Carried tool results, k tokens (Context MCP + shell / plain shell) |
+| --- | --- | --- | --- |
+| diag (0.26.0) | 35 / 26 | 2,029k / 1,162k | 987 + 90 / 656 |
+| diag027 | 27 / 29 | 1,097k / 1,418k | 517 + 17 / 827 |
+| diag028 | 36 / 26 | 1,777k / 1,200k | 846 + 74 / 684 |
+| requal (0.29.0) | 21 / 15 | 745k / 590k | 309 + 5 / 257 |
+| requal r2 (0.30.0) | 28 / 23 | 1,586k / 1,059k | 780 + 129 / 615 |
+
+Findings:
+
+- The fixed part is the same in both arms (first-call input about 10.8k
+  tokens), so the Context tool definitions are not the cost.
+- Context retrieves about as much text as plain (raw tool output roughly 100
+  to 190 KB per session in both arms); it does not read less. It makes more
+  model calls (in four of five pairs) because it uses both Context tools and
+  shell commands, and every call re-reads everything before it.
+- Large results arrive early and are carried longest: a broad
+  `repository_explore` (for example the symbol `H3`, 19 to 24 KB) in the first
+  six calls; JSON-format packets, whose per-line objects are much larger than
+  the text form; and, in the 0.30.0 run, a three-whole-file JSON packet of
+  47 KB at call 4 that the 0.29.0 behaviour would have refused with an outline.
+  So the 0.30.0 change fixed the MCP error gate but can raise cost when the
+  agent asks for whole files.
+- Plain also varies widely between runs (590k to 1,418k), so single pairs
+  cannot show a release effect.
+
 ### Independent protocol review (paid, needs approval)
 
 A fresh Sol/high session reviews the frozen protocol, harness diff and phase 1
