@@ -36,9 +36,12 @@ For explicit client exports, use the [offline daily usage importer](DAILY-USAGE.
 to produce a private request receipt and task summary. It preserves missing
 coverage and reports observed usage rather than claiming savings.
 
-1. Call `repository_status` and confirm its root. If freshness is `stale` or
-   `unknown`, call `repository_refresh`; an `unavailable` index is built by the
-   first search, explore or coverage call. `current` only covers the bounded,
+1. Call the retrieval tool you need, passing the selected checkout as
+   `expectedRoot`; no status or refresh call comes first. Packet, explore,
+   coverage and graph build an unbuilt index on first use and refresh a stale one
+   when `expectedGeneration` is omitted. Search builds on first use but does not
+   refresh, so call `repository_refresh` before it after a pull, merge or branch
+   switch. `repository_status` is a diagnostic. `current` only covers the bounded,
    allowlisted manifest, not every file in the repository.
 2. Search for one exact ASCII identifier, starting small:
 
@@ -57,9 +60,11 @@ coverage and reports observed usage rather than claiming savings.
    If more matches are needed, pass the returned `nextCursor` into the next
    search with the same term. Each cursor is single-use and expires after five
    minutes. Successful refresh invalidates previous cursors.
-4. After edits, refresh explicitly. Failed refresh retains the old generation;
-   do not treat it as updated. On missing evidence, exclusions or quota failure,
-   use bounded `rg`/file reads and record the fallback.
+4. After edits, packet, explore, coverage and graph refresh on demand when
+   `expectedGeneration` is omitted; refresh explicitly before search. Failed
+   refresh retains the old generation; do not treat it as updated. On missing
+   evidence, exclusions or quota failure, use bounded `rg`/file reads and record
+   the fallback.
    Changed or unverifiable repository policy blocks old-snapshot search until a
    successful refresh; inspect `repository_status.policy` to diagnose it.
 5. Record the task, source commit and working-tree changes, client/model/effort,

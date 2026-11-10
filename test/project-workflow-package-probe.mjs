@@ -35,10 +35,11 @@ try {
   assert.ok((await client.listTools()).tools.some(t=>t.name==='repository_graph'));
   const initial = await call('repository_status');
   assert.equal(initial.freshness, 'unavailable');
-  assert.equal(initial.nextAction.arguments.expectedRoot, root);
-  const status = await call(initial.nextAction.name, initial.nextAction.arguments);
+  assert.match(initial.note, /refresh only before search/);
+  assert.equal(initial.nextAction, undefined);
+  const status = await call('repository_refresh');
   assert.equal(status.freshness, 'current');
-  assert.equal((await call('repository_status')).nextAction, undefined);
+  assert.equal((await call('repository_status')).note, undefined);
   const query = await call('repository_graph',{expectedGeneration:status.generation,query:{action:'symbol',symbol:'target'}});
   assert.equal(query.nodes[0].name,'target');
   for(const [path,line,startLine,endLine]of[['lib.rs',3,1,4],['Api.kt',4,3,5]]) {

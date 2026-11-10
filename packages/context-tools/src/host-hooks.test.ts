@@ -63,6 +63,12 @@ it('startup selects only the current Git checkout and leaves a parent workspace 
   const parent=await fixture();const other=JSON.parse(await startupContext({cwd:parent,hook_event_name:'SessionStart'},opts))
   expect(other.hookSpecificOutput.additionalContext).toContain('"checkout":null');expect(other.hookSpecificOutput.additionalContext).not.toContain(JSON.stringify(root)+'\n')
   const kimi=await startupContext({cwd:root,hook_event_name:'UserPromptSubmit'},{...opts,host:'kimi'});expect(kimi.startsWith('Z1P repository context')).toBe(true)
+  // Retrieval tools build and refresh on demand, so the hook never prescribes status-first or a startup coordination read.
+  for(const text of [result.hookSpecificOutput.additionalContext,other.hookSpecificOutput.additionalContext,kimi]){
+    expect(text).toContain('Call repository_* tools directly');expect(text).toContain('deferred tools are not absent tools')
+    expect(text).not.toContain('read repository_status');expect(text).not.toContain('call repository_status and');expect(text).not.toContain('repository_coordination')
+    expect(text).not.toContain('SKILL.md');expect(text).not.toContain('connect')
+  }
   await expect(startupContext({cwd:root,hook_event_name:'PreToolUse'},opts)).rejects.toThrow(/input/)
 })
 
@@ -77,7 +83,7 @@ it('respects Git discovery ceilings while ignoring environment redirects',async(
     const output=JSON.parse(await startupContext({cwd:parent,hook_event_name:'SessionStart'},{host:'claude',skill:join(root,'skills/z1p-context/SKILL.md'),command}))
     expect(output.hookSpecificOutput.additionalContext).toContain('"checkout":null')
     expect(output.hookSpecificOutput.additionalContext).toContain('"sourceFreshness":"not-checked"')
-    expect(output.hookSpecificOutput.additionalContext).toContain("'ROOT'")
+    expect(output.hookSpecificOutput.additionalContext).toContain('not a checkout')
   } finally {
     for(const [key,value]of [['GIT_CEILING_DIRECTORIES',previous.ceiling],['GIT_DIR',previous.dir]]as const)if(value===undefined)delete process.env[key];else process.env[key]=value
   }

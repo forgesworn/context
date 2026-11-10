@@ -59,6 +59,8 @@ try {
     assert.equal(preview.applied, false); assert.equal(preview.action, 'install'); assert.equal(preview.path, file)
     assert.ok(preview.block.startsWith(START) && preview.block.endsWith(END))
     assert.ok(preview.block.includes(JSON.stringify(skillPath)))
+    assert.ok(preview.block.includes('do not call repository_status or repository_refresh first'))
+    assert.ok(!preview.block.includes('read repository_status') && !preview.block.includes('call repository_status and'))
     assert.ok(preview.block.includes("'connect' 'ROOT' '--cache-dir' " + "'" + cache + "'"))
     assert.ok(preview.block.includes("'" + cli + "'") || preview.block.includes("'" + realpathSync(cli) + "'"))
 

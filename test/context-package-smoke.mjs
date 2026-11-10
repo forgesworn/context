@@ -69,7 +69,7 @@ export const view = await vault.create({ title: 'Independent consumer', scope: '
   `], { cwd: consumer, stdio: 'pipe' })
   const toolsConsumer = install('tools-consumer', [core, tools])
   checkNotices(toolsConsumer, '@forgesworn/context-tools')
-  for (const resource of ['SKILL.md', 'references/ollama-worker.md']) {
+  for (const resource of ['SKILL.md', 'references/coordination.md', 'references/handover.md', 'references/shell-connection.md', 'references/ollama.md', 'references/ollama-worker.md']) {
     assert.equal(readFileSync(join(toolsConsumer, 'node_modules/@forgesworn/context-tools/dist/skill', resource), 'utf8'), readFileSync(join(checkout, 'skill', resource), 'utf8'))
   }
   const cli = join(toolsConsumer, 'node_modules/@forgesworn/context-tools/bin/encrypted-context.mjs')
