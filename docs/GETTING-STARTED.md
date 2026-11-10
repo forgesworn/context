@@ -292,15 +292,14 @@ Ask the agent:
 > code. Report the file, lines, generation and source hash. Do not edit source
 > or access another repository.
 
-For packet calls, a concrete exact-range example is below. Replace the generation,
-path and lines with values from your repository; this is MCP tool input, not a
+For packet calls, a concrete exact-range example is below. Replace the path
+and lines with values from your repository; this is MCP tool input, not a
 shell command:
 
 ```json
 {
   "mode": "build",
   "expectedRoot": "/absolute/path/to/your-project",
-  "expectedGeneration": "generation returned by repository_refresh",
   "maxBytes": 8192,
   "spec": {
     "version": 1,

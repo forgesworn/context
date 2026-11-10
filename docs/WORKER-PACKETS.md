@@ -33,12 +33,13 @@ These are task boundaries for review, not a filesystem sandbox.
 The repository navigation server also exposes `repository_packet`. A client can
 request source directly without invoking the checkout helper or writing a task
 specification to disk. Restart the server after installing/building this version,
-then call `repository_refresh` and retain its `generation`.
+then request the packet directly: without `expectedGeneration` it builds the
+index on first use and refreshes a stale one. Pass a generation returned by
+`repository_refresh` only to pin one.
 
 ```json
 {
   "mode": "plan",
-  "expectedGeneration": "generation returned by repository_refresh",
   "maxBytes": 65536,
   "spec": {
     "version": 1,

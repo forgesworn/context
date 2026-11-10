@@ -110,15 +110,18 @@ Another checkout requires another connection. Discover current tool schemas
 on demand with `{"id":1,"name":"tools"}`.
 
 ```json
-{"id":2,"name":"repository_refresh"}
+{"id":2,"name":"repository_packet","arguments":{"mode":"build","spec":{"sources":[{"path":"README.md","startLine":1,"endLine":20}]}}}
 {"id":3,"name":"repository_search","arguments":{"term":"knownIdentifier","format":"json","maxResults":5}}
 {"id":4,"name":"repository_coordination","arguments":{"afterMessage":0,"maxBytes":16384}}
 ```
 
-Use the returned refresh generation with `repository_explore`,
-`repository_packet` and `repository_coverage`, exactly as with native MCP. Read
-the source packet, refresh after edits and retain pagination cursors only for
-their current generation. Handover save/resume uses the same tool names and
+The first request needs no prior status or refresh: packet, explore, coverage
+and graph build the index on first use and refresh a stale one when
+`expectedGeneration` is omitted, exactly as with native MCP. Poll coordination
+only when another session may edit the same checkout or notes are expected.
+Read the source packet, call `repository_refresh` before search after a pull,
+merge or branch switch, and retain pagination cursors only for their current
+generation. Handover save/resume uses the same tool names and
 private checkout-scoped storage; a new host still revalidates the checkpoint.
 Never reuse a generation from another connection.
 

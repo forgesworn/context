@@ -32,6 +32,22 @@ it('previews without writes, applies idempotently, and removes only its own byte
   expect((await setupHost({ ...options, remove: true })).action).toBe('absent')
 })
 
+it('tells the agent to call retrieval tools directly and stays short without its shell command', async () => {
+  const { root, options } = await fixture()
+  const cache = join(root, 'cache'); await mkdir(cache)
+  for (const block of [(await setupHost(options)).block, (await setupHost({ ...options, cacheDirectory: cache })).block]) {
+    expect(block).toContain('do not call repository_status or repository_refresh first')
+    expect(block).toContain('Call repository_refresh only before repository_search')
+    expect(block).toContain(JSON.stringify(join(root, 'skills', 'z1p-context', 'SKILL.md')))
+    expect(block).not.toContain('read repository_status'); expect(block).not.toContain('call repository_status and')
+    expect(block).not.toContain('At the start of project work'); expect(block).not.toContain('load the shared z1p-context skill')
+    // The managed section is resent every session, so the quoted command, which varies by machine, is outside the budget.
+    const withoutCommand = block.replace(/(shell connection: ).*?(\. Substitute)/s, '$1$2')
+    expect(withoutCommand.length).toBeLessThan(block.length)
+    expect(Buffer.byteLength(withoutCommand)).toBeLessThan(2000)
+  }
+})
+
 it('targets the effective Codex override and leaves the base untouched', async () => {
   const { root, options } = await fixture()
   await writeFile(join(root, 'AGENTS.md'), '# Base\n')

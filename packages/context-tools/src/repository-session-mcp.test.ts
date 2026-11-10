@@ -34,6 +34,19 @@ async function connect(storage?: string) {
   return { client, close: async () => { await client.close(); await session.close() } }
 }
 
+it('serves a packet as the first call on an unbuilt index and tells callers retrieval builds on demand', async () => {
+  const f = await fixture(), c = await connect(f.storage)
+  try {
+    const instructions = c.client.getInstructions() ?? ''
+    expect(instructions).toContain('build and refresh on demand when expectedGeneration is omitted; refresh before search after source changes')
+    expect(instructions).not.toContain('use its generation for packets')
+    // No prior status or refresh, and no expectedGeneration.
+    const result = value(await c.client.callTool({ name: 'repository_packet', arguments: { expectedRoot: f.repositories[0], mode: 'build', format: 'json', spec: { sources: [{ path: 'example.ts' }] } } }))
+    expect(result.navigation.refreshed).toBe(true)
+    expect(result.packet.sources[0].text).toContain("sharedMarker = 'first'")
+  } finally { await c.close() }
+})
+
 it('advertises context without a checkout and requires explicit canonical repository selection', async () => {
   const f = await fixture(), c = await connect(f.storage)
   try {

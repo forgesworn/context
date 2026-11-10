@@ -1,24 +1,28 @@
 # Host startup guidance
 
 Use `setup` to add a short, managed Z1P section to a coding host's global
-instructions. It tells fresh sessions to load the shared skill, select the
-authorised Git checkout explicitly, and use the repository tools or shell
-fallback. It does not install the skill or configure MCP.
+instructions. It tells fresh sessions to select the authorised Git checkout
+explicitly, call the repository tools directly, use the shell fallback only when
+they are absent and read the shared skill only for detail. It does not install
+the skill or configure MCP.
 
 This is the default for project work: the user does not need to
 mention Context or invoke the skill. One user-level setup applies to every
 explicitly selected project. No per-project application dependency is needed.
 
-Start with a quick status and, when configured, coordination check before
-investigating project source. Behaviour changes also use activity, source
-packets and a fresh checkpoint. A short bug fix requiring behaviour discovery
-or regression tests follows that workflow; its size does not exempt it. A
-trivial correction in an already identified file needs only the quick check.
+Call the retrieval tool you need directly; no status, coordination or refresh
+call comes first. Packet, explore, coverage and graph build the index on first
+use and refresh a stale one when `expectedGeneration` is omitted; call
+`repository_refresh` only before search after a pull, merge or branch switch.
+Behaviour changes use source packets. Activity, note polling and checkpoints are
+for another session that may edit the same checkout, expected notes or work that
+continues in another session or host. A short bug fix requiring behaviour
+discovery or regression tests follows that workflow; its size does not exempt it.
+A trivial correction in an already identified file needs only a direct read.
 Deferred native schemas should be discovered through the host tool search,
-rather than treated as a missing server. An unavailable, stale or unknown index
-requires `repository_refresh` before packets; it is not a missing tool. MCP
-status supplies a root-bound `nextAction` for that recovery without building
-the index itself.
+rather than treated as a missing server. `repository_status` is a diagnostic:
+for an unavailable, stale or unknown index it carries a `note` saying that
+retrieval builds and refreshes on demand, and it does not build the index itself.
 
 ## Automatic host hooks
 
@@ -47,10 +51,11 @@ Claude and Codex use `SessionStart`; Kimi uses `UserPromptSubmit`, whose stdout
 is appended to model context. Kimi's observation-only `SessionStart` does not
 provide that contract. The installed `startup` command reads bounded hook input,
 selects only the Git checkout containing the supplied local working directory,
-and supplies the shared skill location and connection workflow. A parent
-workspace remains unselected. It reads Git metadata, never source, runs no
-project scripts and claims no fresh index or native tool discovery. Source
-retrieval and task activity still follow the shared skill.
+and supplies a short reminder to call the repository tools directly. The shared
+skill location and shell fallback come from the managed instruction section. A
+parent workspace remains unselected. It reads Git metadata, never source, runs
+no project scripts and claims no fresh index or native tool discovery. Source
+retrieval and any task activity follow the shared skill.
 
 **Codex requires the owner to review and trust a new or changed hook through
 `/hooks`.** The installer reports `trustReviewRequired`; it does not write trust
