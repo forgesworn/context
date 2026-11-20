@@ -1,0 +1,15 @@
+# Z1P Core
+
+> Local code graphs and bounded source evidence for coding agents, with an MCP integration and a local workspace dashboard.
+
+## Documentation
+
+- [Get started](https://github.com/forgesworn/context/blob/main/docs/GETTING-STARTED.md): Build from source and connect to Codex or Claude Code.
+- [MCP configuration](https://github.com/forgesworn/context/blob/main/docs/GLOBAL-SESSIONS.md): Select the checkout explicitly in global coding sessions.
+- [Project overview](https://github.com/forgesworn/context/blob/main/README.md): Capabilities and links to detailed guides.
+
+## ForgeSworn ecosystem
+
+- [ForgeSworn library guide](https://forgesworn.dev/llms.txt): Find related libraries, tools and integration guides by task and runtime.
+- [ForgeSworn on GitHub](https://github.com/forgesworn): Browse the organisation’s public repositories.
+- [Project source](https://github.com/forgesworn/context): Canonical source repository, documentation and release information.
